@@ -118,10 +118,11 @@
         </div>
         <div class="table-wrap">
           <table class="data trucks">
-            <thead><tr><th>Truck and load</th><th>Now</th><th class="num">Duty left</th></tr></thead>
+            <thead><tr><th>Truck and load</th><th>Now</th><th>Next check-in</th><th>Schedule risk</th><th>Route watch</th><th class="num">Duty left</th></tr></thead>
             <tbody id="fleet-list"></tbody>
           </table>
         </div>
+        <p class="note">Simulated check-ins. Schedule risk is an illustrative assumption: extra delay is uniformly spread from 0 to the smaller of 30 minutes or 25% of remaining trip time. It estimates arrival after the appointment starts, and is not a measured traffic forecast. A detour is a contingency, never an automatic dispatch.</p>
       </div>
 
       <div id="view-method" class="view view-method" role="tabpanel" aria-label="Data and method" hidden>
@@ -178,6 +179,7 @@
             <div><dt>Appointments within reach</dt><dd id="monitor-feasible">—</dd></div>
           </dl>
           <p id="monitor-environment" class="note"></p>
+          <div id="monitor-alerts" class="monitor-alerts" aria-live="polite"></div>
           <p id="monitor-note" class="note"></p>
           <div class="jump">
             <h2>Introduce an incident</h2>

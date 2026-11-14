@@ -301,6 +301,7 @@ function updateFrame() {
   const states = tracks.map((track) => stateAt(track, currentTime));
   renderer?.update(states);
   updateFleetLive(states);
+  updateFleetWatch(states);
   updateTruckCard(states);
   updateEventFeed();
   updateTally();
@@ -364,10 +365,16 @@ function updateTruckCard(states) {
   const [label, tone] = activity[state.segment.kind] ?? [state.segment.kind, "planned"];
   const next = playback.events.find((event) => event.truck === state.id && event.t > currentTime + 0.01);
   const until = state.segment.kind === "idle" ? "" : ` until ${clockLabel(state.segment.t1)}`;
+  const watchText = (selector) => [...(document.querySelector(selector)?.childNodes ?? [])].map((part) => part.textContent.trim()).filter(Boolean).join(" · ") || "—";
+  const checkin = watchText(`[data-checkin="${state.id}"]`);
+  const risk = watchText(`[data-risk="${state.id}"]`);
+  const route = watchText(`[data-route-watch="${state.id}"]`);
   card.hidden = false;
   card.innerHTML = `<div class="truck-card-head"><b>${esc(state.id)}</b>${tag([label, tone])}<button class="link" type="button" data-truck="${esc(state.id)}">Close</button></div>
     <p>${esc(state.segment.text)}${until}.</p>
     ${next ? `<p class="muted">Next, ${clockLabel(next.t)}: ${esc(next.text)}</p>` : ""}
+    <p><b>Next check-in:</b> ${esc(checkin)}. <b>Schedule risk:</b> ${esc(risk)}.</p>
+    <p class="muted">Route watch: ${esc(route)}.</p>
     <p class="muted">${esc(truck.fuel)}, ${truck.duty_remaining_hr} h duty left at ${clockLabel(playback.start)}</p>`;
 }
 
@@ -1026,9 +1033,59 @@ function renderFleet() {
   $("#fleet-list").innerHTML = scenario.trucks.map((truck) => `<tr class="${truck.id === selectedTruck ? "selected" : ""}">
     <td><button class="link" type="button" data-truck="${esc(truck.id)}" aria-pressed="${truck.id === selectedTruck}">${esc(truck.id)}</button><span class="detail">${esc(truck.assignment)}, ${esc(truck.fuel.toLowerCase())}</span></td>
     <td class="live" data-live="${esc(truck.id)}"></td>
+    <td data-checkin="${esc(truck.id)}"></td>
+    <td data-risk="${esc(truck.id)}"></td>
+    <td data-route-watch="${esc(truck.id)}"></td>
     <td class="num">${truck.duty_remaining_hr} h</td>
   </tr>`).join("");
   liveKeys.clear();
+  fleetWatchKey = "";
+}
+
+let fleetWatchKey = "";
+function updateFleetWatch(states) {
+  if (!playback || !scenario) return;
+  const key = `${activeScenario}|${plan.action}|${plan.road}|${Math.floor(currentTime)}`;
+  if (key === fleetWatchKey) return;
+  fleetWatchKey = key;
+  const routes = Object.fromEntries(scenario.routes.map((route) => [route.id, route]));
+  const fallback = scenario.decision_model.blockage?.fallback_route;
+  const watched = [];
+  for (const state of states) {
+    const next = playback.events.filter((event) => event.truck === state.id && event.t > currentTime + 0.01 && event.text.startsWith("Checks in"))
+      .map((event) => ({ event, shipment: scenario.shipments.find((shipment) => event.text.includes(shipment.id)) }))
+      .find(({ shipment }) => shipment);
+    const checkin = document.querySelector(`[data-checkin="${state.id}"]`);
+    const riskCell = document.querySelector(`[data-risk="${state.id}"]`);
+    const routeCell = document.querySelector(`[data-route-watch="${state.id}"]`);
+    if (!checkin || !riskCell || !routeCell) continue;
+    if (!next) {
+      checkin.textContent = "Deliveries complete";
+      riskCell.textContent = "—";
+      routeCell.textContent = "—";
+      continue;
+    }
+    const { event, shipment } = next;
+    const appointmentStart = clockMinutes(shipment.appointment.split("–")[0]);
+    const buffer = appointmentStart - event.t;
+    const remaining = Math.max(0, event.t - currentTime);
+    const delayRange = Math.min(30, remaining * 0.25);
+    const chance = buffer < 0 ? 100 : delayRange > 0 ? Math.round(clamp((delayRange - buffer) / delayRange, 0, 1) * 100) : 0;
+    const routeId = plan.action === "reroute" && shipment.id === scenario.disruption.affected_shipment ? fallback : shipment.route;
+    const route = routes[routeId];
+    const activeDetour = routeId === fallback && shipment.route !== fallback;
+    const canDetour = routeId === scenario.decision_model.blockage?.route && routes[fallback];
+    checkin.innerHTML = `${clockLabel(event.t)}<span class="detail">${esc(shipment.id)} · ${Math.max(0, Math.round(remaining))} min away</span>`;
+    riskCell.innerHTML = `<span class="status ${chance >= 50 ? "risk" : chance >= 20 ? "watch" : "ok"}">${chance}% assumed</span><span class="detail">${buffer >= 0 ? `${Math.round(buffer)} min before` : `${Math.round(-buffer)} min after`} appointment start</span>`;
+    routeCell.innerHTML = `${esc(route?.name ?? routeId)}<span class="detail">${activeDetour ? "Detour in simulated plan" : canDetour ? `${esc(routes[fallback].name)} · contingency only` : "No modeled fallback for this trip"}</span>`;
+    if (chance >= 20) watched.push({ truck: state.id, shipment: shipment.id, chance, buffer });
+  }
+  if (step === "monitor") {
+    watched.sort((a, b) => b.chance - a.chance);
+    $("#monitor-alerts").innerHTML = watched.length
+      ? `<h2>Schedule watch <small>illustrative · assumed</small></h2><ul>${watched.slice(0, 3).map((item) => `<li><button class="link" type="button" data-truck="${esc(item.truck)}">${esc(shortTruck(item.truck))}</button> · ${esc(item.shipment)}: ${item.chance}% chance of arriving after the appointment starts (${item.buffer >= 0 ? `${Math.round(item.buffer)} min buffer` : `${Math.round(-item.buffer)} min past start`}).</li>`).join("")}</ul>`
+      : '<h2>Schedule watch</h2><p>No modeled trip is near its appointment start.</p>';
+  }
 }
 
 function renderConditions() {
@@ -1279,6 +1336,8 @@ function renderMonitor() {
   const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
   $("#monitor-note").textContent = unassigned ? `${unassigned} load${unassigned === 1 ? " needs" : "s need"} a truck.` : "";
   $("#monitor-incidents").innerHTML = stories.filter((item) => !item.normal).map(jumpButton).join("");
+  fleetWatchKey = "";
+  if (tracks.length) updateFleetWatch(tracks.map((track) => stateAt(track, currentTime)));
   if (tracks.length) updateMonitorLive(tracks.map((track) => stateAt(track, currentTime)));
 }
 
