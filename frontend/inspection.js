@@ -23,7 +23,7 @@ function renderCase() {
   showSource = false;
   photo.src = selected.annotated_image;
   photo.alt = `${selected.title}. ${selected.review_note}`;
-  document.querySelector("#inspection-title").textContent = selected.title;
+  document.querySelector("#inspection-case-title").textContent = selected.title;
   document.querySelector("#inspection-finding").textContent = labels[selected.visual_label] || "Visual review required";
   document.querySelector("#inspection-note").textContent = selected.review_note;
   document.querySelector("#inspection-count").textContent = selected.image_quality === "unavailable"

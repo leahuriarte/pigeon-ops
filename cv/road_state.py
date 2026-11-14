@@ -17,6 +17,13 @@ DEFAULT_RULE = {
 }
 VISUAL_STATES = ("dense_traffic", "light_traffic", "unclear")
 SIGNAL_FOR_STATE = {"dense_traffic": "blocked", "light_traffic": "clear", "unclear": "inconclusive"}
+SIGNALS = ("blocked", "clear", "inconclusive")
+# Assumed, not measured: how often each visual state appears when the camera
+# looks at traffic approaching a blocked or an open road.
+ASSUMED_STATE_GIVEN_ROAD = {
+    "blocked": {"dense_traffic": 0.75, "unclear": 0.20, "light_traffic": 0.05},
+    "open": {"dense_traffic": 0.15, "unclear": 0.25, "light_traffic": 0.60},
+}
 
 
 def point_in_polygon(x, y, polygon):
@@ -83,10 +90,9 @@ def likelihood_table(pairs, smoothing=1.0):
     Additive smoothing keeps rare cells above zero, so a small evaluation set
     cannot make any signal look impossible.
     """
-    signals = tuple(SIGNAL_FOR_STATE[state] for state in VISUAL_STATES)
     table = {}
     for state in VISUAL_STATES:
-        counts = {signal: smoothing for signal in signals}
+        counts = {signal: smoothing for signal in SIGNALS}
         for reference, predicted in pairs:
             if reference == state:
                 counts[SIGNAL_FOR_STATE[predicted]] += 1
@@ -94,3 +100,15 @@ def likelihood_table(pairs, smoothing=1.0):
         table[state] = {signal: round(count / total, 4) for signal, count in counts.items()}
         table[state]["n"] = sum(1 for reference, _ in pairs if reference == state)
     return table
+
+
+def road_likelihoods(signal_given_state, state_given_road=ASSUMED_STATE_GIVEN_ROAD):
+    """P(signal | road state) for the decision engine's `drone.cv_only.likelihoods`.
+
+    Sums P(signal | visual state) * P(visual state | road) over visual states.
+    """
+    return {
+        road: {signal: round(sum(signal_given_state[state][signal] * share for state, share in shares.items()), 4)
+               for signal in SIGNALS}
+        for road, shares in state_given_road.items()
+    }

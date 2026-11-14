@@ -1,35 +1,59 @@
-# Repository Guidelines
+# PigeonOps agent guide
 
-## Project Structure & Module Organization
+PigeonOps is a one-day hackathon prototype (GeoAI track, perspective 3: resilience, cost and sustainability). A port dispatcher sees shipments on a map, a disruption appears, and the tool calculates whether a drone inspection is worth its cost before recommending a response. All data is synthetic (see DATA.md), no real drone is controlled, and the dispatcher makes every decision.
 
-PigeonOps is a synthetic logistics decision-support demo. `backend/decision_engine.py` handles loss scoring, action ranking, Bayesian updates, and information value. `backend/scenario.py` loads scenario data; `backend/server.py` serves the JSON API and static files. `run.py` is the entry point.
+## Run and test
 
-`frontend/` contains the HTML dashboard, JavaScript interactions, and CSS, including ArcGIS styling. `config/port_scenario.json` defines shipments, routes, weights, and action outcomes. Automated checks live in `tests/test_decision_engine.py`. Keep decision calculations in the backend and scenario-specific values in configuration.
+- `python run.py`, then open http://127.0.0.1:8000
+- `python -m unittest discover -s tests -v` must pass before every commit.
 
-`cv/` contains optional offline image/video inspection and evaluation tools. Follow `cv/README.md` for its separate Python environment and data downloads.
+## Who owns what
 
-## Build, Test, and Development Commands
+| Track | Owns |
+| --- | --- |
+| A: decision engine, route data, indicators | `backend/`, `config/`, `tests/`, `scripts/`, `DATA.md`, `docs/METHODS.md` |
+| B: map and dispatcher UI | `frontend/` except `frontend/evidence/` |
+| C: drone footage and computer vision | `cv/`, `frontend/evidence/` |
+| Shared, change only with team agreement | `AGENTS.md`, `CLAUDE.md`, `README.md`, `run.py`, `.gitignore` |
 
-Run commands from the repository root with Python 3.9 or newer. No package installation or build step is required.
+Never edit files another track owns. If you need a change there, say so in your final message instead.
 
-- `python run.py`: start the demo at `http://127.0.0.1:8000`.
-- `python -m unittest discover -s tests -v`: run the automated test suite.
-- `python -m unittest discover -v`: discover tests from the repository root.
+## Rules
 
-Use `python3` if that is your platform's Python executable. After frontend changes, check the dashboard in a browser, exercise simulated inspection results, and verify the schematic fallback when map resources are unavailable.
+- Everyone works on `main` for now. Do not create branches or worktrees. Pull before starting a task, keep commits small, and push often.
+- `backend/` uses the Python standard library only. Heavy dependencies (ultralytics, opencv) live in `cv/` with its own virtual environment and write precomputed files.
+- The frontend is plain HTML, CSS and JavaScript with no build step and no framework. The map is the ArcGIS Maps SDK for JavaScript 5.2 loaded from Esri's CDN with an OpenStreetMap basemap and no API key; keep it, and keep the offline SVG schematic fallback working. Other third-party libraries go in `frontend/vendor/`, not a CDN.
+- Label every stub, synthetic, assumed or estimated number, in data (`basis` or `data_provenance`) and in the UI. Never present one as measured. Synthetic ids use the `SYN-` prefix.
+- Recommendations are advisory. Nothing triggers an action without the dispatcher.
+- Do not change a contract below without the team agreeing. Update this file and `tests/test_contracts.py` in the same commit.
+- Do not add frameworks or change the stack.
 
-## Coding Style & Naming Conventions
+## Contracts
 
-Follow existing file conventions: four-space indentation and `snake_case` functions in Python; two-space indentation, `camelCase`, and semicolons in JavaScript. Python classes use `PascalCase`; constants use `UPPER_SNAKE_CASE`. Preserve existing JSON keys and use descriptive CSS classes. No formatter or linter is configured; avoid unrelated reformatting and keep dependencies minimal.
+### 1. Scenario data: `config/port_scenario.json`
 
-## Testing Guidelines
+One shared operating picture plus named variants:
 
-Use standard-library `unittest`, with files named `test_*.py` and methods named `test_*`. Add focused regression cases when changing ranking, probability updates, or information-value calculations. Keep tests deterministic with synthetic scenarios. No coverage threshold is configured; run the full suite before submitting changes.
+- Base fields: `map_bounds`, `locations[]`, `shipments[]`, `trucks[]`, `routes[]` (`id`, `name`, `role`, `color`, `points` as `[lat, lon]` pairs), `operations`, `data_provenance[]`, `decision_model` (weights, `drone` settings, `actions` with `open` and `blocked` outcomes and a `stakeholder_effect`).
+- `scenario_variants`: currently `normal` (inspection not worth it) and `disruption` (inspection worth it). `backend/scenario.py` deep-merges the chosen variant over the base; `shipment_overrides` and `truck_overrides` patch records by id.
+- Each variant sets `id`, `name`, `scenario_type`, a `disruption` (with `prior_blocked_probability`; the disruption variant also lists `evidence_clips`, clip ids in `frontend/evidence/`), and `indicators_stub`, the indicator list from contract 2, used until Track A calculates indicators.
+- Planned (Track A, A1): each route gains a GeoJSON LineString `geometry` with `[lon, lat]` coordinates, plus `distance_m` and `duration_s`.
 
-## Commit & Pull Request Guidelines
+### 2. API
 
-The short Git history uses plain descriptive subjects, such as `Integrate ArcGIS port map`; no formal commit convention is established. Prefer concise, imperative subjects. PRs should describe the behavior changed, explain validation, and link relevant issues when available. Include screenshots for dashboard changes and identify changes to model assumptions or scenario values.
+- `GET /api/scenarios` returns `{"scenarios": [{id, label}]}`.
+- `GET /api/scenario?scenario=<variant>` returns the merged scenario plus `analysis`. The default variant is `disruption`. Unknown variant returns 404.
+- `GET /api/analysis?scenario=<variant>&observation=<blocked|clear|inconclusive>` returns `scenario_id`, `prior_blocked_probability`, `posterior_blocked_probability`, `observation`, `before[]`, `after[]`, `evoi`, `sensitivity` (21 points of `{prior, net_value}` from 0 to 1) and `indicators`. Bad observation returns 400.
+- `indicators` is a list of `{id, label, value, unit, basis}`, plus `of` for `appointments_feasible`. Ids: `shipments_at_risk`, `appointments_feasible`, `expected_delay_min`, `added_miles`, `co2_kg`, `community_exposure`. `basis` is `stub`, `estimated`, `simulated` or `measured`. `value` may be `null` while not yet computed. Indicators describe the whole plan under the top-ranked option before any inspection.
 
-## Demo Boundaries & Configuration
+### 3. Inspection evidence: `frontend/evidence/<clip_id>.json`
 
-Use synthetic data and keep recommendations advisory. Do not add real drone commands or automatic dispatch. Preserve the offline map fallback. The current map requires no API key; never commit credentials if adding external services.
+Served at `/evidence/<clip_id>.json`. Fields: `clip_id`, `basis`, `label` (`blocked`, `clear` or `inconclusive`), `confidence` (0 to 1), `vehicle_count`, `stationary_count`, `flow_per_min`, `frames_analyzed`, `model`, `video` (path relative to `frontend/`, such as `evidence/<clip_id>.mp4`, or `null` until a clip exists), `location` (`{lat, lon}`), `location_simulated`, `source`, `license`.
+
+`confidence` is the classifier's own score, not the probability that the road is blocked. The engine's Bayes update uses the inspection accuracy in `decision_model.drone`.
+
+## Gotchas
+
+- Coordinate order: GeoJSON, OSRM and ArcGIS `paths` use `[lon, lat]`. The scenario's `points` use `[lat, lon]`.
+- Browsers refuse OpenCV's default mp4 codec. Re-encode clips with `ffmpeg -i in.mp4 -c:v libx264 -pix_fmt yuv420p -movflags +faststart out.mp4`.
+- The built-in Python server does not support HTTP range requests, so keep clips short; they play but may not seek.

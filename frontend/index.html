@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PigeonOps — Drone-Assisted Logistics Intelligence</title>
+  <title>PigeonOps dispatch</title>
   <link rel="stylesheet" href="https://js.arcgis.com/5.2/esri/themes/light/main.css">
   <script type="module" src="https://js.arcgis.com/5.2/"></script>
   <link rel="stylesheet" href="/styles.css">
@@ -12,71 +12,182 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="brand-mark">P</span><div><strong>PigeonOps</strong><small>Decision intelligence • simulation</small></div></div>
-    <div class="topbar-actions">
-      <div class="scenario-switch" role="group" aria-label="Demo scenario">
-        <button data-scenario="normal">Normal flow</button>
-        <button data-scenario="disruption" class="active">Changed condition</button>
-      </div>
-      <div class="status"><span class="pulse"></span> Simulation live <span id="clock"></span></div>
+    <div class="brand"><strong>PigeonOps</strong><span>Simulated dispatch data for the ports of Los Angeles and Long Beach</span></div>
+    <div class="topbar-controls">
+      <fieldset class="segmented" style="--n:2">
+        <legend class="visually-hidden">Scenario</legend>
+        <input type="radio" name="scenario" id="scenario-normal" value="normal"><label for="scenario-normal">Normal flow</label>
+        <input type="radio" name="scenario" id="scenario-disruption" value="disruption" checked><label for="scenario-disruption">Changed condition</label>
+        <span class="glider" aria-hidden="true"></span>
+      </fieldset>
+      <span class="scenario-clock">Scenario time <b id="scenario-time">—</b></span>
     </div>
   </header>
+
   <main>
-    <section class="hero panel">
-      <div><p class="eyebrow"><span id="scenario-eyebrow">ACTIVE DISRUPTION</span> <span id="disruption-id"></span></p><h1 id="disruption-title">Loading scenario…</h1><p id="disruption-description"></p></div>
-      <div class="risk-gauge"><span>Blockage likelihood</span><strong id="risk-value">—</strong><small>unverified prior</small></div>
-    </section>
-    <section id="ops-summary" class="ops-summary" aria-label="Operating summary"></section>
-    <section class="layout">
-      <div class="left-column">
-        <section class="panel map-panel">
-          <div class="panel-heading map-heading"><div><p class="eyebrow">NETWORK VIEW</p><h2>Port movement map</h2></div><div class="legend"><i class="route-primary"></i> Current <i class="route-detour"></i> Detour <i class="route-fleet"></i> Fleet</div></div>
-          <div class="map-shell">
-            <arcgis-map id="arcgis-map" class="arcgis-map" basemap="osm" center="-118.24, 33.80" zoom="11" aria-label="Interactive ArcGIS map of port shipments, trucks, and routes">
-              <arcgis-zoom slot="top-left"></arcgis-zoom>
-              <arcgis-popup slot="popup"></arcgis-popup>
-            </arcgis-map>
-            <svg id="map-fallback" class="hidden" viewBox="0 0 760 390" role="img" aria-label="Offline schematic map of Port of Los Angeles and Long Beach routes">
-              <defs><pattern id="grid" width="38" height="38" patternUnits="userSpaceOnUse"><path d="M38 0L0 0 0 38" fill="none" stroke="#d8e0e5"/></pattern></defs>
-              <rect width="760" height="390" fill="#edf3f5"/><rect width="760" height="390" fill="url(#grid)"/>
-              <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#c5e1e8"/>
-              <g id="routes"></g><g id="markers"></g><text x="20" y="370" class="water-label">SAN PEDRO BAY • OFFLINE SCHEMATIC</text>
-            </svg>
-            <div class="map-overlay"><span><b id="map-truck-count">—</b> trucks</span><span><b id="map-shipment-count">—</b> shipments</span><span><b id="map-risk-count">—</b> need attention</span></div>
-            <span id="map-provider" class="map-provider">Loading ArcGIS map…</span>
-          </div>
-          <div class="shipment-toolbar"><strong>Shipment queue</strong><div id="shipment-filters"><button data-filter="attention" class="active">Needs attention</button><button data-filter="all">All shipments</button></div></div>
-          <div id="shipment-strip" class="shipment-strip"></div>
-        </section>
-        <section class="panel">
-          <div class="panel-heading"><div><p class="eyebrow">DISPATCH OPTIONS</p><h2 id="ranking-title">Ranked before inspection</h2></div><span class="human-badge">Human approval required</span></div>
-          <div class="comparison-head"><span>Option</span><span>Late</span><span>Cost</span><span>CO₂</span><span>Breaches</span><span>Loss score</span></div>
-          <div id="rankings"></div>
-          <p class="fine-print">Scores combine configurable lateness, direct cost, emissions, and constraint penalties. Lower is better.</p>
-        </section>
+    <section class="decision" aria-labelledby="disruption-title">
+      <div class="decision-main">
+        <h1 id="disruption-title">Loading scenario…</h1>
+        <p id="disruption-description"></p>
+        <h2>Constraints</h2>
+        <ul id="constraints"></ul>
       </div>
-      <aside class="right-column">
-        <section class="panel">
-          <p class="eyebrow">EXPECTED VALUE OF INFORMATION</p><h2>Is inspection worth it?</h2>
-          <div id="recommendation" class="recommendation">Calculating…</div>
-          <div class="equation"><div><span>Act-now loss</span><strong id="act-loss">—</strong></div><b>−</b><div><span>With evidence</span><strong id="evidence-loss">—</strong></div><b>−</b><div><span>Inspection</span><strong id="inspection-cost">—</strong></div></div>
-          <div class="net-value"><span>Net information value</span><strong id="net-value">—</strong></div>
-          <p id="cv-only" class="cv-only"></p>
-          <details><summary>Show assumptions & formula</summary><div id="assumptions"></div></details>
-        </section>
-        <section class="panel observation-panel">
-          <p class="eyebrow">VISUAL EVIDENCE · DEMO</p><h2>Inspection review</h2>
-          <div class="feed" id="inspection-placeholder"><div class="scanline"></div><span>CALIFORNIA IMAGE LIBRARY</span><strong id="feed-label">Choose an image to review</strong></div>
-          <div id="selected-evidence" class="selected-evidence hidden"><img id="selected-evidence-image" alt="Reviewed road image"><p id="selected-evidence-title"></p><small>Reviewed external illustration applied to this fictional scenario.</small></div>
-          <p class="fine-print" id="drone-note"></p><button id="inspect-button" class="primary">Review California images</button>
-          <div id="observation-buttons" class="observation-buttons hidden"><p>Choose the observation returned by the stub:</p><button data-observation="blocked">Road blocked</button><button data-observation="clear">Road clear</button><button data-observation="inconclusive">Inconclusive</button></div>
-          <div id="posterior" class="posterior hidden"></div>
-        </section>
-        <section class="panel constraints"><p class="eyebrow">KNOWN CONSTRAINTS</p><ul id="constraints"></ul></section>
-        <section class="panel"><div class="panel-heading"><div><p class="eyebrow">FLEET CAPACITY</p><h2>Truck availability</h2></div><span id="fleet-count" class="count-badge">—</span></div><div id="fleet-list" class="fleet-list"></div></section>
-        <section class="panel"><p class="eyebrow">DATA CONFIDENCE</p><h2>What is real vs simulated?</h2><div id="provenance" class="provenance"></div><p class="fine-print">Shipment, truck, appointment and incident records are fictional. Inspection images are attributed external examples; they do not document the fictional incident. See DATA.md for sources.</p></section>
-      </aside>
+      <dl class="facts">
+        <div><dt>Blockage probability before inspection</dt><dd id="risk-value">—</dd></div>
+        <div><dt>Affected shipment</dt><dd id="affected">—</dd></div>
+        <div><dt>Decide by</dt><dd id="deadline">—</dd></div>
+        <div><dt>Model recommendation</dt><dd id="recommendation-short">—</dd></div>
+      </dl>
     </section>
+
+    <div class="row row-options">
+      <section class="block" aria-labelledby="options-title">
+        <div class="block-head"><h2 id="options-title">Dispatch options</h2><p id="ranking-state">Ranked by expected loss before inspection</p></div>
+        <div class="table-wrap">
+          <table class="data options">
+            <thead><tr><th class="num">#</th><th>Option</th><th class="num">Delay (min)</th><th class="num">Direct cost</th><th class="num">CO₂ (kg)</th><th class="num">Breaches</th><th class="num">Expected loss</th></tr></thead>
+            <tbody id="rankings"></tbody>
+          </table>
+        </div>
+        <p class="note">Delay, cost, CO₂ and breaches are averages of the open and blocked outcomes, weighted by the blockage probability. This page does not contact trucks or drivers.</p>
+      </section>
+
+      <section class="block" aria-labelledby="inspection-title">
+        <h2 id="inspection-title">Inspection</h2>
+        <p id="recommendation" class="recommendation">Calculating…</p>
+        <dl class="ledger">
+          <div><dt>Expected loss if you act now</dt><dd id="act-loss">—</dd></div>
+          <div><dt>Expected loss if you inspect first</dt><dd id="evidence-loss">—</dd></div>
+          <div><dt>Cost of inspecting</dt><dd id="inspection-cost">—</dd></div>
+          <div class="total"><dt>Net value of inspecting</dt><dd id="net-value">—</dd></div>
+        </dl>
+        <p id="cv-only" class="note"></p>
+        <figure id="selected-evidence" class="selected-evidence" hidden><img id="selected-evidence-image" alt="Reviewed road image"><figcaption id="selected-evidence-title"></figcaption><small>Reviewed external illustration applied to this fictional scenario.</small></figure>
+        <button id="inspect-button" class="button" type="button">Review inspection images</button>
+        <div id="observation-buttons" class="choices" hidden>
+          <p>Choose what the simulated feed reports:</p>
+          <div>
+            <button class="choice" type="button" data-observation="blocked">Road blocked</button>
+            <button class="choice" type="button" data-observation="clear">Road clear</button>
+            <button class="choice" type="button" data-observation="inconclusive">Inconclusive</button>
+          </div>
+        </div>
+        <p id="posterior" class="posterior" hidden></p>
+        <p class="note" id="drone-note"></p>
+        <details><summary>Assumptions</summary><dl id="assumptions" class="ledger"></dl></details>
+      </section>
+    </div>
+
+    <div class="row row-map">
+      <section class="block" aria-labelledby="map-title">
+        <div class="block-head">
+          <h2 id="map-title">Map</h2>
+          <ul class="legend">
+            <li class="only-disruption"><i class="swatch primary"></i>Current route</li>
+            <li class="only-disruption"><i class="swatch detour"></i>Detour</li>
+            <li><i class="swatch fleet"></i>Route ahead</li>
+            <li><i class="swatch arrow"></i>Moving</li>
+            <li><i class="swatch stopped"></i>Stopped</li>
+            <li class="only-disruption"><i class="swatch stopped stuck"></i>Stuck</li>
+          </ul>
+        </div>
+        <div class="map-shell">
+          <arcgis-map id="arcgis-map" class="arcgis-map" basemap="osm" center="-118.24, 33.80" zoom="12" popup-disabled aria-label="Map of port terminals, warehouses, trucks, and routes">
+            <arcgis-zoom slot="top-left"></arcgis-zoom>
+          </arcgis-map>
+          <svg id="map-fallback" class="hidden" viewBox="0 0 760 390" role="img" aria-label="Schematic map of Port of Los Angeles and Long Beach routes">
+            <rect width="760" height="390" fill="#f2f3f1"/>
+            <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#d6e3e8"/>
+            <text x="20" y="372" class="water-label">San Pedro Bay</text>
+            <g id="routes"></g><g id="markers"></g><g id="truck-marks"></g>
+          </svg>
+          <div class="map-clock" aria-hidden="true"><b id="map-clock">—</b><span>Simulated time</span></div>
+          <div id="truck-card" class="truck-card" hidden aria-live="polite"></div>
+        </div>
+        <div class="playback" aria-label="Playback">
+          <div class="playback-main">
+            <button id="play" class="play" type="button" aria-label="Play">
+              <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z"/></svg>
+              <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>
+            </button>
+            <div class="timeline">
+              <input id="timeline" type="range" min="0" max="1" step="0.25" value="0" aria-label="Simulated time">
+              <div id="timeline-ticks" class="ticks" aria-hidden="true"></div>
+              <div class="timeline-ends" aria-hidden="true"><span id="timeline-start">—</span><span id="timeline-end">—</span></div>
+            </div>
+            <label class="speed"><span class="visually-hidden">Playback speed</span>
+              <select id="playback-speed">
+                <option value="1">1 min/s</option>
+                <option value="5" selected>5 min/s</option>
+                <option value="15">15 min/s</option>
+              </select>
+            </label>
+          </div>
+          <div class="plan only-disruption">
+            <label class="plan-action">Play out
+              <select id="playback-action"></select>
+            </label>
+            <fieldset class="segmented" style="--n:2">
+              <legend class="visually-hidden">CA-47 road state</legend>
+              <input type="radio" name="road" id="road-open" value="open"><label for="road-open">CA-47 open</label>
+              <input type="radio" name="road" id="road-blocked" value="blocked"><label for="road-blocked">CA-47 blocked</label>
+              <span class="glider" aria-hidden="true"></span>
+            </fieldset>
+            <span id="plan-note" class="plan-note"></span>
+          </div>
+          <ol id="event-feed" class="event-feed" aria-live="polite"></ol>
+        </div>
+        <p class="note"><span id="map-provider">Loading map…</span> <span id="conditions"></span></p>
+      </section>
+
+      <section class="block" aria-labelledby="trucks-title">
+        <div class="block-head"><h2 id="trucks-title">Trucks</h2><p id="fleet-count"></p></div>
+        <div class="table-wrap">
+          <table class="data trucks">
+            <thead><tr><th>Truck and load</th><th>Now</th><th class="num">Duty left</th></tr></thead>
+            <tbody id="fleet-list"></tbody>
+          </table>
+        </div>
+        <p class="note">Select a truck, here or on the map, to follow it and list only its shipments.</p>
+      </section>
+    </div>
+
+    <section class="block" id="shipments" aria-labelledby="shipments-title">
+      <div class="block-head">
+        <h2 id="shipments-title">Shipments</h2>
+        <p id="shipment-count"></p>
+        <fieldset class="segmented" style="--n:2">
+          <legend class="visually-hidden">Shipment filter</legend>
+          <input type="radio" name="shipment-filter" id="filter-attention" value="attention" checked><label for="filter-attention">Needs attention</label>
+          <input type="radio" name="shipment-filter" id="filter-all" value="all"><label for="filter-all">All</label>
+          <span class="glider" aria-hidden="true"></span>
+        </fieldset>
+      </div>
+      <p id="truck-filter" class="filter-note" hidden>Showing shipments on <b id="truck-filter-id"></b>. <button class="link" type="button" id="clear-truck">Show all</button></p>
+      <div class="table-wrap">
+        <table class="data shipments">
+          <thead><tr><th>Shipment</th><th>Cargo</th><th>Priority</th><th>Truck</th><th>Appointment</th><th>ETA</th><th class="num">Slack</th><th>Status</th></tr></thead>
+          <tbody id="shipment-list"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="row row-ref">
+      <section class="block" aria-labelledby="sources-title">
+        <h2 id="sources-title">Data sources</h2>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Data</th><th>Type</th><th>Source</th></tr></thead>
+            <tbody id="provenance"></tbody>
+          </table>
+        </div>
+        <p class="note">The shipments, trucks, appointments, incident and inspection results are made up. DATA.md lists the sources and how the numbers were chosen.</p>
+      </section>
+      <section class="block" aria-labelledby="definitions-title">
+        <h2 id="definitions-title">Definitions</h2>
+        <dl id="definitions" class="definitions"></dl>
+      </section>
+    </div>
   </main>
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">
     <div class="inspection-header"><div><p class="eyebrow">EXTERNAL IMAGE · DISPATCHER REVIEW</p><h2 id="inspection-dialog-heading">Review visual evidence</h2></div><button id="inspection-close" class="inspection-close">Close</button></div>
@@ -85,18 +196,18 @@
       <label class="inspection-picker">Inspection image<select id="inspection-case"></select></label>
       <img id="inspection-photo" class="inspection-photo" alt="Road inspection image">
       <div class="inspection-photo-caption"><span id="inspection-count"></span><button id="inspection-image-toggle">Show source image</button></div>
-      <strong id="inspection-title"></strong><h3 id="inspection-finding" class="inspection-finding"></h3><p id="inspection-note" class="inspection-note"></p>
+      <strong id="inspection-case-title"></strong><h3 id="inspection-finding" class="inspection-finding"></h3><p id="inspection-note" class="inspection-note"></p>
       <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Road and debris markings are provisional visual annotations. Green boxes are vehicle detections.</span></div>
       <fieldset class="inspection-choices"><legend>Observation to use in the demo</legend>
         <label><input type="radio" name="inspection-observation" value="blocked">Visible obstruction</label>
         <label><input type="radio" name="inspection-observation" value="clear">No visible obstruction in this view</label>
         <label><input type="radio" name="inspection-observation" value="inconclusive">Insufficient evidence</label>
       </fieldset>
-      <p id="inspection-restriction" class="fine-print"></p>
+      <p id="inspection-restriction" class="note"></p>
       <label class="inspection-review-note">Review note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
       <p id="inspection-error" class="inspection-error" role="alert"></p>
     </div>
-    <div class="inspection-footer"><p>The source, observation and review time are saved locally. A dispatcher approves any logistics action.</p><button id="inspection-apply" class="primary" disabled>Use for demo</button></div>
+    <div class="inspection-footer"><p>The source, observation and review time are saved locally. A dispatcher approves any logistics action.</p><button id="inspection-apply" class="button" disabled>Use for demo</button></div>
   </dialog>
   <script type="module" src="/app.js"></script>
 </body>

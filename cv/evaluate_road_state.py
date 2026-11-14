@@ -10,7 +10,7 @@ import numpy as np
 
 from cv.benchmark import reference_boxes
 from cv.common import MODEL_CHOICES, ROOT, dataset_root, load_model, predict_frame
-from cv.road_state import DEFAULT_RULE, assess_road, likelihood_table, to_pixels
+from cv.road_state import DEFAULT_RULE, assess_road, likelihood_table, road_likelihoods, to_pixels
 
 
 def main():
@@ -74,6 +74,8 @@ def main():
         "rule": DEFAULT_RULE, "confusion_reference_to_detected": confusion,
         "agreement": round(sum(reference == detected for reference, detected in pairs) / len(pairs), 4),
         "signal_given_reference_state": likelihood_table(pairs),
+        # Paste into config decision_model.drone.cv_only.likelihoods.
+        "decision_engine_likelihoods": road_likelihoods(likelihood_table(pairs)),
         "evaluation": "Reference states apply the same rule to annotated boxes, so this measures detector-induced error only. "
                       "It does not measure whether dense traffic means a blocked road.",
         "scope": "China aerial imagery with hand-drawn road regions; frames from one video are correlated.",

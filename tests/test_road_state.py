@@ -1,6 +1,6 @@
 import unittest
 
-from cv.road_state import DEFAULT_RULE, assess_road, likelihood_table, point_in_polygon
+from cv.road_state import DEFAULT_RULE, assess_road, likelihood_table, point_in_polygon, road_likelihoods
 
 ROAD = [(0, 0), (1000, 0), (1000, 100), (0, 100)]
 
@@ -47,6 +47,13 @@ class RoadStateTests(unittest.TestCase):
             self.assertTrue(all(value > 0 for value in probabilities))
         self.assertEqual(1, table["dense_traffic"]["n"])
         self.assertEqual(0, table["unclear"]["n"])
+
+    def test_road_likelihoods_mix_visual_states(self):
+        perfect = {"dense_traffic": {"blocked": 1, "clear": 0, "inconclusive": 0},
+                   "light_traffic": {"blocked": 0, "clear": 1, "inconclusive": 0}}
+        table = road_likelihoods(perfect, {"blocked": {"dense_traffic": 1.0}, "open": {"dense_traffic": 0.5, "light_traffic": 0.5}})
+        self.assertEqual({"blocked": 1, "clear": 0, "inconclusive": 0}, table["blocked"])
+        self.assertEqual(0.5, table["open"]["clear"])
 
 
 if __name__ == "__main__":
