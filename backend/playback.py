@@ -5,14 +5,19 @@ or a stop at one place, with a start and end time in minutes after midnight. The
 frontend interpolates truck positions from these segments.
 
 Arrival times come from the shipment ETAs in the scenario, so the playback agrees
-with the shipments table. Road paths come from config/road_geometry.json, which
-scripts/build_road_geometry.py fills from OpenStreetMap routing. A leg missing from
-that file falls back to straight lines between its waypoints.
+with the shipments table. The affected truck follows the same trip that
+backend/outcomes.py prices for each dispatch option, along the scenario's route
+geometry, and arrives at the time that trip computes. Other legs take their road
+paths from config/road_geometry.json, which scripts/build_road_geometry.py fills
+from OpenStreetMap routing; a leg missing from that file falls back to straight
+lines between its waypoints.
 """
 
 import json
 import math
 from pathlib import Path
+
+from backend.outcomes import RouteModel
 
 ROOT = Path(__file__).resolve().parents[1]
 ROAD_GEOMETRY = ROOT / "config" / "road_geometry.json"
@@ -20,7 +25,7 @@ ROAD_GEOMETRY = ROOT / "config" / "road_geometry.json"
 FOCUS_TRUCK = "SYN-TRK-07"
 SWAP_TRUCK = "SYN-TRK-12"
 TRANSFER_SITE = "warehouse-6"
-# Anaheim St waypoints that keep the detour off the CA-47 connector.
+# Anaheim St waypoints that keep the truck swap off the CA-47 connector.
 DETOUR_VIA = [(33.7797, -118.2639), (33.7815, -118.2165)]
 LOAD_MIN = 15
 UNLOAD_MIN = 20
@@ -47,6 +52,31 @@ def _haversine_m(a, b):
     lat1, lon1, lat2, lon2 = map(math.radians, (*a, *b))
     h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
     return 6371000 * 2 * math.asin(math.sqrt(h))
+
+
+def route_piece(route, start, end):
+    """The part of a route's [lon, lat] LineString between two length fractions, in travel order."""
+    coords = route["geometry"]["coordinates"]
+    scale = math.cos(math.radians(coords[0][1]))
+    along = [0.0]
+    for a, b in zip(coords, coords[1:]):
+        along.append(along[-1] + math.hypot((b[0] - a[0]) * scale, b[1] - a[1]))
+    total = along[-1] or 1.0
+    low, high = sorted((start * total, end * total))
+
+    def at(distance):
+        for i in range(1, len(along)):
+            if along[i] >= distance:
+                span = along[i] - along[i - 1] or 1.0
+                f = (distance - along[i - 1]) / span
+                a, b = coords[i - 1], coords[i]
+                return [round(a[0] + (b[0] - a[0]) * f, 6), round(a[1] + (b[1] - a[1]) * f, 6)]
+        return coords[-1]
+
+    piece = [at(low)] + [c for c, d in zip(coords, along) if low < d < high] + [at(high)]
+    if end < start:
+        piece.reverse()
+    return piece, abs(end - start) * route["distance_m"]
 
 
 def load_geometry(path=ROAD_GEOMETRY):
@@ -185,31 +215,14 @@ class Planner:
         rest = [s for s in shipments if s is not affected]
         window_start = clock(affected["appointment"].split("–")[0])
         action = next(a for a in self.scenario["decision_model"]["actions"] if a["id"] == self.action)
-        lateness = action["outcomes"][self.road]["lateness_min"]
+        outcome = action["outcomes"][self.road]
+        lateness = outcome["lateness_min"]
         target = window_start + lateness if lateness > 0 else clock(affected["eta"])
         dest = affected["destination"]
         track = self.truck_start(truck, shipments)
-        has_incident = self.scenario.get("scenario_type") == "disruption" and "incident" in self.places
 
-        if self.action == "hold-course":
-            if has_incident:
-                self.drive(track, "incident", f"Carrying {affected['id']} toward the CA-47 connector", affected["id"],
-                           arrive=None if self.road == "blocked" else target - self.minutes(["incident", dest]), stretch=math.inf)
-                if self.road == "blocked":
-                    self.event(track, "Stopped by the obstruction on the CA-47 connector", "risk")
-                    self.stop(track, target - self.minutes(["incident", dest]), "blocked", "Stuck behind the obstruction on CA-47", affected["id"])
-                    self.event(track, "CA-47 reopens and traffic starts moving", "watch")
-                self.drive(track, dest, f"Carrying {affected['id']} to {self.name(dest)}", affected["id"], arrive=target, stretch=math.inf)
-            else:
-                self.drive(track, dest, f"Carrying {affected['id']} to {self.name(dest)}", affected["id"], arrive=target, stretch=math.inf)
-            self.deliver(track, affected, dest)
-            self.run_shipments(track, rest, first_loaded=False)
-            return [track]
-
-        if self.action == "reroute":
-            self.event(track, "Turns off CA-47 onto the Anaheim St detour", "watch")
-            self.drive(track, dest, f"Carrying {affected['id']} to {self.name(dest)} via Anaheim St", affected["id"],
-                       via=DETOUR_VIA, arrive=target, kind="detour", stretch=math.inf)
+        if action.get("plan") and "detail" in outcome:
+            self.follow_route_trip(track, affected, action["plan"]["route"], clock(outcome["detail"]["arrival"]))
             self.deliver(track, affected, dest)
             self.run_shipments(track, rest, first_loaded=False)
             return [track]
@@ -244,6 +257,53 @@ class Planner:
         self.run_shipments(helper, partner_loads[1:], first_loaded=False)
         tracks_by_id[SWAP_TRUCK] = helper
         return [track, helper]
+
+    def follow_route_trip(self, track, affected, route_id, arrival):
+        """Drive the trip backend/outcomes.py prices for this option, arriving at its computed time."""
+        model = RouteModel(self.scenario)
+        route = model.routes[route_id]
+        load = affected["id"]
+        origin = self.name(affected["origin"])
+        dest = self.name(affected["destination"])
+        pieces = []  # (route, from, to, kind, text, event before, tone) or ("wait", minutes, ...)
+        position = model.truck_at
+        if route is not model.current:
+            pieces.append((model.current, position, 0.0, "detour", f"Turning back to {origin} to take the detour", f"Turns back toward {origin} to take the detour", "watch"))
+            position = 0.0
+        if self.road == "blocked" and route is model.blocked_route and position < model.incident_at:
+            pieces.append((route, position, model.incident_at, "driving", f"Carrying {load} toward the CA-47 connector", None, None))
+            pieces.append(("wait", model.turnaround_min, "blocked", "Stuck in the queue at the obstruction, turning around", "Reaches the obstruction on CA-47 and has to turn around", "risk"))
+            pieces.append((route, model.incident_at, 0.0, "detour", f"Heading back to {origin} to take the detour", None, None))
+            pieces.append((model.fallback, 0.0, 1.0, "detour", f"Carrying {load} to {dest} on the detour", f"Back at {origin}, starts the detour", "watch"))
+        else:
+            kind = "driving" if route is model.current else "detour"
+            text = f"Carrying {load} to {dest}" + ("" if kind == "driving" else " on the detour")
+            event = None if kind == "driving" or route is model.current else f"Back at {origin}, starts the detour"
+            pieces.append((route, position, 1.0, kind, text, event, "watch"))
+
+        waits = sum(p[1] for p in pieces if p[0] == "wait")
+        drives = [(p, *route_piece(p[0], p[1], p[2])) for p in pieces if p[0] != "wait"]
+        distance = sum(d for _, _, d in drives) or 1.0
+        drive_time = max(arrival - track["t"] - waits, 1.0)
+        geometry = iter(drives)
+        for piece in pieces:
+            if piece[0] == "wait":
+                _, minutes, kind, text, event, tone = piece
+                self.event(track, event, tone)
+                track["segments"].append({
+                    "t0": round(track["t"], 2), "t1": round(track["t"] + minutes, 2), "kind": kind, "text": text,
+                    "shipment": load, "path": [list(track["segments"][-1]["path"][-1])],
+                })
+                track["t"] += minutes
+                continue
+            _, path, metres = next(geometry)
+            _, _, _, kind, text, event, tone = piece
+            if event:
+                self.event(track, event, tone)
+            end = track["t"] + drive_time * metres / distance
+            self._segment(track, track["t"], end, kind, text, load, path, metres)
+            track["t"] = end
+        track["place"] = affected["destination"]
 
     # Entry point --------------------------------------------------------------
     def build(self):
@@ -293,29 +353,12 @@ class Planner:
         }
 
     def alternatives(self):
-        """The two road choices for the focus truck, drawn as context on the map."""
-        truck = next(t for t in self.scenario["trucks"] if t["id"] == FOCUS_TRUCK)
-        affected = next(s for s in self.scenario["shipments"] if s["id"] == self.scenario["disruption"]["affected_shipment"])
-        here = (truck["lat"], truck["lon"])
-        dest = affected["destination"]
-        current = [here, "incident", dest] if "incident" in self.places and self.scenario.get("scenario_type") == "disruption" else [here, dest]
-        if current[1] == "incident":
-            first, _ = self.leg(current[:2])
-            second, _ = self.leg(current[1:])
-            current_path = first + second[1:]
-        else:
-            current_path, _ = self.leg(current)
-        detour_path, _ = self.leg([here, *DETOUR_VIA, dest])
+        """The planned and fallback routes for the affected load, drawn as context on the map."""
+        model = RouteModel(self.scenario)
         return [
-            {"id": "current", "name": "Current route via CA-47", "path": current_path},
-            {"id": "detour", "name": "Detour via Anaheim St", "path": detour_path},
+            {"id": key, "name": route["name"], "color": route["color"], "path": route["geometry"]["coordinates"]}
+            for key, route in (("current", model.current), ("detour", model.fallback))
         ]
-
-
-def default_choice(scenario, analysis, observation=None):
-    ranked = analysis["after"] if observation and analysis.get("after") else analysis["before"]
-    probability = analysis.get("posterior_blocked_probability", analysis.get("prior_blocked_probability", 0))
-    return ranked[0]["id"], "blocked" if probability >= 0.5 else "open"
 
 
 def build_playback(scenario, action="hold-course", road="open", geometry=None):

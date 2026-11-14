@@ -152,6 +152,7 @@ async function loadPlayback({ keepTime = false } = {}) {
   currentTime = keepTime ? clamp(currentTime, playback.start, playback.end) : playback.start;
   $("#timeline-start").textContent = clockLabel(playback.start);
   $("#timeline-end").textContent = clockLabel(playback.end);
+  playback.alternatives.forEach((alt) => document.documentElement.style.setProperty(`--route-${alt.id}`, alt.color));
   renderTicks();
   renderPlanNote();
   renderer?.setPlayback(playback, tracks);
@@ -179,7 +180,7 @@ function renderPlanNote() {
   $(`#road-${plan.road}`).checked = true;
   const outcome = scenario.decision_model.actions.find((a) => a.id === plan.action).outcomes[plan.road];
   $("#plan-note").textContent = outcome.lateness_min > 0
-    ? `${affectedShipment().id} arrives about ${outcome.lateness_min} min late in this case.`
+    ? `${affectedShipment().id} arrives about ${Math.round(outcome.lateness_min)} min late in this case.`
     : `${affectedShipment().id} arrives on time in this case.`;
 }
 
@@ -367,32 +368,18 @@ function createSchematicRenderer() {
 async function createArcGISRenderer() {
   const arcgis = globalThis.$arcgis;
   if (!arcgis?.import) throw new Error("ArcGIS SDK unavailable");
-  const [GraphicsLayer, Graphic, Basemap, TileLayer, Extent] = await arcgis.import([
+  const [GraphicsLayer, Graphic, Extent] = await arcgis.import([
     "@arcgis/core/layers/GraphicsLayer.js",
     "@arcgis/core/Graphic.js",
-    "@arcgis/core/Basemap.js",
-    "@arcgis/core/layers/TileLayer.js",
     "@arcgis/core/geometry/Extent.js",
   ]);
   const viewElement = $("#arcgis-map");
-  // Esri's public light gray canvas: quiet enough for routes and trucks to stand out, no API key needed.
-  const canvas = "https://services.arcgisonline.com/arcgis/rest/services/Canvas/";
-  const base = new TileLayer({ url: `${canvas}World_Light_Gray_Base/MapServer` });
-  viewElement.basemap = new Basemap({
-    title: "Light gray canvas",
-    baseLayers: [base],
-    referenceLayers: [new TileLayer({ url: `${canvas}World_Light_Gray_Reference/MapServer`, opacity: 0.8 })],
-  });
   await viewElement.viewOnReady();
-  let basemapNote = "Basemap: Esri light gray canvas.";
-  try {
-    await base.load();
-  } catch (error) {
-    console.warn("Light gray canvas unavailable, using OpenStreetMap:", error);
-    viewElement.basemap = "osm";
-    basemapNote = "Basemap: OpenStreetMap.";
-  }
-  viewElement.view.constraints = { minZoom: 10, maxZoom: 16, snapToZoom: false };
+  // Mute the OpenStreetMap tiles so routes and trucks stand out.
+  viewElement.map.basemap?.baseLayers.forEach((layer) => {
+    layer.effect = "grayscale(0.85) brightness(1.06) contrast(0.82)";
+  });
+  viewElement.view.constraints = { minZoom: 10, maxZoom: 18, snapToZoom: false };
 
   const layers = {
     alternatives: new GraphicsLayer({ title: "Route options" }),
@@ -433,7 +420,6 @@ async function createArcGISRenderer() {
   });
 
   return {
-    basemapNote,
     setScenario() {
       layers.places.removeAll();
       const style = {
@@ -465,7 +451,7 @@ async function createArcGISRenderer() {
       if (scenario.scenario_type === "disruption") {
         data.alternatives.forEach((alt) => {
           const strong = alternativeEmphasis(alt.id);
-          const color = alt.id === "current" ? colors.accent : colors.amber;
+          const color = alt.color;
           layers.alternatives.addMany([
             new Graphic({ geometry: line(alt.path), symbol: { type: "simple-line", color: rgba("#ffffff", strong ? 0.9 : 0.6), width: 9, cap: "round", join: "round" } }),
             new Graphic({ geometry: line(alt.path), symbol: { type: "simple-line", color: rgba(color, strong ? 0.95 : 0.4), width: 5, cap: "round", join: "round", style: alt.id === "detour" ? "short-dash" : "solid" } }),
@@ -555,7 +541,7 @@ async function drawMap() {
         renderer = await createArcGISRenderer();
         $("#map-fallback").classList.add("hidden");
         $("#arcgis-map").classList.remove("hidden");
-        $("#map-provider").textContent = `${renderer.basemapNote} Road paths from OpenStreetMap via OSRM. Trucks and schedules are simulated.`;
+        $("#map-provider").textContent = "Basemap and road paths from OpenStreetMap (roads routed with OSRM). Trucks and schedules are simulated.";
       } catch (error) {
         console.warn("Using the schematic map because ArcGIS failed to load:", error);
         renderer = createSchematicRenderer();

@@ -231,8 +231,8 @@ details .ledger { margin-top: 8px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: 13px; }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .swatch { width: 18px; height: 0; border-top: 3px solid; }
-.swatch.primary { border-color: #24508f; border-top-width: 4px; }
-.swatch.detour { border-top-style: dashed; border-top-width: 4px; border-color: #c27c0e; }
+.swatch.primary { border-color: var(--route-current, #24508f); border-top-width: 4px; }
+.swatch.detour { border-top-style: dashed; border-top-width: 4px; border-color: var(--route-detour, #c27c0e); }
 .swatch.fleet { border-top-width: 2px; border-color: #8a939b; }
 .swatch.arrow { width: 12px; height: 13px; border: 0; background: var(--ink); clip-path: polygon(50% 0, 100% 100%, 50% 74%, 0 100%); }
 .swatch.stopped { width: 9px; height: 9px; margin: 0 2px; border: 0; background: #7c858c; transform: rotate(45deg); }

@@ -2,6 +2,8 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+from backend.outcomes import apply_route_outcomes
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SCENARIO = ROOT / "config" / "port_scenario.json"
 
@@ -31,7 +33,7 @@ def load_scenario(path=DEFAULT_SCENARIO, variant="disruption"):
         _deep_merge(shipment, shipment_overrides.get(shipment["id"], {}))
     for truck in selected.get("trucks", []):
         _deep_merge(truck, truck_overrides.get(truck["id"], {}))
-    return selected
+    return apply_route_outcomes(selected)
 
 
 def available_scenarios(path=DEFAULT_SCENARIO):

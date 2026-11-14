@@ -2,7 +2,7 @@
 
 A dependency-light hackathon prototype for deciding **whether more information is worth gathering before a dispatcher acts**. The demo uses publicly calibrated synthetic Port of Los Angeles / Long Beach operations, a simulated road disruption, and a simulated observation feed. It never controls or deploys a real drone.
 
-The network view uses ArcGIS Maps SDK for JavaScript 5.2 with Esri's public light gray canvas basemap, which needs no API key (it falls back to OpenStreetMap if those tiles fail). A timeline under the map plays the morning forward: every truck moves along road-following paths, and in the disruption scenario you can play out each dispatch option with CA-47 open or blocked. If the CDN is unavailable, or the screen is narrower than 920px, an SVG schematic plays the same timeline.
+The network view uses ArcGIS Maps SDK for JavaScript 5.2 with a muted OpenStreetMap basemap and no API key. A timeline under the map plays the morning forward: every truck moves along road-following paths, and in the disruption scenario you can play out each dispatch option with CA-47 open or blocked. If the CDN is unavailable, or the screen is narrower than 920px, an SVG schematic plays the same timeline.
 
 Repository slug: `pigeon-ops`
 
@@ -17,12 +17,6 @@ python3 run.py
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flow** and **Changed condition**, inspect the shipment and truck network, then click **Run simulated inspection**. The ranked dispatcher options and blockage probability update immediately.
 
 The demo includes 12 fictional shipments, 9 fictional trucks, multiple port-to-warehouse corridors, appointment and readiness context, and visible data-provenance labels. Read [DATA.md](DATA.md) for the source inventory, modeling choices, and limitations.
-
-Run the automated checks with:
-
-```bash
-python3 -m unittest discover -v
-```
 
 Run the tests:
 
@@ -65,18 +59,21 @@ This is a decision-support prototype, not an operational safety or flight system
 ## Project layout
 
 ```text
-config/port_scenario.json     Scenario, map, shipments, weights, actions
-backend/decision_engine.py    Auditable scoring, ranking, Bayes, information value
-backend/scenario.py           Scenario loading and basic validation seam
+AGENTS.md                     Team rules, file ownership, data contracts (CLAUDE.md imports it)
+DATA.md                       Data sources, modeling choices, limitations
+config/port_scenario.json     Scenario, map, shipments, trucks, weights, actions, variants
+backend/decision_engine.py    Auditable scoring, ranking, Bayes, information value, sensitivity
+backend/scenario.py           Scenario loading and variant overlays
 backend/playback.py           Minute-by-minute truck schedules for the map timeline
 config/road_geometry.json     Saved road paths for every playback leg (from OSRM)
 scripts/build_road_geometry.py  Refreshes road_geometry.json after scenario edits
 backend/server.py             Tiny JSON API and static-file server
 frontend/index.html           Dashboard structure
 frontend/styles.css           Responsive visual design
+frontend/arcgis.css           ArcGIS map styles
 frontend/app.js               Map rendering and interaction
-tests/test_decision_engine.py Decision-model tests
-tests/test_playback.py        Playback schedule tests
+frontend/evidence/            Inspection evidence files from the CV pipeline
+tests/                        Decision-model, contract, and server tests
 run.py                        One-command entry point
 ```
 
@@ -100,25 +97,9 @@ Useful endpoints:
 - Add a `ScenarioRepository` behind `scenario.py` for SQLite, Postgres, or a logistics API.
 - Add authentication, audit logs, geofencing, aviation checks, and explicit authorization before considering any real-world field integration.
 
-## Suggested partner split
+## Team split
 
-**Partner A — operations and decision intelligence**
-
-- Add two scenarios (terminal congestion and missed appointment cascade).
-- Interview an operator/judge and tune weights, constraints, and labels.
-- Add sensitivity analysis: show when the recommendation flips as blockage probability or inspection time changes.
-- Prepare the demo narrative and validate that every metric is defensible.
-
-**Partner B — evidence and product experience**
-
-- Add a 10–20 second prerecorded inspection clip.
-- Implement a `cvAdapter` interface returning label, confidence, timestamp, and source.
-- Feed the playback from live truck positions instead of the planned schedule.
-- Add a dispatcher “Approve option” interaction and an in-memory audit trail.
-
-**Work together last**
-
-- Integrate one additional scenario, rehearse failure paths, run tests, and verify the demo without internet access.
+Three tracks (engine, map and UI, drone evidence) with separate file ownership, all working on `main`. See `AGENTS.md`.
 
 ## Guardrails
 
@@ -131,6 +112,6 @@ Useful endpoints:
 
 - ArcGIS Maps SDK for JavaScript requires no additional purchase when used with ArcGIS Location Platform. This demo loads the SDK from Esri's CDN.
 - ArcGIS Location Platform uses pay-as-you-go pricing. Esri-hosted basemap tiles currently include a free monthly allowance, then charge for additional usage.
-- PigeonOps does not configure an ArcGIS token or call a metered ArcGIS location service. Its basemap is Esri's public World Light Gray Canvas tile service on services.arcgisonline.com, which needs no key and is subject to Esri's terms of use; set the basemap back to `osm` in `frontend/app.js` to avoid Esri-hosted tiles entirely. Route paths were fetched once from OSRM and are served from this repository, and route and marker data stays client-side.
+- PigeonOps deliberately does not configure an ArcGIS token or call a metered ArcGIS location service. Its basemap is OpenStreetMap, road paths were fetched once from OSRM and are served from this repository, and route and marker data stays client-side.
 
 Official references: [SDK terms of use](https://developers.arcgis.com/javascript/latest/licensing/) and [ArcGIS Location Platform pricing](https://developers.arcgis.com/pricing/).

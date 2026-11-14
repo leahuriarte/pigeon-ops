@@ -146,8 +146,8 @@
 #map-fallback text { font-size: 11px; }
 .water-label { fill: #4f6f7a; }
 .alt { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.4; }
-.alt.current { stroke: #24508f; }
-.alt.detour { stroke: #c27c0e; stroke-dasharray: 9 7; }
+.alt.current { stroke: var(--route-current, #24508f); }
+.alt.detour { stroke: var(--route-detour, #c27c0e); stroke-dasharray: 9 7; }
 .alt.active { opacity: 0.95; }
 .trail { fill: none; stroke: #8a939b; stroke-linecap: round; stroke-linejoin: round; }
 .trail.ahead { stroke-width: 2.25; opacity: 0.65; }

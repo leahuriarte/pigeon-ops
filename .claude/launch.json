@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "pigeon-ops",
+      "name": "pigeonops",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["run.py"],
       "port": 8000
