@@ -10,7 +10,7 @@ from pathlib import Path
 import cv2
 import imageio_ffmpeg
 
-from cv.common import MODEL_CHOICES, ROOT, annotate, load_model, predict_frame
+from cv.common import MODEL_CHOICES, ROOT, annotate, load_model, predict_frame, write_report
 
 
 def main():
@@ -111,13 +111,10 @@ def main():
     }
     (output / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     summary = {key: value for key, value in evidence.items() if key != "frames"}
-    report = f'''<!doctype html><html lang="en"><meta charset="utf-8"><title>PigeonOps inspection review</title>
-<style>body{{font:16px system-ui;background:#102a35;color:#edf5f4;max-width:1100px;margin:30px auto;padding:20px}}video,img{{width:100%;border-radius:12px}}pre{{white-space:pre-wrap;background:#193c48;padding:20px}}a{{color:#64debd}}</style>
-<h1>Inspection evidence for human review</h1><p>Road state: <strong>inconclusive — review required</strong></p>
+    write_report(output, "Inspection evidence for human review", f'''<p>Road state: <strong>inconclusive — review required</strong></p>
 <p>{html.escape(str(evidence['creators']))}, <a href="{html.escape(evidence['dataset_url'] or '#', quote=True)}">{html.escape(evidence['dataset'])}</a>, {html.escape(evidence['license'] or 'license unspecified')}. Footage is separate from the fictional demo incident.</p>
 <video controls muted preload="metadata" src="annotated.mp4"></video><p>Sampled playback. Vehicle detections do not establish blockage or safety.</p>
-<pre>{html.escape(json.dumps(summary, indent=2))}</pre></html>'''
-    (output / "report.html").write_text(report, encoding="utf-8")
+''', summary)
     print(json.dumps(summary, indent=2), flush=True)
 
 

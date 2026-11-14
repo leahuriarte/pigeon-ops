@@ -84,7 +84,6 @@ def information_value(model, prior, likelihoods=None):
         "inspection_cost": round(inspection_cost, 2),
         "net_value_of_information": round(net_value, 2),
         "recommend_inspection": net_value > 0,
-        "missed_blockage_probability": round(likelihoods["blocked"]["clear"], 4),
         "formula": "Net EVI = best expected loss now − expected loss with observation − inspection cost",
         "assumptions": {
             "inspection_accuracy": drone["accuracy"],
@@ -129,10 +128,13 @@ def analyze(scenario, observation=None):
     evoi = information_value(model, prior)
     evoi["break_even_accuracy"] = break_even_accuracy(model, prior)
     # Automated CV alone, using the measured error table, for comparison with reviewed imagery.
-    cv_only = drone.get("cv_only")
-    evoi["cv_only"] = cv_only and {
-        "basis": cv_only["basis"], **information_value(model, prior, cv_only["likelihoods"]),
-    }
+    if "cv_only" in drone:
+        cv_value = information_value(model, prior, drone["cv_only"]["likelihoods"])
+        evoi["cv_only"] = {
+            "basis": drone["cv_only"]["basis"],
+            "net_value_of_information": cv_value["net_value_of_information"],
+            "recommend_inspection": cv_value["recommend_inspection"],
+        }
     return {
         "scenario_id": scenario.get("id"),
         "prior_blocked_probability": round(prior, 4),

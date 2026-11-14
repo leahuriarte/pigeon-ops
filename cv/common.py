@@ -1,5 +1,7 @@
-"""Paths and model output conversion shared by the offline CV commands."""
+"""Paths, model output conversion and report pages shared by the offline CV commands."""
 
+import html
+import json
 from pathlib import Path
 
 from cv.metrics import intersection_over_union
@@ -12,6 +14,18 @@ VEHICLE_NAMES = {"car", "bus", "truck", "small vehicle", "large vehicle"}
 # far more of them. Each member runs at the size that scored best on UAV-OBB.
 ENSEMBLES = {"aerial-ensemble": [("yolo11s.pt", 1280), ("yolo11m-obb.pt", 1024)]}
 MODEL_CHOICES = ["yolo11n.pt", "yolo11s.pt", "yolo11s-obb.pt", "yolo11m-obb.pt", *ENSEMBLES]
+
+REPORT_STYLE = ("body{font:16px system-ui;background:#102a35;color:#edf5f4;max-width:1150px;margin:30px auto;padding:20px}"
+                "img,video{width:100%;border-radius:12px}figure{margin:25px 0}a{color:#64debd}"
+                "pre{white-space:pre-wrap;background:#193c48;padding:20px;border-radius:12px}")
+
+
+def write_report(folder, title, intro_html, summary, extra_html=""):
+    """Write folder/report.html: heading, intro, the run summary as JSON, then any extra markup."""
+    page = (f'<!doctype html><html lang="en"><meta charset="utf-8"><title>{html.escape(title)}</title>'
+            f'<style>{REPORT_STYLE}</style><h1>{html.escape(title)}</h1>{intro_html}'
+            f'<pre>{html.escape(json.dumps(summary, indent=2))}</pre>{extra_html}</html>')
+    (folder / "report.html").write_text(page, encoding="utf-8")
 
 
 def dataset_root():

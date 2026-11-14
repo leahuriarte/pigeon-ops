@@ -5,6 +5,7 @@ does not show whether they are moving or why. Densely packed traffic is
 evidence for a blockage further along the road, so the engine weighs it with
 measured detector error and an explicit, assumed traffic model.
 """
+import math
 
 DEFAULT_RULE = {
     # Neighbours closer than this many vehicle lengths count as closely spaced.
@@ -39,9 +40,9 @@ def to_pixels(polygon, width, height):
     return [(x * width, y * height) for x, y in polygon]
 
 
-def boxes_on_road(boxes, road):
-    """Keep axis-aligned boxes whose centre lies inside the road polygon."""
-    return [box for box in boxes if point_in_polygon((box[0] + box[2]) / 2, (box[1] + box[3]) / 2, road)]
+def on_road(box, road):
+    """True when an [x1, y1, x2, y2] box's centre lies inside the road polygon."""
+    return bool(road) and point_in_polygon((box[0] + box[2]) / 2, (box[1] + box[3]) / 2, road)
 
 
 def closely_spaced_count(boxes, gap_ratio):
@@ -52,14 +53,11 @@ def closely_spaced_count(boxes, gap_ratio):
     """
     centres = [((box[0] + box[2]) / 2, (box[1] + box[3]) / 2) for box in boxes]
     sizes = [max(0.0, (box[2] - box[0]) * (box[3] - box[1])) ** 0.5 for box in boxes]
-    close = 0
-    for index, (x, y) in enumerate(centres):
-        for other, (ox, oy) in enumerate(centres):
-            scale = (sizes[index] + sizes[other]) / 2
-            if other != index and scale and ((x - ox) ** 2 + (y - oy) ** 2) ** 0.5 / scale < gap_ratio:
-                close += 1
-                break
-    return close
+    return sum(
+        any(other != index and math.dist(centres[index], centres[other]) < gap_ratio * (sizes[index] + sizes[other]) / 2
+            for other in range(len(boxes)))
+        for index in range(len(boxes))
+    )
 
 
 def assess_road(boxes, road, rule=DEFAULT_RULE, frame_brightness=None):
@@ -68,8 +66,8 @@ def assess_road(boxes, road, rule=DEFAULT_RULE, frame_brightness=None):
     Pass frame_brightness for detector output. Reference annotations omit it
     because their completeness does not depend on lighting.
     """
-    on_road = boxes_on_road(boxes, road)
-    close = closely_spaced_count(on_road, rule["gap_ratio"])
+    road_boxes = [box for box in boxes if on_road(box, road)]
+    close = closely_spaced_count(road_boxes, rule["gap_ratio"])
     if close >= rule["dense_min_close"]:
         state, reason = "dense_traffic", f"{close} closely spaced vehicles on the road"
     elif close > rule["light_max_close"]:
@@ -80,7 +78,7 @@ def assess_road(boxes, road, rule=DEFAULT_RULE, frame_brightness=None):
         state, reason = "light_traffic", f"only {close} closely spaced vehicles on the road"
     return {
         "visual_state": state, "signal": SIGNAL_FOR_STATE[state], "reason": reason,
-        "vehicles_on_road": len(on_road), "closely_spaced_vehicles": close, "rule": dict(rule),
+        "vehicles_on_road": len(road_boxes), "closely_spaced_vehicles": close, "rule": dict(rule),
     }
 
 

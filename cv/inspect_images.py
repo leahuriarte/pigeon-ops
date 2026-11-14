@@ -9,7 +9,7 @@ from pathlib import Path
 import cv2
 from PIL import Image, ImageDraw
 
-from cv.common import MODEL_CHOICES, ROOT, annotate, load_model, predict_frame
+from cv.common import MODEL_CHOICES, ROOT, annotate, load_model, predict_frame, write_report
 
 
 def main():
@@ -92,12 +92,9 @@ def main():
     (output / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     cards = "".join(f'<figure><img src="{item["annotated_image"]}"><figcaption>{html.escape(Path(item["source_file"]).name)} — {item["vehicle_count"]} detections; {html.escape(item["quality_warning"] or "human review required")}.</figcaption><pre>{html.escape(json.dumps(item["camera_context"], indent=2)) if item["camera_context"] else ""}</pre></figure>' for item in observations)
     summary = {key: value for key, value in evidence.items() if key != "observations"}
-    report = f'''<!doctype html><html lang="en"><meta charset="utf-8"><title>PigeonOps image inspection</title>
-<style>body{{font:16px system-ui;background:#102a35;color:#edf5f4;max-width:1100px;margin:30px auto;padding:20px}}img{{width:100%;border-radius:12px}}figure{{margin:30px 0}}pre{{white-space:pre-wrap;background:#193c48;padding:20px}}a{{color:#64debd}}</style>
-<h1>Road image inspection</h1><p>Model detections are visual evidence for review. Road state remains <strong>inconclusive</strong> until reviewed. These images are separate from the fictional demo incident. Camera metadata and retrieval times appear below when available.</p>
+    write_report(output, "Road image inspection", f'''<p>Model detections are visual evidence for review. Road state remains <strong>inconclusive</strong> until reviewed. These images are separate from the fictional demo incident. Camera metadata and retrieval times appear below when available.</p>
 <p>Attribution and source: {html.escape(str(evidence['creators']))}, <a href="{html.escape(evidence['dataset_url'] or '#', quote=True)}">{html.escape(evidence['dataset'])}</a>, {html.escape(evidence['license'] or 'license unspecified')}.</p>
-<img src="contact-sheet.jpg" alt="Overview of annotated road images"><pre>{html.escape(json.dumps(summary, indent=2))}</pre>{cards}</html>'''
-    (output / "report.html").write_text(report, encoding="utf-8")
+<img src="contact-sheet.jpg" alt="Overview of annotated road images">''', summary, cards)
     print(f"Report ready: {output / 'report.html'}", flush=True)
 
 

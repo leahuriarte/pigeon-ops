@@ -82,14 +82,38 @@ how many reference vehicles were found. Neither is road-blockage accuracy.
 This samples two frames per second by default and produces an annotated H.264
 MP4, evidence JSON and an HTML report. Counts are per frame, not unique tracks.
 
-## Hand off to the engine and UI
+## Review images in the logistics dashboard
 
-Every unreviewed result deliberately returns `label: inconclusive` and
-`review_status: needs_human_review`. The UI teammate should display the image,
-source timestamp and explanation before asking the reviewer to confirm the road
-state. Only then pass `blocked`, `clear` or `inconclusive` into the existing
-`/api/analysis?scenario=disruption&observation=...` endpoint. Detection confidence
-must not replace the engine's configured observation accuracy.
+The image library is integrated. Prepare it with:
+
+```powershell
+.\.venv\Scripts\python.exe -m cv.prepare_review
+python run.py
+```
+
+Open `http://127.0.0.1:8000`, then choose **Review inspection images**. Select a
+case, inspect its marked road area or source image, choose the supported
+observation, and select **Use for demo**. Rankings and map playback update for
+the fictional scenario. The default library contains 16 Caltrans snapshots and
+three historical California images, including a documented debris example.
+
+`california_review.json` contains normalized road polygons and provisional
+AI-assisted visual notes. They are not independently validated ground truth.
+Green boxes are retained vehicle detections; the orange debris outline is a
+visual annotation, not a debris-model prediction. Image-level labels do not
+measure classifier accuracy. Unavailable or insufficient-detail cases permit
+only an inconclusive observation.
+
+`cv/outputs/review-cases/library.json` is served by `/api/inspection-cases`.
+`POST /api/inspection-review` records the source hash, observation, scenario,
+optional note and review time in `cv/outputs/inspection-reviews.jsonl`. The
+backend loads these precomputed files without importing CV dependencies. If the
+library is absent, the core demo retains its simulated-observation fallback.
+
+Raw inspection tools still return `inconclusive` until review. Applying an
+external image is explicitly an illustration for the synthetic scenario, not
+a report of current conditions. Detector confidence never replaces the engine's
+configured evidence assumptions.
 
 For a still image, use wording such as “vehicle visible in the inspected lane.”
 Do not infer speed, a persistent queue or a confirmed obstruction from vehicle

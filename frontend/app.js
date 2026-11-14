@@ -615,7 +615,7 @@ function renderEvoi(analysis) {
     : `An inspection pays off once its evidence is at least ${pct(e.break_even_accuracy)} accurate.`;
   const cv = e.cv_only;
   $("#cv-only").textContent = cv
-    ? `Automated CV alone (measured): ${money(cv.net_value_of_information)} net, missing ${pct(cv.missed_blockage_probability)} of blockages. ${breakEven}`
+    ? `CV-only scenario estimate: ${money(cv.net_value_of_information)} net, using measured detection errors and an assumed link between traffic and blockage. ${breakEven}`
     : breakEven;
   const a = e.assumptions;
   $("#assumptions").innerHTML = [
@@ -801,7 +801,11 @@ function bindEvents() {
 
 window.addEventListener("inspection-reviewed", ({ detail }) => {
   if (detail.review.scenario !== activeScenario) return;
-  showObservation(detail.analysis);
+  showObservation(detail.analysis).catch((error) => {
+    $("#posterior").textContent += ` Playback could not update: ${error.message}`;
+  });
+  const finding = { blocked: "visible obstruction", clear: "no visible obstruction in this view", inconclusive: "insufficient evidence" }[detail.review.observation];
+  $("#posterior").textContent = `Reviewed illustration: ${finding}. For this fictional scenario, the model's blockage probability changes from ${pct(detail.analysis.prior_blocked_probability)} to ${pct(detail.analysis.posterior_blocked_probability)}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;

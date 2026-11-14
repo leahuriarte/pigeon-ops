@@ -70,6 +70,22 @@ on these data during setup.
 
 ## Alternatives considered
 
+## Historical California review cases
+
+The review library adds three attributed historical examples:
+
+- [Regent's Slide, Caltrans publication February 17, 2026](https://dot.ca.gov/caltrans-near-me/district-5/d5-news/d5-news-2-17-2026): rocks and soil visibly cover SR-1; the accompanying release reported a closure. Exact photo capture time is unspecified. Caltrans Conditions of Use apply.
+- [Mud Creek aerial image, July 7, 2017](https://www.usgs.gov/media/images/big-sur-landslide-july-7-2017): Bob Van Wagenen / USGS, public domain. Landslide and roadworks are visible; temporary-route access remains inconclusive from this photo.
+- [Big Sur coast, July 12, 2017](https://www.usgs.gov/media/images/big-sur-coast): Shawn Harrison / USGS, public domain. No obstruction is visible in the photographed road segment; this does not establish current road access or safety.
+
+The source files are downloaded to `cv/data/california-hazards/`. The preparer
+records image hashes, date descriptions and credits in the generated library.
+Road polygons and visual notes in `california_review.json` were produced through
+AI-assisted visual review and remain provisional. No independent annotator has
+validated these labels, and no blockage-accuracy score is reported from them.
+
+## Alternatives considered
+
 [VisDrone](https://github.com/VisDrone/VisDrone-Dataset) is a strong aerial
 detection benchmark, but the selected releases offer clearer publisher-stated
 reuse terms for a small demo. [pNEUMA Vision](https://zenodo.org/records/7426506)

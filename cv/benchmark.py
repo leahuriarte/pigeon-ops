@@ -10,7 +10,7 @@ from pathlib import Path
 
 import cv2
 
-from cv.common import MODEL_CHOICES, ROOT, annotate, dataset_root, load_model, predict_frame
+from cv.common import MODEL_CHOICES, ROOT, annotate, dataset_root, load_model, predict_frame, write_report
 from cv.metrics import match_detections, summarize_counts
 
 
@@ -81,7 +81,9 @@ def main():
         raise ValueError(f"No images found in {root / args.split}")
     tile_suffix = f"-tile{args.tile_size}" if args.tile_size else ""
     dataset_prefix = "transset-" if args.dataset == "transset" else ""
-    output = ROOT / "outputs" / f"{dataset_prefix}{args.model.removesuffix('.pt')}-{args.imgsz}{tile_suffix}-{args.split}"
+    # Partial runs get their own folder so they never overwrite a full-split result.
+    limit_suffix = f"-first{args.limit}" if args.limit else ""
+    output = ROOT / "outputs" / f"{dataset_prefix}{args.model.removesuffix('.pt')}-{args.imgsz}{tile_suffix}-{args.split}{limit_suffix}"
     output.mkdir(parents=True, exist_ok=True)
     model = load_model(args.model)
     # Warm up so the first image does not inflate timing.
@@ -129,12 +131,9 @@ def main():
         writer.writeheader()
         writer.writerows(records)
     cards = "".join(f'<figure><img src="{filename}"><figcaption>{html.escape(name)}: {found} detections / {actual} references</figcaption></figure>' for filename, name, found, actual in previews)
-    report = f'''<!doctype html><html lang="en"><meta charset="utf-8"><title>PigeonOps CV evaluation</title>
-<style>body{{font:16px system-ui;background:#102a35;color:#edf5f4;margin:30px auto;max-width:1200px;padding:20px}}pre{{white-space:pre-wrap;background:#193c48;padding:20px;border-radius:12px}}img{{width:100%}}figure{{margin:25px 0}}a{{color:#64debd}}</style>
-<h1>PigeonOps vehicle detection evaluation</h1><p>Data: {dataset_name}, {creators}, <a href="{source_url}">CC BY 4.0</a>. External imagery, not Port of LA footage.</p>
+    write_report(output, "PigeonOps vehicle detection evaluation", f'''<p>Data: {dataset_name}, {creators}, <a href="{source_url}">CC BY 4.0</a>. External imagery, not Port of LA footage.</p>
 <p>Boxes indicate model detections. Road state remains inconclusive pending human review. Detector scores are not road-blockage probabilities.</p>
-<pre>{html.escape(json.dumps(summary, indent=2))}</pre>{cards}</html>'''
-    (output / "report.html").write_text(report, encoding="utf-8")
+''', summary, cards)
     print(json.dumps(summary, indent=2), flush=True)
 
 

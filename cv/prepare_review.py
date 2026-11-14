@@ -11,16 +11,13 @@ import cv2
 import numpy as np
 
 from cv.common import ROOT, load_model, predict_frame
-from cv.road_state import point_in_polygon
+from cv.road_state import on_road, to_pixels
 
 
 def prepare_cases(snapshot, output, catalog_path=ROOT / "california_review.json"):
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     snapshot_manifest = json.loads((snapshot / "source.json").read_text(encoding="utf-8"))
     cameras = {item["image"]: item for item in json.loads((snapshot / "snapshots.json").read_text(encoding="utf-8"))["images"]}
-    cached_path = ROOT / "outputs" / "california-highways" / "evidence.json"
-    cached_run = json.loads(cached_path.read_text(encoding="utf-8")) if cached_path.exists() else {}
-    cached = {Path(item["source_file"]).name: item for item in cached_run.get("observations", [])}
     model = None
     cases = []
     for item in catalog["camera_cases"] + catalog["historical_cases"]:
@@ -62,20 +59,14 @@ def prepare_cases(snapshot, output, catalog_path=ROOT / "california_review.json"
             raise ValueError(f"Unreadable source image: {source}")
         height, width = frame.shape[:2]
         unavailable = item["visual_label"] == "image_unavailable"
-        previous = cached.get(item["file"], {})
-        cache_matches = camera and (previous.get("camera_context") or {}).get("sha256") == digest and cached_run.get("model") == "yolo11s.pt" and cached_run.get("image_size") == 1280 and cached_run.get("confidence_threshold") == 0.25 and not cached_run.get("tile_size")
         if unavailable:
             predictions = []
-        elif cache_matches:
-            predictions = previous["detections"]
         else:
             if model is None:
                 model = load_model("yolo11s.pt")
             predictions = predict_frame(model, frame, 1280, 0.25)
-        road = [(x * width, y * height) for x, y in item["road"]]
-        retained = [prediction for prediction in predictions if road and point_in_polygon(
-            (prediction["box"][0] + prediction["box"][2]) / 2,
-            (prediction["box"][1] + prediction["box"][3]) / 2, road)]
+        road = to_pixels(item["road"], width, height)
+        retained = [prediction for prediction in predictions if on_road(prediction["box"], road)]
         rendered = frame.copy()
         if road:
             polygon = np.array(road, np.int32)
@@ -87,7 +78,7 @@ def prepare_cases(snapshot, output, catalog_path=ROOT / "california_review.json"
             x1, y1, x2, y2 = [round(value) for value in detection["box"]]
             cv2.rectangle(rendered, (x1, y1), (x2, y2), (80, 220, 100), 2)
         if item.get("hazard"):
-            hazard = np.array([(x * width, y * height) for x, y in item["hazard"]], np.int32)
+            hazard = np.array(to_pixels(item["hazard"], width, height), np.int32)
             cv2.polylines(rendered, [hazard], True, (0, 130, 255), max(2, width // 500))
         destination = output / case_id
         destination.mkdir(parents=True, exist_ok=True)
@@ -105,7 +96,7 @@ def prepare_cases(snapshot, output, catalog_path=ROOT / "california_review.json"
             "annotated_image": f"/inspection-assets/{case_id}/annotated.jpg",
             "vehicle_detections": len(retained), "detections_before_region_filter": len(predictions),
             "excluded_detections": len(predictions) - len(retained),
-            "vehicle_model": "YOLO11s, 1280, confidence 0.25; cached source-matched detections where available",
+            "vehicle_model": "YOLO11s, 1280, confidence 0.25",
             "detector_observation": "inconclusive",
             "allowed_observations": ["inconclusive"] if restricted else ["blocked", "clear", "inconclusive"],
             "review_status": "needs_dispatcher_review", "simulated_application": True,

@@ -33,39 +33,25 @@ class DemoHandler(BaseHTTPRequestHandler):
             return self._file(ASSETS, unquote(parsed.path.removeprefix("/inspection-assets/")))
         if parsed.path == "/api/scenarios":
             return self._json({"scenarios": available_scenarios()})
+        if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback"):
+            return self._static(parsed.path)
+
+        params = {key: values[0] for key, values in parse_qs(parsed.query).items()}
+        try:
+            scenario = load_scenario(variant=params.get("scenario", "disruption"))
+        except ValueError as error:
+            return self._json({"error": str(error)}, 404)
         if parsed.path == "/api/scenario":
-            variant = parse_qs(parsed.query).get("scenario", ["disruption"])[0]
-            try:
-                scenario = load_scenario(variant=variant)
-            except ValueError as error:
-                return self._json({"error": str(error)}, 404)
-            scenario["analysis"] = analyze(scenario)
-            return self._json(scenario)
+            return self._json({**scenario, "analysis": analyze(scenario)})
         if parsed.path == "/api/analysis":
-            params = parse_qs(parsed.query)
-            observation = params.get("observation", [None])[0]
+            observation = params.get("observation")
             if observation not in (None, "blocked", "clear", "inconclusive"):
                 return self._json({"error": "observation must be blocked, clear, or inconclusive"}, 400)
-            variant = params.get("scenario", ["disruption"])[0]
-            try:
-                scenario = load_scenario(variant=variant)
-            except ValueError as error:
-                return self._json({"error": str(error)}, 404)
             return self._json(analyze(scenario, observation))
-        if parsed.path == "/api/playback":
-            params = parse_qs(parsed.query)
-            variant = params.get("scenario", ["disruption"])[0]
-            try:
-                scenario = load_scenario(variant=variant)
-                playback = build_playback(
-                    scenario,
-                    action=params.get("action", ["hold-course"])[0],
-                    road=params.get("road", ["open"])[0],
-                )
-            except ValueError as error:
-                return self._json({"error": str(error)}, 400)
-            return self._json(playback)
-        return self._static(parsed.path)
+        try:
+            return self._json(build_playback(scenario, action=params.get("action", "hold-course"), road=params.get("road", "open")))
+        except ValueError as error:
+            return self._json({"error": str(error)}, 400)
 
     def do_POST(self):
         if urlparse(self.path).path != "/api/inspection-review":
