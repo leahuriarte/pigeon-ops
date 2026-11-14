@@ -304,6 +304,7 @@ function updateFrame() {
   updateTruckCard(states);
   updateEventFeed();
   updateTally();
+  updateLiveComparison();
   if (step === "monitor") updateMonitorLive(states);
 }
 
@@ -911,16 +912,48 @@ function indicatorChange(item, base) {
 }
 const shortLabels = { appointments_feasible: "Appointments within reach", community_exposure: "Schools near routes" };
 const comparisonIndicators = new Set(["expected_delay_min", "co2_kg"]);
+function wholePlanLiveMetrics(t) {
+  const loaded = playback.tracks.flatMap((track) => track.segments)
+    .filter((segment) => segment.shipment && ["driving", "detour"].includes(segment.kind) && segment.distance_m > 0);
+  const totalDistance = loaded.reduce((sum, segment) => sum + segment.distance_m, 0);
+  const drivenDistance = loaded.reduce((sum, segment) => sum + segment.distance_m * clamp((t - segment.t0) / (segment.t1 - segment.t0), 0, 1), 0);
+  const progress = totalDistance ? clamp(drivenDistance / totalDistance, 0, 1) : 0;
+  const planCo2 = scenario.analysis.indicators.find((item) => item.id === "co2_kg")?.value;
+  const checkins = playback.events.filter((event) => event.text.startsWith("Checks in") && event.t <= t + 0.01);
+  const delay = checkins.reduce((sum, event) => {
+    const shipment = scenario.shipments.find((item) => event.text.includes(item.id));
+    return shipment ? sum + Math.max(0, event.t - clockMinutes(shipment.appointment.split("–")[0])) : sum;
+  }, 0);
+  return { delay, completed: checkins.length, co2: planCo2 == null ? null : planCo2 * progress, progress };
+}
+
+function updateLiveComparison() {
+  if (scenario.scenario_type !== "normal" || !playback) return;
+  const live = wholePlanLiveMetrics(currentTime);
+  $("#live-delay").textContent = `${live.delay.toFixed(1)} min`;
+  $("#live-co2").textContent = live.co2 == null ? "—" : `${live.co2.toFixed(1)} kg`;
+  $("#live-delay-progress").textContent = `${live.completed} of ${scenario.shipments.length} check-ins`;
+  $("#live-co2-progress").textContent = `${Math.round(live.progress * 100)}% of estimated trip distance`;
+}
+
 function renderIndicators(indicators) {
   const compare = scenario.scenario_type !== "normal" && baseline;
   const missing = indicators.filter((item) => item.value === null || item.value === undefined);
   const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
   $("#indicators-note").textContent = scenario.scenario_type === "normal"
-    ? `Estimates: delivery delay and whole-plan CO₂.${pending}`
+    ? `End values are estimates. Live delay comes from completed simulated check-ins; live CO₂ allocates the whole-plan estimate by loaded trip progress.${pending}`
     : `Estimates before inspection.${activeScenario === "congestion" ? " Cargo released earlier than baseline." : ""}${pending}`;
   $("#comparison-caption").textContent = scenario.scenario_type === "normal"
-    ? "Normal morning · baseline" : `Changed scenario · ${scenario.name}`;
+    ? "Normal morning · live progress" : `Changed scenario · ${scenario.name}`;
+  $("#comparison-base-head").textContent = scenario.scenario_type === "normal" ? "Estimated at end" : "Normal";
+  $("#comparison-current-head").textContent = scenario.scenario_type === "normal" ? "Simulated so far" : "Current";
+  $("#comparison-change-head").textContent = scenario.scenario_type === "normal" ? "Progress" : "Change";
   $("#scenario-comparison").innerHTML = indicators.filter((item) => comparisonIndicators.has(item.id)).map((item) => {
+    if (scenario.scenario_type === "normal") {
+      const delay = item.id === "expected_delay_min";
+      const expected = item.value == null ? "—" : `${item.value.toFixed(1)} ${item.unit}`;
+      return `<tr><th scope="row">${delay ? "Delivery delay" : "CO₂"}</th><td class="num">${expected}<small>estimated</small></td><td class="num"><b id="live-${delay ? "delay" : "co2"}">—</b><small>${delay ? "simulated" : "estimated · simulated progress"}</small></td><td id="live-${delay ? "delay" : "co2"}-progress" class="num">—</td></tr>`;
+    }
     const base = baseline?.find((entry) => entry.id === item.id);
     const available = item.value != null && base?.value != null;
     const change = available ? indicatorChange(item, base) : null;
@@ -1359,8 +1392,7 @@ function renderMonitor() {
   $("#monitor-feasible").innerHTML = feasible ? `${whole(feasible.value)} of ${whole(feasible.of)}<small>estimated</small>` : "—";
   const totalCo2 = a.indicators.find((item) => item.id === "co2_kg");
   const schools = a.indicators.find((item) => item.id === "community_exposure");
-  const modeled = tallies[plan.action]?.length ?? 0;
-  $("#monitor-environment").textContent = `Whole-plan estimate: ${totalCo2?.value == null ? "CO₂ unavailable" : `${whole(totalCo2.value)} kg CO₂`}; ${schools?.value == null ? "school proximity unavailable" : `${whole(schools.value)} schools within 300 m of planned routes (OSM estimate)`}. The live CO₂ counter covers ${modeled} modeled trips only.`;
+  $("#monitor-environment").textContent = `End estimate: ${totalCo2?.value == null ? "CO₂ unavailable" : `${totalCo2.value.toFixed(1)} kg CO₂`}; ${schools?.value == null ? "school proximity unavailable" : `${whole(schools.value)} schools within 300 m of planned routes (OSM estimate)`}. Live CO₂ follows the simulated progress of all assigned loads.`;
   const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
   $("#monitor-note").textContent = unassigned ? `${unassigned} load${unassigned === 1 ? " needs" : "s need"} a truck.` : "";
   $("#monitor-incidents").innerHTML = stories.filter((item) => !item.normal).map(jumpButton).join("");
@@ -1372,9 +1404,8 @@ function renderMonitor() {
 function updateMonitorLive(states) {
   const moving = states.filter((state) => state.moving).length;
   $("#monitor-moving").innerHTML = `${moving} of ${states.length}<small>simulated positions</small>`;
-  const rows = tallies[plan.action];
-  const co2 = rows ? totalsAt(rows, currentTime).co2 : null;
-  $("#monitor-co2").innerHTML = co2 === null ? "—" : `${co2.toFixed(1)} kg<small>estimated · modeled trips</small>`;
+  const co2 = wholePlanLiveMetrics(currentTime).co2;
+  $("#monitor-co2").innerHTML = co2 === null ? "—" : `${co2.toFixed(1)} kg<small>estimated · simulated progress</small>`;
 }
 
 function renderOutcome() {

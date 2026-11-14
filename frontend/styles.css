@@ -263,6 +263,7 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
 .scenario-comparison .worse { color: var(--risk); }
 .scenario-comparison .better { color: var(--ok); }
 .scenario-comparison tbody th { text-align: left; font-weight: 400; }
+.scenario-comparison td small { display: block; color: var(--ink-2); font-size: 11px; font-weight: 400; }
 .stats-bar > .stats-note { white-space: normal; }
 
 /* View tabs: index-card tabs; the selected one overlaps the view's top border. */
