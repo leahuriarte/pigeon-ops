@@ -162,13 +162,14 @@
 
         <section class="step step-monitor" data-step="monitor" aria-labelledby="monitor-title" hidden>
           <p class="tag-line"><span class="tag ok">No incident</span><span>Regular morning</span></p>
-          <h1 id="monitor-title">Running to plan</h1>
-          <p class="lede">No incidents reported. Trucks are following the planned routes.</p>
+          <h1 id="monitor-title">Fleet and environment</h1>
+          <p class="lede">No incidents reported. Follow the simulated trucks and their estimated environmental impact as the shift runs.</p>
           <dl class="facts">
-            <div><dt>Chance CA-47 is blocked</dt><dd id="monitor-risk">—</dd></div>
-            <div><dt>Drone check</dt><dd id="monitor-check">—</dd></div>
+            <div><dt>Trucks moving now</dt><dd id="monitor-moving">—</dd></div>
+            <div><dt>CO₂ emitted so far</dt><dd id="monitor-co2">—</dd></div>
             <div><dt>Appointments within reach</dt><dd id="monitor-feasible">—</dd></div>
           </dl>
+          <p id="monitor-environment" class="note"></p>
           <p id="monitor-note" class="note"></p>
           <div class="actions">
             <button id="monitor-skip" class="btn" type="button">View shift report</button>
@@ -262,8 +263,8 @@
             </div>
             <p id="tally-scope" class="subhead"></p>
             <ul id="tally" class="tally-tiles"></ul>
-            <h3 class="tally-race-title">Cost of each response <span id="tally-race-road"></span></h3>
-            <ol id="tally-race" class="tally-race-list"></ol>
+            <div id="tally-alternatives"><h3 class="tally-race-title">Cost of each response <span id="tally-race-road"></span></h3>
+              <ol id="tally-race" class="tally-race-list"></ol></div>
             <details class="more"><summary>What the cost includes</summary><p id="tally-note" class="note"></p></details>
           </section>
 
@@ -271,11 +272,11 @@
             <h2 id="report-indicators-title">Plan comparison</h2>
             <div class="table-wrap">
               <table class="data">
-                <thead><tr><th>Indicator</th><th class="num">Usual</th><th class="num">Today</th><th>Change</th></tr></thead>
+                <thead><tr><th>Indicator</th><th id="report-usual-head" class="num">Usual</th><th id="report-today-head" class="num">Today</th><th id="report-change-head">Change</th></tr></thead>
                 <tbody id="report-indicators"></tbody>
               </table>
             </div>
-            <p class="note">Whole-plan estimates for the top-ranked response before inspection.</p>
+            <p id="report-indicators-note" class="note">Whole-plan estimates for the top-ranked response before inspection.</p>
             <h2 id="report-log-title">Decision log</h2>
             <ol id="report-log" class="report-log"></ol>
           </div>

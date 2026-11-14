@@ -273,7 +273,10 @@ function renderTicks() {
 }
 
 function renderPlanNote() {
-  if (scenario.scenario_type !== "disruption") return;
+  if (scenario.scenario_type !== "disruption") {
+    $("#plan-note").textContent = "";
+    return;
+  }
   $(`#road-${plan.road}`).checked = true;
   $$('input[name="road"]').forEach((input) => { $(`label[for="${input.id}"]`).textContent = roadWord(input.value); });
   const outcome = scenario.decision_model.actions.find((a) => a.id === plan.action)[outcomesKey()][plan.road];
@@ -300,6 +303,7 @@ function updateFrame() {
   updateTruckCard(states);
   updateEventFeed();
   updateTally();
+  if (step === "monitor") updateMonitorLive(states);
 }
 
 function frame(now) {
@@ -469,9 +473,12 @@ function renderTallyFrame() {
   block.hidden = !current;
   if (!current) return;
   const actions = scenario.decision_model.actions;
+  const normal = scenario.scenario_type === "normal";
+  $("#tally-title").textContent = normal ? "Planned trips" : "Trip totals";
+  $("#tally-alternatives").hidden = normal;
   const label = actions.find((a) => a.id === plan.action).label;
   const road = scenario.scenario_type === "disruption" ? `, CA-47 ${roadWord(plan.road)}` : "";
-  $("#tally-scope").textContent = `${label}${road}`;
+  $("#tally-scope").textContent = normal ? `${current.length} modeled shipments on their planned routes · estimated` : `${label}${road}`;
   $("#tally-race-road").textContent = scenario.scenario_type === "disruption" ? `(CA-47 ${roadWord(plan.road)})` : "";
   $("#tally").innerHTML = tallyMetrics.map((metric) => `<li class="tally-tile" data-metric="${metric.id}">
     <span class="kpi-label">${metric.label}</span>
@@ -504,15 +511,19 @@ function updateTally() {
     const changed = setHTML(`v-${metric.id}`, tile.querySelector(".tally-value"), metric.format(now[metric.id]));
     const share = final[metric.id] > 0 ? now[metric.id] / final[metric.id] : 0;
     tile.querySelector(".tally-bar i").style.width = `${(share * 100).toFixed(1)}%`;
+    const normal = scenario.scenario_type === "normal";
     const diff = final[metric.id] - planTotals[metric.id];
     const tone = Math.abs(diff) < 0.05 ? "" : diff > 0 ? "worse" : "better";
     const vsPlan = tone ? `${diff > 0 ? "+" : "−"}${metric.format(Math.abs(diff)).replace(/<[^>]+>/g, "")} vs plan` : "same as plan";
-    setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), `<span>Ends at ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span><span class="${tone}">${vsPlan}</span>`);
+    setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), normal
+      ? `<span>Estimated at delivery: ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span>`
+      : `<span>Ends at ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span><span class="${tone}">${vsPlan}</span>`);
     // A missed appointment or the first late minute is a step change worth drawing the eye to.
     if (changed && metric.id === "missed" && now.missed > 0) bump(tile);
     if (metric.id === "late") tile.classList.toggle("alert", now.late > 0);
     if (metric.id === "missed") tile.classList.toggle("alert", now.missed > 0);
   });
+  if (scenario.scenario_type === "normal") return;
   const finals = Object.fromEntries(Object.entries(tallies).map(([id, rows]) => [id, totalsAt(rows, Infinity).cost]));
   const top = Math.max(...Object.values(finals), 1);
   $$("#tally-race .race-row").forEach((row) => {
@@ -881,7 +892,9 @@ function renderIndicators(indicators) {
   const compare = scenario.scenario_type !== "normal" && baseline;
   const missing = indicators.filter((item) => item.value === null || item.value === undefined);
   const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
-  $("#indicators-note").textContent = `Estimates for the recommended plan, before inspection.${pending}`;
+  $("#indicators-note").textContent = scenario.scenario_type === "normal"
+    ? `Whole-plan estimates for the planned routes. Simulated trucks.${pending}`
+    : `Estimates for the recommended plan, before inspection.${pending}`;
   $("#indicators").innerHTML = indicators.filter((item) => !missing.includes(item)).map((item) => {
     const label = shortLabels[item.id] ?? indicatorLabel(item);
     const basis = basisLabel[item.basis] ?? item.basis;
@@ -1241,13 +1254,22 @@ function renderStart() {
 function renderMonitor() {
   const a = scenario.analysis;
   const feasible = a.indicators.find((item) => item.id === "appointments_feasible");
-  $("#monitor-risk").innerHTML = `${pct(a.prior_blocked_probability)}<small>assumed</small>`;
-  $("#monitor-check").innerHTML = a.evoi.recommend_inspection
-    ? `Recommended<small>${money(a.evoi.net_value_of_information)} estimated saving</small>`
-    : `Skip<small>${money(-a.evoi.net_value_of_information)} estimated added loss</small>`;
   $("#monitor-feasible").innerHTML = feasible ? `${whole(feasible.value)} of ${whole(feasible.of)}<small>estimated</small>` : "—";
+  const totalCo2 = a.indicators.find((item) => item.id === "co2_kg");
+  const schools = a.indicators.find((item) => item.id === "community_exposure");
+  const modeled = tallies[plan.action]?.length ?? 0;
+  $("#monitor-environment").textContent = `Whole-plan estimate: ${totalCo2?.value == null ? "CO₂ unavailable" : `${whole(totalCo2.value)} kg CO₂`}; ${schools?.value == null ? "school proximity unavailable" : `${whole(schools.value)} schools within 300 m of planned routes (OSM estimate)`}. The live CO₂ counter covers ${modeled} modeled trips only.`;
   const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
   $("#monitor-note").textContent = unassigned ? `${unassigned} load${unassigned === 1 ? " needs" : "s need"} a truck.` : "";
+  if (tracks.length) updateMonitorLive(tracks.map((track) => stateAt(track, currentTime)));
+}
+
+function updateMonitorLive(states) {
+  const moving = states.filter((state) => state.moving).length;
+  $("#monitor-moving").innerHTML = `${moving} of ${states.length}<small>simulated positions</small>`;
+  const rows = tallies[plan.action];
+  const co2 = rows ? totalsAt(rows, currentTime).co2 : null;
+  $("#monitor-co2").innerHTML = co2 === null ? "—" : `${co2.toFixed(1)} kg<small>estimated · modeled trips</small>`;
 }
 
 function renderOutcome() {
@@ -1260,7 +1282,7 @@ function renderOutcome() {
   $("#report-restart").hidden = !report;
   const others = stories.filter((item) => item.id !== story);
   $("#next-incidents").innerHTML = others.map(jumpButton).join("");
-  $("#next-incidents-wrap").hidden = !report || !others.length;
+  $("#next-incidents-wrap").hidden = !report || routine || !others.length;
 }
 
 async function triggerIncident(variant = story) {
@@ -1337,8 +1359,15 @@ function renderReport() {
   const incident = scenario.scenario_type === "normal" ? "No incidents" : scenarioCopy[activeScenario]?.title ?? d.title;
   $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${incident}. Simulated results.`;
   $("#report-indicators-title").textContent = routine ? "Regular morning" : "Plan comparison";
+  $("#report-usual-head").hidden = routine;
+  $("#report-today-head").textContent = routine ? "Planned day" : "Today";
+  $("#report-change-head").textContent = routine ? "Basis" : "Change";
+  $("#report-indicators-note").textContent = routine
+    ? "Whole-plan estimates for the planned routes. Response alternatives appear only when an incident is reported."
+    : "Whole-plan estimates for the top-ranked response before inspection.";
 
   $("#report-indicators").innerHTML = scenario.analysis.indicators.map((item) => {
+    if (routine) return `<tr><td>${indicatorLabel(item)}</td><td class="num">${item.value == null ? "—" : indicatorText(item, item.value)}</td><td class="muted">${esc(basisLabel[item.basis] ?? item.basis)}</td></tr>`;
     const base = baseline?.find((b) => b.id === item.id);
     if (item.value === null || item.value === undefined || !base || base.value === null) {
       return `<tr><td>${indicatorLabel(item)}</td><td class="num">—</td><td class="num">—</td><td class="muted">${esc(basisLabel[item.basis] ?? item.basis)}</td></tr>`;
