@@ -1,68 +1,82 @@
 {
-  "id": "port-la-demo",
-  "name": "Port of LA / Long Beach morning dispatch",
-  "generated_at": "2026-11-14T08:00:00-08:00",
-  "map_bounds": {"north": 33.805, "south": 33.715, "west": -118.300, "east": -118.165},
+  "generated_at": "2026-11-14T09:12:00-08:00",
+  "map_bounds": {"north": 33.915, "south": 33.715, "west": -118.355, "east": -118.155},
   "locations": [
     {"id": "terminal-a", "name": "Pier 400 Terminal", "kind": "terminal", "lat": 33.735, "lon": -118.262},
     {"id": "terminal-b", "name": "Long Beach Container Terminal", "kind": "terminal", "lat": 33.754, "lon": -118.216},
-    {"id": "warehouse-1", "name": "Carson Cross-Dock", "kind": "warehouse", "lat": 33.796, "lon": -118.250},
+    {"id": "terminal-c", "name": "TraPac Terminal", "kind": "terminal", "lat": 33.747, "lon": -118.278},
+    {"id": "warehouse-1", "name": "Carson Cross-Dock", "kind": "warehouse", "lat": 33.824, "lon": -118.251},
     {"id": "warehouse-2", "name": "West Long Beach DC", "kind": "warehouse", "lat": 33.789, "lon": -118.197},
+    {"id": "warehouse-3", "name": "Rancho Dominguez Hub", "kind": "warehouse", "lat": 33.849, "lon": -118.205},
+    {"id": "warehouse-4", "name": "Compton Fulfillment Center", "kind": "warehouse", "lat": 33.887, "lon": -118.224},
+    {"id": "warehouse-5", "name": "Torrance Consolidation Center", "kind": "warehouse", "lat": 33.835, "lon": -118.314},
+    {"id": "warehouse-6", "name": "Wilmington Transfer Yard", "kind": "warehouse", "lat": 33.781, "lon": -118.264},
     {"id": "incident", "name": "Reported obstruction", "kind": "incident", "lat": 33.773, "lon": -118.237}
   ],
   "shipments": [
-    {"id": "SHP-1042", "container": "MSCU-481209", "cargo": "Medical devices", "origin": "terminal-a", "destination": "warehouse-2", "truck": "TRK-07", "appointment": "10:15", "eta": "10:03", "status": "at-risk"},
-    {"id": "SHP-1048", "container": "OOLU-720144", "cargo": "Consumer electronics", "origin": "terminal-b", "destination": "warehouse-1", "truck": "TRK-12", "appointment": "11:00", "eta": "10:42", "status": "watch"},
-    {"id": "SHP-1051", "container": "CMAU-330918", "cargo": "Auto parts", "origin": "terminal-a", "destination": "warehouse-1", "truck": "TRK-19", "appointment": "11:30", "eta": "11:08", "status": "on-time"}
+    {"id": "SYN-SHP-1042", "container": "SYN-C-1042", "cargo": "Medical equipment", "commodity_code": "SCTG 35", "origin": "terminal-a", "destination": "warehouse-2", "truck": "SYN-TRK-07", "appointment": "10:15–10:45", "readiness": "Ready 08:54", "eta": "10:03", "slack_min": 12, "priority": "critical", "status": "at-risk", "route": "primary"},
+    {"id": "SYN-SHP-1048", "container": "SYN-C-1048", "cargo": "Consumer electronics", "commodity_code": "SCTG 35", "origin": "terminal-b", "destination": "warehouse-1", "truck": "SYN-TRK-12", "appointment": "11:00–11:30", "readiness": "Ready 09:02", "eta": "10:42", "slack_min": 18, "priority": "high", "status": "watch", "route": "northbound"},
+    {"id": "SYN-SHP-1051", "container": "SYN-C-1051", "cargo": "Motor vehicle parts", "commodity_code": "SCTG 36", "origin": "terminal-a", "destination": "warehouse-1", "truck": "SYN-TRK-19", "appointment": "11:30–12:00", "readiness": "Ready 08:48", "eta": "11:08", "slack_min": 22, "priority": "standard", "status": "on-time", "route": "northbound"},
+    {"id": "SYN-SHP-1055", "container": "SYN-C-1055", "cargo": "Mixed retail goods", "commodity_code": "SCTG 40", "origin": "terminal-c", "destination": "warehouse-5", "truck": "SYN-TRK-22", "appointment": "10:45–11:15", "readiness": "Ready 09:05", "eta": "10:31", "slack_min": 14, "priority": "standard", "status": "watch", "route": "westbound"},
+    {"id": "SYN-SHP-1058", "container": "SYN-C-1058", "cargo": "Industrial machinery", "commodity_code": "SCTG 34", "origin": "terminal-b", "destination": "warehouse-3", "truck": "SYN-TRK-31", "appointment": "12:00–12:45", "readiness": "Ready 09:10", "eta": "11:34", "slack_min": 26, "priority": "high", "status": "on-time", "route": "northbound"},
+    {"id": "SYN-SHP-1060", "container": "SYN-C-1060", "cargo": "Textiles and apparel", "commodity_code": "SCTG 30", "origin": "terminal-a", "destination": "warehouse-4", "truck": "SYN-TRK-35", "appointment": "12:15–12:45", "readiness": "Hold until 09:24", "eta": "11:58", "slack_min": 17, "priority": "standard", "status": "watch", "route": "northbound"},
+    {"id": "SYN-SHP-1064", "container": "SYN-C-1064", "cargo": "Plastics and rubber", "commodity_code": "SCTG 24", "origin": "terminal-c", "destination": "warehouse-6", "truck": "SYN-TRK-41", "appointment": "10:30–11:00", "readiness": "Ready 08:57", "eta": "10:12", "slack_min": 18, "priority": "standard", "status": "on-time", "route": "westbound"},
+    {"id": "SYN-SHP-1068", "container": "SYN-C-1068", "cargo": "Furniture", "commodity_code": "SCTG 39", "origin": "terminal-b", "destination": "warehouse-4", "truck": "SYN-TRK-44", "appointment": "13:00–13:30", "readiness": "Ready 09:07", "eta": "12:21", "slack_min": 39, "priority": "standard", "status": "on-time", "route": "northbound"},
+    {"id": "SYN-SHP-1071", "container": "SYN-C-1071", "cargo": "Pharmaceutical products", "commodity_code": "SCTG 21", "origin": "terminal-a", "destination": "warehouse-3", "truck": "SYN-TRK-52", "appointment": "11:45–12:15", "readiness": "Ready 09:01", "eta": "11:29", "slack_min": 16, "priority": "critical", "status": "watch", "route": "northbound"},
+    {"id": "SYN-SHP-1074", "container": "SYN-C-1074", "cargo": "Food preparations", "commodity_code": "SCTG 20", "origin": "terminal-c", "destination": "warehouse-5", "truck": "SYN-TRK-22", "appointment": "14:00–14:30", "readiness": "Hold until 10:10", "eta": "13:26", "slack_min": 34, "priority": "high", "status": "planned", "route": "westbound"},
+    {"id": "SYN-SHP-1077", "container": "SYN-C-1077", "cargo": "Printed products", "commodity_code": "SCTG 29", "origin": "terminal-b", "destination": "warehouse-2", "truck": "Unassigned", "appointment": "13:30–14:00", "readiness": "Ready 09:11", "eta": "—", "slack_min": 0, "priority": "standard", "status": "unassigned", "route": "primary"},
+    {"id": "SYN-SHP-1082", "container": "SYN-C-1082", "cargo": "Precision instruments", "commodity_code": "SCTG 38", "origin": "terminal-a", "destination": "warehouse-1", "truck": "SYN-TRK-19", "appointment": "15:00–15:30", "readiness": "Hold until 10:40", "eta": "14:18", "slack_min": 42, "priority": "high", "status": "planned", "route": "northbound"}
+  ],
+  "trucks": [
+    {"id": "SYN-TRK-07", "status": "en-route", "assignment": "SYN-SHP-1042", "fuel": "Diesel", "duty_remaining_hr": 5.8, "lat": 33.756, "lon": -118.248},
+    {"id": "SYN-TRK-12", "status": "available-soon", "assignment": "SYN-SHP-1048", "fuel": "Battery electric", "duty_remaining_hr": 7.1, "lat": 33.782, "lon": -118.218},
+    {"id": "SYN-TRK-19", "status": "en-route", "assignment": "SYN-SHP-1051", "fuel": "Diesel", "duty_remaining_hr": 4.9, "lat": 33.799, "lon": -118.246},
+    {"id": "SYN-TRK-22", "status": "at-terminal", "assignment": "SYN-SHP-1055", "fuel": "Natural gas", "duty_remaining_hr": 6.4, "lat": 33.749, "lon": -118.275},
+    {"id": "SYN-TRK-31", "status": "en-route", "assignment": "SYN-SHP-1058", "fuel": "Diesel", "duty_remaining_hr": 5.2, "lat": 33.813, "lon": -118.211},
+    {"id": "SYN-TRK-35", "status": "waiting", "assignment": "SYN-SHP-1060", "fuel": "Battery electric", "duty_remaining_hr": 7.8, "lat": 33.739, "lon": -118.258},
+    {"id": "SYN-TRK-41", "status": "en-route", "assignment": "SYN-SHP-1064", "fuel": "Diesel", "duty_remaining_hr": 3.7, "lat": 33.771, "lon": -118.272},
+    {"id": "SYN-TRK-44", "status": "en-route", "assignment": "SYN-SHP-1068", "fuel": "Diesel", "duty_remaining_hr": 6.0, "lat": 33.842, "lon": -118.219},
+    {"id": "SYN-TRK-52", "status": "at-terminal", "assignment": "SYN-SHP-1071", "fuel": "Battery electric", "duty_remaining_hr": 8.2, "lat": 33.737, "lon": -118.265}
   ],
   "routes": [
-    {"id": "primary", "name": "Primary via CA-47 / I-710", "color": "#18a999", "points": [[33.735,-118.262],[33.758,-118.248],[33.773,-118.237],[33.789,-118.197]]},
-    {"id": "detour", "name": "Detour via Anaheim St", "color": "#f6a723", "points": [[33.735,-118.262],[33.741,-118.285],[33.780,-118.284],[33.798,-118.240],[33.789,-118.197]]}
+    {"id": "primary", "name": "Current via CA-47 / I-710", "role": "primary", "color": "#18a999", "points": [[33.735,-118.262],[33.758,-118.248],[33.773,-118.237],[33.789,-118.197]]},
+    {"id": "detour", "name": "Candidate detour via Anaheim St", "role": "detour", "color": "#f6a723", "points": [[33.735,-118.262],[33.741,-118.285],[33.780,-118.284],[33.798,-118.240],[33.789,-118.197]]},
+    {"id": "northbound", "name": "Fleet corridor via I-710", "role": "fleet", "color": "#557b8b", "points": [[33.754,-118.216],[33.789,-118.210],[33.849,-118.205],[33.887,-118.224]]},
+    {"id": "westbound", "name": "Fleet corridor via CA-47 / I-110", "role": "fleet", "color": "#7d91a0", "points": [[33.747,-118.278],[33.781,-118.264],[33.818,-118.286],[33.835,-118.314]]}
   ],
-  "disruption": {
-    "id": "DSP-07",
-    "title": "Possible overturned vehicle on CA-47 connector",
-    "description": "Two unverified driver reports indicate a partial or full blockage near the interchange.",
-    "affected_shipment": "SHP-1042",
-    "prior_blocked_probability": 0.55,
-    "reported_at": "09:08",
-    "decision_deadline": "09:18",
-    "constraints": ["Warehouse appointment at 10:15", "Medical cargo priority", "TRK-12 unavailable before 09:25"]
-  },
+  "operations": {"window": "09:12–13:30", "terminal_turn_time_min": 47, "network_speed_mph": 31, "appointments_next_90_min": 4, "weather": "Clear · 64°F · visibility 9 mi"},
+  "data_provenance": [
+    {"label": "Road geography", "kind": "public baseline", "source": "Caltrans truck network and OpenStreetMap"},
+    {"label": "Traffic and incident patterns", "kind": "publicly calibrated", "source": "Caltrans PeMS / Traffic Census"},
+    {"label": "Cargo mix", "kind": "publicly calibrated", "source": "BTS FAF6 / 2022 Commodity Flow Survey"},
+    {"label": "Truck and appointment records", "kind": "synthetic", "source": "PigeonOps seeded demo data"},
+    {"label": "Inspection accuracy", "kind": "assumed", "source": "Hackathon sensitivity parameter"}
+  ],
   "decision_model": {
     "lateness_cost_per_minute": 85,
-    "emissions_cost_per_kg": 2.5,
+    "emissions_cost_per_kg": 0.25,
     "hard_constraint_penalty": 2500,
-    "drone": {
-      "label": "Simulated inspection feed",
-      "accuracy": 0.90,
-      "launch_and_review_minutes": 6,
-      "direct_cost": 90,
-      "delay_cost": 75,
-      "note": "Hackathon simulation only. No command is sent to real hardware."
-    },
+    "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "launch_and_review_minutes": 6, "direct_cost": 90, "delay_cost": 75, "note": "Synthetic evidence only. The 90% accuracy is an assumption shown for sensitivity testing; no command is sent to real hardware."},
     "actions": [
-      {
-        "id": "hold-course", "label": "Keep current route", "summary": "Stay on CA-47 and preserve the appointment if the report is false.",
-        "outcomes": {
-          "open": {"lateness_min": 0, "incremental_cost": 0, "emissions_kg": 8, "constraint_breaches": 0},
-          "blocked": {"lateness_min": 42, "incremental_cost": 320, "emissions_kg": 25, "constraint_breaches": 1}
-        }
-      },
-      {
-        "id": "reroute", "label": "Reroute via Anaheim St", "summary": "Take the known detour now; reliable but longer.",
-        "outcomes": {
-          "open": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0},
-          "blocked": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0}
-        }
-      },
-      {
-        "id": "swap-truck", "label": "Swap with TRK-12", "summary": "Use the nearer truck after 09:25 and resequence both loads.",
-        "outcomes": {
-          "open": {"lateness_min": 12, "incremental_cost": 410, "emissions_kg": 20, "constraint_breaches": 0},
-          "blocked": {"lateness_min": 9, "incremental_cost": 460, "emissions_kg": 22, "constraint_breaches": 0}
-        }
-      }
+      {"id": "hold-course", "label": "Keep current route", "summary": "Preserve the appointment if the report is false.", "stakeholder_effect": "No reassignment; highest disruption exposure.", "outcomes": {"open": {"lateness_min": 0, "incremental_cost": 0, "emissions_kg": 8, "constraint_breaches": 0}, "blocked": {"lateness_min": 42, "incremental_cost": 320, "emissions_kg": 25, "constraint_breaches": 1}}},
+      {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Take the known detour now; reliable but longer.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "outcomes": {"open": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0}, "blocked": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0}}},
+      {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Use the nearer truck after 09:25 and resequence both loads.", "stakeholder_effect": "Protects the priority load but puts SYN-SHP-1048 on watch.", "outcomes": {"open": {"lateness_min": 12, "incremental_cost": 410, "emissions_kg": 20, "constraint_breaches": 0}, "blocked": {"lateness_min": 9, "incremental_cost": 460, "emissions_kg": 22, "constraint_breaches": 0}}}
     ]
+  },
+  "scenario_variants": {
+    "normal": {
+      "id": "port-la-normal", "name": "Normal morning flow", "scenario_type": "normal",
+      "disruption": {"id": "OPS-NORMAL", "eyebrow": "NORMAL OPERATIONS", "title": "Morning dispatch is within planned tolerances", "description": "No confirmed roadway disruption. PigeonOps monitors four tight appointments and recommends acting without additional inspection.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.05, "reported_at": "09:12", "decision_deadline": "09:24", "constraints": ["Four appointments begin within 90 minutes", "SYN-SHP-1042 has 21 minutes of arrival slack", "SYN-TRK-12 remains committed to SYN-SHP-1048"]},
+      "shipment_overrides": {"SYN-SHP-1042": {"status": "on-time", "slack_min": 21, "eta": "09:54"}, "SYN-SHP-1048": {"status": "on-time", "slack_min": 25, "eta": "10:35"}, "SYN-SHP-1055": {"status": "on-time", "slack_min": 23, "eta": "10:22"}},
+      "decision_model": {"actions": [
+        {"id": "hold-course", "label": "Keep current route", "summary": "Continue on the planned corridor while conditions remain normal.", "stakeholder_effect": "No reassignment or added neighborhood mileage.", "outcomes": {"open": {"lateness_min": 0, "incremental_cost": 0, "emissions_kg": 8, "constraint_breaches": 0}, "blocked": {"lateness_min": 25, "incremental_cost": 260, "emissions_kg": 20, "constraint_breaches": 1}}},
+        {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Avoid a low-probability problem at a known time and mileage cost.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "outcomes": {"open": {"lateness_min": 14, "incremental_cost": 190, "emissions_kg": 29, "constraint_breaches": 0}, "blocked": {"lateness_min": 14, "incremental_cost": 190, "emissions_kg": 29, "constraint_breaches": 0}}},
+        {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Resequence two healthy loads without a confirmed need.", "stakeholder_effect": "Creates avoidable risk for SYN-SHP-1048.", "outcomes": {"open": {"lateness_min": 10, "incremental_cost": 360, "emissions_kg": 18, "constraint_breaches": 0}, "blocked": {"lateness_min": 8, "incremental_cost": 410, "emissions_kg": 20, "constraint_breaches": 0}}}
+      ]}
+    },
+    "disruption": {
+      "id": "port-la-disruption", "name": "Changed condition", "scenario_type": "disruption",
+      "disruption": {"id": "DSP-07", "eyebrow": "ACTIVE DISRUPTION", "title": "Possible overturned vehicle on CA-47 connector", "description": "Two unverified driver reports indicate a partial or full blockage. The medical-equipment load has 12 minutes of appointment slack.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.55, "reported_at": "09:08", "decision_deadline": "09:18", "constraints": ["Warehouse appointment begins at 10:15", "Medical-equipment load is priority critical", "SYN-TRK-12 cannot transfer before 09:25", "A truck swap places SYN-SHP-1048 on watch"]}
+    }
   }
 }

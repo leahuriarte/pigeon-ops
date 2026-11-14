@@ -38,6 +38,7 @@ def rank_actions(model, blocked_probability):
         }
         ranked.append({
             "id": action["id"], "label": action["label"], "summary": action["summary"],
+            "stakeholder_effect": action.get("stakeholder_effect", "No additional stakeholder effect recorded."),
             "expected": expected, "expected_loss": round(expected_loss, 2),
             "outcomes": action["outcomes"]
         })

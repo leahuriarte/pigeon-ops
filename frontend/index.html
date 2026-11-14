@@ -12,19 +12,26 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="brand-mark">P</span><div><strong>PigeonOps</strong><small>Decision intelligence • simulation</small></div></div>
-    <div class="status"><span class="pulse"></span> Port operations live <span id="clock"></span></div>
+    <div class="topbar-actions">
+      <div class="scenario-switch" role="group" aria-label="Demo scenario">
+        <button data-scenario="normal">Normal flow</button>
+        <button data-scenario="disruption" class="active">Changed condition</button>
+      </div>
+      <div class="status"><span class="pulse"></span> Simulation live <span id="clock"></span></div>
+    </div>
   </header>
   <main>
     <section class="hero panel">
-      <div><p class="eyebrow">ACTIVE DISRUPTION <span id="disruption-id"></span></p><h1 id="disruption-title">Loading scenario…</h1><p id="disruption-description"></p></div>
+      <div><p class="eyebrow"><span id="scenario-eyebrow">ACTIVE DISRUPTION</span> <span id="disruption-id"></span></p><h1 id="disruption-title">Loading scenario…</h1><p id="disruption-description"></p></div>
       <div class="risk-gauge"><span>Blockage likelihood</span><strong id="risk-value">—</strong><small>unverified prior</small></div>
     </section>
+    <section id="ops-summary" class="ops-summary" aria-label="Operating summary"></section>
     <section class="layout">
       <div class="left-column">
         <section class="panel map-panel">
-          <div class="panel-heading"><div><p class="eyebrow">NETWORK VIEW</p><h2>Port movement map</h2></div><div class="legend"><i class="route-primary"></i> Current <i class="route-detour"></i> Detour</div></div>
+          <div class="panel-heading map-heading"><div><p class="eyebrow">NETWORK VIEW</p><h2>Port movement map</h2></div><div class="legend"><i class="route-primary"></i> Current <i class="route-detour"></i> Detour <i class="route-fleet"></i> Fleet</div></div>
           <div class="map-shell">
-            <arcgis-map id="arcgis-map" class="arcgis-map" basemap="osm" center="-118.2325, 33.76" zoom="12" aria-label="Interactive ArcGIS map of Port of Los Angeles and Long Beach routes">
+            <arcgis-map id="arcgis-map" class="arcgis-map" basemap="osm" center="-118.24, 33.80" zoom="11" aria-label="Interactive ArcGIS map of port shipments, trucks, and routes">
               <arcgis-zoom slot="top-left"></arcgis-zoom>
               <arcgis-popup slot="popup"></arcgis-popup>
             </arcgis-map>
@@ -34,8 +41,10 @@
               <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#c5e1e8"/>
               <g id="routes"></g><g id="markers"></g><text x="20" y="370" class="water-label">SAN PEDRO BAY • OFFLINE SCHEMATIC</text>
             </svg>
+            <div class="map-overlay"><span><b id="map-truck-count">—</b> trucks</span><span><b id="map-shipment-count">—</b> shipments</span><span><b id="map-risk-count">—</b> need attention</span></div>
             <span id="map-provider" class="map-provider">Loading ArcGIS map…</span>
           </div>
+          <div class="shipment-toolbar"><strong>Shipment queue</strong><div id="shipment-filters"><button data-filter="attention" class="active">Needs attention</button><button data-filter="all">All shipments</button></div></div>
           <div id="shipment-strip" class="shipment-strip"></div>
         </section>
         <section class="panel">
@@ -61,6 +70,8 @@
           <div id="posterior" class="posterior hidden"></div>
         </section>
         <section class="panel constraints"><p class="eyebrow">KNOWN CONSTRAINTS</p><ul id="constraints"></ul></section>
+        <section class="panel"><div class="panel-heading"><div><p class="eyebrow">FLEET CAPACITY</p><h2>Truck availability</h2></div><span id="fleet-count" class="count-badge">—</span></div><div id="fleet-list" class="fleet-list"></div></section>
+        <section class="panel"><p class="eyebrow">DATA CONFIDENCE</p><h2>What is real vs simulated?</h2><div id="provenance" class="provenance"></div><p class="fine-print">All shipment, truck, appointment, incident, and inspection records are fictional. See DATA.md for methodology and sources.</p></section>
       </aside>
     </section>
   </main>

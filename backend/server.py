@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from backend.decision_engine import analyze
-from backend.scenario import load_scenario
+from backend.scenario import available_scenarios, load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
@@ -25,15 +25,26 @@ class DemoHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/health":
             return self._json({"status": "ok"})
+        if parsed.path == "/api/scenarios":
+            return self._json({"scenarios": available_scenarios()})
         if parsed.path == "/api/scenario":
-            scenario = load_scenario()
+            variant = parse_qs(parsed.query).get("scenario", ["disruption"])[0]
+            try:
+                scenario = load_scenario(variant=variant)
+            except ValueError as error:
+                return self._json({"error": str(error)}, 404)
             scenario["analysis"] = analyze(scenario)
             return self._json(scenario)
         if parsed.path == "/api/analysis":
-            observation = parse_qs(parsed.query).get("observation", [None])[0]
+            params = parse_qs(parsed.query)
+            observation = params.get("observation", [None])[0]
             if observation not in (None, "blocked", "clear", "inconclusive"):
                 return self._json({"error": "observation must be blocked, clear, or inconclusive"}, 400)
-            scenario = load_scenario()
+            variant = params.get("scenario", ["disruption"])[0]
+            try:
+                scenario = load_scenario(variant=variant)
+            except ValueError as error:
+                return self._json({"error": str(error)}, 404)
             return self._json(analyze(scenario, observation))
         return self._static(parsed.path)
 

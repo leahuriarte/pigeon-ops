@@ -1,6 +1,6 @@
 # PigeonOps: Drone-Assisted Logistics Decision Intelligence
 
-A dependency-light, one-day-hackathon starter for deciding **whether more information is worth gathering before a dispatcher acts**. The demo uses synthetic Port of Los Angeles / Long Beach operations, a simulated road disruption, and a simulated observation feed. It never controls or deploys a real drone.
+A dependency-light hackathon prototype for deciding **whether more information is worth gathering before a dispatcher acts**. The demo uses publicly calibrated synthetic Port of Los Angeles / Long Beach operations, a simulated road disruption, and a simulated observation feed. It never controls or deploys a real drone.
 
 The network view uses ArcGIS Maps SDK for JavaScript 5.2 with an OpenStreetMap basemap, so it does not require an ArcGIS API key or a paid ArcGIS location service. If the CDN or map tiles are unavailable, the original schematic remains as an offline fallback.
 
@@ -14,7 +14,9 @@ Requires Python 3.9+ and no package installation.
 python3 run.py
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Click **Run simulated inspection**, then choose the evidence returned by the stub. The ranked dispatcher options and blockage probability update immediately.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flow** and **Changed condition**, inspect the shipment and truck network, then click **Run simulated inspection**. The ranked dispatcher options and blockage probability update immediately.
+
+The demo includes 12 fictional shipments, 9 fictional trucks, multiple port-to-warehouse corridors, appointment and readiness context, and visible data-provenance labels. Read [DATA.md](DATA.md) for the source inventory, modeling choices, and limitations.
 
 Run the automated checks with:
 
@@ -30,11 +32,12 @@ python3 -m unittest discover -s tests -v
 
 ## Demo story (about 90 seconds)
 
-1. `SHP-1042`, a medical-device container, may miss its warehouse appointment because CA-47 could be blocked.
-2. The dashboard ranks acting now: keep course, reroute, or swap trucks.
-3. The expected-value-of-information card explains whether a six-minute simulated inspection is worth its cost.
-4. Run the inspection and select **Road blocked** or **Road clear** as the prerecorded/CV-stub result.
-5. Show the posterior blockage probability and newly ranked options. Emphasize that a dispatcher approves any action.
+1. Start with **Normal flow**: the fleet is visible, four appointments are tight, and inspection is not worth its cost.
+2. Switch to **Changed condition**: `SYN-SHP-1042` may miss its appointment because CA-47 could be blocked.
+3. Compare keep course, reroute, and truck-swap options, including stakeholder and environmental effects.
+4. Show why a six-minute simulated inspection is worth gathering in this condition.
+5. Run the inspection and select **Road blocked**, **Road clear**, or **Inconclusive** as the stub result.
+6. Show the posterior blockage probability and newly ranked options. Emphasize that a dispatcher approves any action.
 
 ## How the decision model works
 
@@ -75,10 +78,12 @@ run.py                        One-command entry point
 Useful endpoints:
 
 - `GET /api/health`
-- `GET /api/scenario`
-- `GET /api/analysis?observation=blocked`
-- `GET /api/analysis?observation=clear`
-- `GET /api/analysis?observation=inconclusive`
+- `GET /api/scenarios`
+- `GET /api/scenario?scenario=normal`
+- `GET /api/scenario?scenario=disruption`
+- `GET /api/analysis?scenario=disruption&observation=blocked`
+- `GET /api/analysis?scenario=disruption&observation=clear`
+- `GET /api/analysis?scenario=disruption&observation=inconclusive`
 
 ## Extend it quickly
 
