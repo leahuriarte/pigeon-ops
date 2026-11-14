@@ -114,6 +114,19 @@
               </fieldset>
               <span id="plan-note" class="plan-note"></span>
             </div>
+            <section id="tally-block" class="tally" aria-labelledby="tally-title" hidden>
+              <div class="tally-head">
+                <h3 id="tally-title">Running tally</h3>
+                <p id="tally-scope"></p>
+                <span class="basis estimated">Estimated</span>
+              </div>
+              <ul id="tally" class="tally-tiles"></ul>
+              <div class="tally-race">
+                <p class="tally-race-title">Cost so far for each response <span id="tally-race-road"></span></p>
+                <ol id="tally-race" class="tally-race-list"></ol>
+              </div>
+              <p id="tally-note" class="note"></p>
+            </section>
             <ol id="event-feed" class="event-feed" aria-live="polite"></ol>
           </div>
           <p class="note"><span id="map-provider">Loading map…</span> <span id="conditions"></span></p>

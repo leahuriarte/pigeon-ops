@@ -69,6 +69,7 @@ let speed = 5; // Simulated minutes per real second.
 let lastFrame = 0;
 let renderer = null;
 let plan = { action: "hold-course", road: "open" };
+let span = { start: 0, end: 1 }; // Timeline range, shared by every response's playback.
 const liveKeys = new Map();
 
 // Planar distance in metres, good enough for interpolation over a few kilometres.
@@ -142,31 +143,49 @@ function truckTone(state) {
   return state.moving ? colors.ink : colors.stopped;
 }
 
+const playbackCache = new Map();
+async function fetchPlayback(action, road) {
+  const params = new URLSearchParams({ scenario: activeScenario, action, road });
+  const key = params.toString();
+  if (!playbackCache.has(key)) {
+    const request = fetch(`/api/playback?${params}`).then((response) => {
+      if (!response.ok) throw new Error("The playback failed to load");
+      return response.json();
+    });
+    playbackCache.set(key, request);
+    request.catch(() => playbackCache.delete(key));
+  }
+  return playbackCache.get(key);
+}
+
 async function loadPlayback({ keepTime = false } = {}) {
-  const params = new URLSearchParams({ scenario: activeScenario, action: plan.action, road: plan.road });
-  const response = await fetch(`/api/playback?${params}`);
-  if (!response.ok) throw new Error("The playback failed to load");
-  playback = await response.json();
+  const actions = scenario.decision_model.actions.map((a) => a.id);
+  const all = await Promise.all(actions.map((id) => fetchPlayback(id, plan.road)));
+  playback = all[actions.indexOf(plan.action)];
   tracks = playback.tracks.map(prepareTrack);
+  buildTallies(Object.fromEntries(actions.map((id, i) => [id, all[i]])));
   liveKeys.clear();
+  // One timeline for every response, so switching responses keeps the clock and the race lines up.
+  span = { start: playback.start, end: Math.max(...all.map((p) => p.end)) };
   const slider = $("#timeline");
-  slider.min = playback.start;
-  slider.max = playback.end;
-  currentTime = keepTime ? clamp(currentTime, playback.start, playback.end) : playback.start;
-  $("#timeline-start").textContent = clockLabel(playback.start);
-  $("#timeline-end").textContent = clockLabel(playback.end);
+  slider.min = span.start;
+  slider.max = span.end;
+  currentTime = keepTime ? clamp(currentTime, span.start, span.end) : span.start;
+  $("#timeline-start").textContent = clockLabel(span.start);
+  $("#timeline-end").textContent = clockLabel(span.end);
   playback.alternatives.forEach((alt) => document.documentElement.style.setProperty(`--route-${alt.id}`, alt.color));
   renderTicks();
   renderPlanNote();
   renderer?.setPlayback(playback, tracks);
+  renderTallyFrame();
   updateFrame();
 }
 
 function renderTicks() {
-  const span = playback.end - playback.start;
+  const width = span.end - span.start;
   const marks = playback.events.filter((event) => event.tone !== "info");
   $("#timeline-ticks").innerHTML = marks.map((event) => {
-    const left = ((event.t - playback.start) / span) * 100;
+    const left = ((event.t - span.start) / width) * 100;
     const mine = selectedTruck && event.truck === selectedTruck;
     return `<i class="tick ${event.tone}${mine ? " mine" : ""}" style="left:${left.toFixed(2)}%"></i>`;
   }).join("");
@@ -191,7 +210,7 @@ function updateFrame() {
   if (!playback) return;
   const slider = $("#timeline");
   slider.value = currentTime;
-  slider.style.setProperty("--p", `${((currentTime - playback.start) / (playback.end - playback.start)) * 100}%`);
+  slider.style.setProperty("--p", `${((currentTime - span.start) / (span.end - span.start)) * 100}%`);
   slider.setAttribute("aria-valuetext", clockLabel(currentTime));
   $("#map-clock").textContent = clockLabel(currentTime);
   const states = tracks.map((track) => stateAt(track, currentTime));
@@ -199,21 +218,22 @@ function updateFrame() {
   updateFleetLive(states);
   updateTruckCard(states);
   updateEventFeed();
+  updateTally();
 }
 
 function frame(now) {
   if (!playing) return;
   const elapsed = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
-  currentTime = Math.min(playback.end, currentTime + elapsed * speed);
+  currentTime = Math.min(span.end, currentTime + elapsed * speed);
   updateFrame();
-  if (currentTime >= playback.end) setPlaying(false);
+  if (currentTime >= span.end) setPlaying(false);
   else requestAnimationFrame(frame);
 }
 
 function setPlaying(value) {
   if (!playback) return;
-  if (value && currentTime >= playback.end) currentTime = playback.start;
+  if (value && currentTime >= span.end) currentTime = span.start;
   playing = value;
   lastFrame = 0;
   const button = $("#play");
@@ -266,6 +286,162 @@ function updateEventFeed() {
     <span>${upcoming ? "Next: " : ""}${esc(event.text)}</span></li>`;
   const rows = [...past.map((event) => row(event, false)), next ? row(next, true) : ""];
   $("#event-feed").innerHTML = rows.join("") || '<li class="upcoming"><span>Press play to start the simulation.</span></li>';
+}
+
+// ---------------------------------------------------------------------------
+// Running tally. For each response, the pool shipments' computed outcome rows
+// (decision_model.actions[*].outcomes[road].detail.shipments) are spread over
+// that response's playback, so the counters end exactly at the computed totals.
+// Miles, CO2 and per-mile cost follow the truck's distance driven; driver time
+// follows the clock; delay ticks once the truck can no longer arrive on time;
+// a missed appointment counts when its window closes without the truck.
+// ---------------------------------------------------------------------------
+let tallies = {};
+let planTotals = null; // Keep the current route with CA-47 open: the original plan.
+const tallyKeys = new Map();
+const tallyMetrics = [
+  { id: "cost", label: "Cost so far", format: (v) => money(v) },
+  { id: "co2", label: "CO₂ emitted", format: (v) => `${v.toFixed(1)} <small>kg</small>` },
+  { id: "miles", label: "Miles driven", format: (v) => `${v.toFixed(1)} <small>mi</small>` },
+  { id: "late", label: "Minutes late", format: (v) => `${whole(v)} <small>min</small>` },
+  { id: "missed", label: "Missed appointments", format: (v) => whole(v) },
+];
+
+function outcomeRows(actionId, road) {
+  const action = scenario.decision_model.actions.find((a) => a.id === actionId);
+  return action?.outcomes?.[road]?.detail?.shipments ?? null;
+}
+
+function checkInTime(pb, row) {
+  const event = pb.events.find((e) => e.truck === row.truck && e.text.startsWith("Checks in") && e.text.includes(row.shipment));
+  return event ? event.t : clockMinutes(row.arrival);
+}
+
+function clockMinutes(text) {
+  const [h, m] = text.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function buildTallies(playbacks) {
+  tallies = {};
+  tallyKeys.clear();
+  for (const [actionId, pb] of Object.entries(playbacks)) {
+    const rows = outcomeRows(actionId, plan.road);
+    if (!rows) continue;
+    tallies[actionId] = rows.map((row) => {
+      const raw = pb.tracks.find((t) => t.id === row.truck);
+      const track = raw ? prepareTrack(raw) : null;
+      const t0 = pb.start;
+      const t1 = Math.max(t0 + 1, checkInTime(pb, row));
+      const d0 = track ? stateAt(track, t0).dist : 0;
+      const d1 = track ? stateAt(track, t1).dist : 0;
+      const windowEnd = clockMinutes(row.appointment.split("–")[1] ?? row.appointment);
+      return { ...row, track, t0, t1, d0, d1, breachAt: Math.min(t1, windowEnd) };
+    });
+  }
+  planTotals = totalsAt(outcomeRows("hold-course", "open")?.map((row) => ({ ...row, t0: 0, t1: 1, breachAt: 0 })) ?? [], Infinity);
+}
+
+function totalsAt(rows, t) {
+  const m = scenario.decision_model;
+  const out = { cost: 0, co2: 0, miles: 0, late: 0, missed: 0 };
+  for (const row of rows) {
+    const byTime = clamp((t - row.t0) / (row.t1 - row.t0), 0, 1);
+    let byDistance = byTime;
+    if (row.track && row.d1 > row.d0 && t < row.t1) byDistance = clamp((stateAt(row.track, Math.max(t, row.t0)).dist - row.d0) / (row.d1 - row.d0), 0, 1);
+    const mileCost = row.miles * m.rates.cost_per_mile;
+    const late = clamp(t - (row.t1 - row.lateness_min), 0, row.lateness_min);
+    const missed = row.constraint_breaches > 0 && t >= row.breachAt ? row.constraint_breaches : 0;
+    const co2 = row.emissions_kg * byDistance;
+    out.miles += row.miles * byDistance;
+    out.co2 += co2;
+    out.late += late;
+    out.missed += missed;
+    out.cost += mileCost * byDistance + (row.trip_cost - mileCost) * byTime
+      + late * m.lateness_cost_per_minute + co2 * m.emissions_cost_per_kg + missed * m.hard_constraint_penalty;
+  }
+  return out;
+}
+
+function setHTML(key, node, html) {
+  if (tallyKeys.get(key) === html) return false;
+  tallyKeys.set(key, html);
+  node.innerHTML = html;
+  return true;
+}
+
+function renderTallyFrame() {
+  const block = $("#tally-block");
+  const current = tallies[plan.action];
+  block.hidden = !current;
+  if (!current) return;
+  const actions = scenario.decision_model.actions;
+  const label = actions.find((a) => a.id === plan.action).label;
+  const road = scenario.scenario_type === "disruption" ? `, CA-47 ${plan.road}` : "";
+  $("#tally-scope").textContent = `${label}${road}`;
+  $("#tally-race-road").textContent = scenario.scenario_type === "disruption" ? `(CA-47 ${plan.road})` : "";
+  $("#tally").innerHTML = tallyMetrics.map((metric) => `<li class="tally-tile" data-metric="${metric.id}">
+    <span class="kpi-label">${metric.label}</span>
+    <span class="tally-value"></span>
+    <span class="tally-bar" aria-hidden="true"><i></i></span>
+    <span class="tally-foot"></span></li>`).join("");
+  const best = scenario.analysis.before[0]?.id;
+  $("#tally-race").innerHTML = actions.filter((a) => tallies[a.id]).map((a) => `<li>
+    <button type="button" class="tally-row${a.id === plan.action ? " current" : ""}" data-show="${esc(a.id)}" aria-pressed="${a.id === plan.action}">
+      <span class="tally-row-name">${esc(a.label)}${a.id === best ? ' <small>model’s pick</small>' : ""}</span>
+      <span class="tally-row-bar" aria-hidden="true"><i class="ghost"></i><i class="fill"></i></span>
+      <span class="tally-row-value"></span>
+    </button></li>`).join("");
+  const r = scenario.decision_model;
+  const shipments = [...new Set(current.map((row) => row.shipment))].join(" and ");
+  $("#tally-note").textContent = `Covers ${shipments}, the shipments the responses change, from ${clockLabel(span.start)} until each is delivered. Cost adds truck running cost ($${r.rates.cost_per_mile.toFixed(2)}/mi), driver time ($${r.rates.driver_hourly_rate}/h), delay (${money(r.lateness_cost_per_minute)}/min), CO₂ ($${r.emissions_cost_per_kg.toFixed(2)}/kg) and ${money(r.hard_constraint_penalty)} per missed appointment. All rates are assumed.`;
+  tallyKeys.clear();
+}
+
+function updateTally() {
+  const current = tallies[plan.action];
+  if (!current) return;
+  const now = totalsAt(current, currentTime);
+  const final = totalsAt(current, Infinity);
+  tallyMetrics.forEach((metric) => {
+    const tile = document.querySelector(`.tally-tile[data-metric="${metric.id}"]`);
+    if (!tile) return;
+    const changed = setHTML(`v-${metric.id}`, tile.querySelector(".tally-value"), metric.format(now[metric.id]));
+    const share = final[metric.id] > 0 ? now[metric.id] / final[metric.id] : 0;
+    tile.querySelector(".tally-bar i").style.width = `${(share * 100).toFixed(1)}%`;
+    const diff = final[metric.id] - planTotals[metric.id];
+    const tone = Math.abs(diff) < 0.05 ? "" : diff > 0 ? "worse" : "better";
+    const vsPlan = tone ? `${diff > 0 ? "+" : "−"}${metric.format(Math.abs(diff)).replace(/<[^>]+>/g, "")} vs plan` : "same as plan";
+    setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), `<span>Ends at ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span><span class="${tone}">${vsPlan}</span>`);
+    // A missed appointment or the first late minute is a step change worth drawing the eye to.
+    if (changed && metric.id === "missed" && now.missed > 0) bump(tile);
+    if (metric.id === "late") tile.classList.toggle("alert", now.late > 0);
+    if (metric.id === "missed") tile.classList.toggle("alert", now.missed > 0);
+  });
+  const finals = Object.fromEntries(Object.entries(tallies).map(([id, rows]) => [id, totalsAt(rows, Infinity).cost]));
+  const top = Math.max(...Object.values(finals), 1);
+  $$("#tally-race .tally-row").forEach((row) => {
+    const id = row.dataset.show;
+    const cost = totalsAt(tallies[id], currentTime).cost;
+    row.querySelector(".ghost").style.width = `${(finals[id] / top * 100).toFixed(1)}%`;
+    row.querySelector(".fill").style.width = `${(cost / top * 100).toFixed(1)}%`;
+    setHTML(`race-${id}`, row.querySelector(".tally-row-value"), `${money(cost)} <small>of ${money(finals[id])}</small>`);
+  });
+}
+
+function bump(node) {
+  node.classList.remove("bump");
+  void node.offsetWidth;
+  node.classList.add("bump");
+}
+
+async function watchResponse(actionId) {
+  if (actionId === plan.action && playing) return;
+  plan = { ...plan, action: actionId };
+  setPlaying(false);
+  await loadPlayback();
+  $(".map-block").scrollIntoView({ behavior: "smooth", block: "start" });
+  setPlaying(true);
 }
 
 function selectTruck(id) {
@@ -635,6 +811,7 @@ function renderRankings(items, observation = null) {
       </div>
       <p>${esc(item.summary)}</p>
       <p class="muted">${esc(item.stakeholder_effect)}</p>
+      <button class="link watch" type="button" data-watch="${esc(item.id)}">Watch it play out on the map</button>
       <dl class="option-metrics">
         <div><dt>Delay</dt><dd>${whole(e.lateness_min)} min</dd></div>
         <div><dt>Direct cost</dt><dd>${money(e.incremental_cost)}</dd></div>
@@ -829,6 +1006,15 @@ function bindEvents() {
   });
 
   $("#play").addEventListener("click", () => setPlaying(!playing));
+  document.addEventListener("click", (event) => {
+    const watch = event.target.closest("[data-watch]");
+    if (watch) watchResponse(watch.dataset.watch);
+    const show = event.target.closest("[data-show]");
+    if (show && show.dataset.show !== plan.action) {
+      plan = { ...plan, action: show.dataset.show };
+      loadPlayback({ keepTime: true });
+    }
+  });
   $("#timeline").addEventListener("input", (event) => {
     currentTime = Number(event.target.value);
     updateFrame();
