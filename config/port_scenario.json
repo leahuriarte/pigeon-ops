@@ -29,7 +29,7 @@
   ],
   "trucks": [
     {"id": "SYN-TRK-07", "status": "en-route", "assignment": "SYN-SHP-1042", "fuel": "Diesel", "duty_remaining_hr": 5.8, "lat": 33.756, "lon": -118.248},
-    {"id": "SYN-TRK-12", "status": "available-soon", "assignment": "SYN-SHP-1048", "fuel": "Battery electric", "duty_remaining_hr": 7.1, "lat": 33.782, "lon": -118.218},
+    {"id": "SYN-TRK-12", "status": "available-soon", "available_at": "09:25", "assignment": "SYN-SHP-1048", "fuel": "Battery electric", "duty_remaining_hr": 7.1, "lat": 33.782, "lon": -118.218},
     {"id": "SYN-TRK-19", "status": "en-route", "assignment": "SYN-SHP-1051", "fuel": "Diesel", "duty_remaining_hr": 4.9, "lat": 33.799, "lon": -118.246},
     {"id": "SYN-TRK-22", "status": "at-terminal", "assignment": "SYN-SHP-1055", "fuel": "Natural gas", "duty_remaining_hr": 6.4, "lat": 33.749, "lon": -118.275},
     {"id": "SYN-TRK-31", "status": "en-route", "assignment": "SYN-SHP-1058", "fuel": "Diesel", "duty_remaining_hr": 5.2, "lat": 33.813, "lon": -118.211},

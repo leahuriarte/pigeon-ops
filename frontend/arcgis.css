@@ -1,10 +1,10 @@
 .map-shell {
   position: relative;
-  height: 420px;
+  height: 540px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #eef0f1;
+  background: #f2f3f1;
 }
 
 .arcgis-map,
@@ -14,29 +14,162 @@
   height: 100%;
 }
 
-.map-provider {
+/* The schematic keeps its own aspect ratio, and the truck card sits below it. */
+.map-shell.schematic { height: auto; }
+.map-shell.schematic #map-fallback { height: auto; }
+.map-shell.schematic .truck-card { position: static; width: auto; margin: 0; border-width: 1px 0 0 3px; border-radius: 0; box-shadow: none; }
+
+/* Overlays */
+.map-clock {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 10px;
+  right: 10px;
   z-index: 2;
-  padding: 3px 6px;
+  display: grid;
+  justify-items: end;
+  padding: 6px 10px 5px;
   border: 1px solid var(--line);
-  border-radius: 2px;
-  background: #fffffff0;
-  color: var(--muted);
-  font-size: 12px;
+  border-radius: var(--radius);
+  background: #ffffffeb;
+  box-shadow: 0 1px 3px #1b1f2314;
+  pointer-events: none;
 }
+.map-clock b { font-size: 20px; line-height: 1.1; letter-spacing: 0.02em; }
+.map-clock span { color: var(--muted); font-size: 11px; }
+
+.truck-card {
+  position: absolute;
+  top: 10px;
+  left: 56px;
+  z-index: 2;
+  width: min(320px, calc(100% - 20px));
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--selected);
+  border-radius: var(--radius);
+  background: #fffffff2;
+  box-shadow: 0 2px 8px #1b1f231f;
+  font-size: 13px;
+}
+.truck-card p { margin-top: 4px; }
+.truck-card-head { display: flex; align-items: center; gap: 10px; }
+.truck-card-head .link { margin-left: auto; font-size: 12px; }
+
+/* Playback controls */
+.playback { display: grid; gap: 10px; margin-top: 12px; }
+.playback-main { display: flex; align-items: center; gap: 12px; }
+.play {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+}
+.play:hover { background: #343a40; }
+.play svg { width: 14px; height: 14px; fill: currentColor; }
+.play .icon-pause, .play.playing .icon-play { display: none; }
+.play.playing .icon-pause { display: block; }
+
+.timeline { position: relative; flex: 1; min-width: 0; padding-top: 2px; }
+.timeline input {
+  --p: 0%;
+  display: block;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+.timeline input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--ink) var(--p), var(--line) var(--p));
+}
+.timeline input::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+.timeline input::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--ink); }
+.timeline input::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: #fff;
+  appearance: none;
+}
+.timeline input::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid var(--ink); border-radius: 50%; background: #fff; }
+.timeline input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.ticks { position: absolute; top: 0; right: 8px; left: 8px; height: 6px; pointer-events: none; }
+.tick { position: absolute; top: -2px; width: 2px; height: 6px; margin-left: -1px; border-radius: 1px; background: var(--ok); }
+.tick.watch { background: #c27c0e; }
+.tick.risk { background: var(--risk); }
+.tick.mine { top: -5px; height: 9px; width: 3px; }
+.timeline-ends { display: flex; justify-content: space-between; margin-top: 2px; color: var(--muted); font-size: 12px; }
+
+.playback select {
+  padding: 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.speed { flex: none; }
+
+.plan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.plan-action { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.plan-action select { color: var(--ink); }
+.plan .segmented { background: var(--surface); }
+.plan-note { color: var(--muted); font-size: 13px; }
+
+.event-feed { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.event-feed li { display: grid; grid-template-columns: 44px 36px minmax(0, 1fr); gap: 6px; align-items: baseline; padding: 3px 0 3px 8px; border-left: 3px solid var(--line); }
+.event-feed li > span:only-child { grid-column: 1 / -1; color: var(--muted); }
+.event-feed time { color: var(--muted); }
+.event-feed .ok { border-left-color: var(--ok); }
+.event-feed .watch { border-left-color: #c27c0e; }
+.event-feed .risk { border-left-color: var(--risk); }
+.event-feed .upcoming { color: var(--muted); border-left-style: dashed; }
+.event-feed .upcoming .link.quiet { color: var(--muted); }
+
+.trucks td.live { min-width: 190px; }
+.trucks td.live .detail { white-space: normal; }
 
 /* Schematic fallback */
-.route { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
-.route.detour { stroke-dasharray: 9 7; }
-.route.fleet { stroke-width: 3; }
-.marker circle { stroke: #fff; stroke-width: 2; }
-.marker text, .truck-marker text { fill: var(--ink); font-size: 11px; }
-.truck-marker rect { fill: var(--ink); stroke: #fff; stroke-width: 1.5; }
-.truck-marker.waiting rect { fill: #c27c0e; }
-.water-label { fill: #4f6f7a; font-size: 12px; }
+#map-fallback text { font-size: 11px; }
+.water-label { fill: #4f6f7a; }
+.alt { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.4; }
+.alt.current { stroke: #24508f; }
+.alt.detour { stroke: #c27c0e; stroke-dasharray: 9 7; }
+.alt.active { opacity: 0.95; }
+.trail { fill: none; stroke: #8a939b; stroke-linecap: round; stroke-linejoin: round; }
+.trail.ahead { stroke-width: 2.25; opacity: 0.65; }
+.trail.behind { stroke-width: 1.5; stroke-dasharray: 1 4; opacity: 0.45; }
+.trail.selected { stroke: var(--selected); }
+.trail.ahead.selected { stroke-width: 4; opacity: 1; }
+.place rect { fill: var(--ink); stroke: #fff; stroke-width: 2; }
+.place circle { fill: #fff; stroke: var(--muted); stroke-width: 2.5; }
+.place.incident circle { fill: var(--risk); stroke: #fff; }
+.place text { fill: #2f353a; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.truck { cursor: pointer; --tone: #7c858c; }
+.truck .arrow, .truck .stop { fill: var(--tone); stroke: #fff; stroke-width: 1.5; }
+.truck .arrow, .truck.moving .stop { display: none; }
+.truck.moving .arrow { display: block; }
+.truck.selected { --tone: var(--selected) !important; }
+.truck text { fill: var(--ink); font-size: 10px; font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
 
 @media (max-width: 640px) {
-  .map-shell { height: 320px; }
+  .map-shell { height: 340px; }
+  .map-clock b { font-size: 16px; }
+  .truck-card { top: auto; bottom: 10px; left: 10px; }
+  .playback-main { flex-wrap: wrap; }
+  .timeline { flex-basis: calc(100% - 48px); }
+  .speed { margin-left: 48px; }
 }

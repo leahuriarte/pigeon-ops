@@ -9,6 +9,7 @@ The shared operating picture in `config/port_scenario.json` contains:
 - 12 synthetic shipments across three port terminals and six destination facilities
 - 9 synthetic trucks with assignments, powertrains, status, duty time, and approximate simulated positions
 - 4 illustrative corridors, including a current route, candidate detour, and two fleet context routes
+- A playback schedule for every truck, built from the shipment ETAs, appointments, and release holds, with road-following paths in `config/road_geometry.json`
 - 2 scenario variants: routine morning operations and an unverified road disruption
 - 3 dispatcher actions with state-dependent delay, cost, emissions, and constraint outcomes
 - 1 simulated observation with an explicit accuracy assumption
@@ -50,7 +51,7 @@ The demo cargo labels are synthetic examples aligned to Standard Classification 
 - [Caltrans Performance Measurement System](https://dot.ca.gov/programs/traffic-operations/mpr/pems-source) provides historical detector, speed, volume, incident, closure, and travel-time data. A free account is required for detailed downloads.
 - [Caltrans Traffic Census](https://dot.ca.gov/programs/traffic-operations/census) publishes AADT, truck AADT, ramp volume, and peak-hour data.
 - [California Truck Network](https://dot.ca.gov/programs/traffic-operations/legal-truck-access/truck-network-map) is the official state reference for legal truck access.
-- The live map uses an OpenStreetMap basemap through the ArcGIS Maps SDK. Route lines in the scenario are illustrative polylines, not turn-by-turn navigation.
+- The live map uses Esri's light gray canvas basemap through the ArcGIS Maps SDK. Truck paths come from the public [OSRM](https://project-osrm.org/) demo server's car profile over [OpenStreetMap](https://www.openstreetmap.org/copyright) data (ODbL), fetched once by `scripts/build_road_geometry.py`. They follow real streets but ignore truck restrictions, so they are not truck-legal navigation.
 
 The current 31 mph network speed and 47 minute terminal turn time are demonstration estimates. They are labeled as publicly calibrated rather than direct measurements for November 14, 2026.
 
@@ -98,7 +99,8 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 
 ## Known limitations
 
-- Route lines are illustrative and must not be used for navigation.
+- Route lines are illustrative and must not be used for navigation. Playback paths use a car routing profile, not the California Truck Network.
+- Playback times are derived, not simulated traffic: trucks arrive at their scenario ETA, drive at up to 1.5× the network travel time, and otherwise wait at the destination. Load, unload, and transfer times (15, 20, and 10 min) are assumptions. Only SYN-TRK-07 and SYN-TRK-12 change with the dispatch option and road state.
 - Terminal turn time, traffic speed, and emissions are not live measurements.
 - Observation accuracy is assumed rather than validated on labeled footage.
 - Driver hours are synthetic summaries and do not implement hours-of-service compliance.

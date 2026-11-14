@@ -4,9 +4,24 @@ const money = (value) => `${value < 0 ? "−" : ""}$${Math.abs(Math.round(value)
 const pct = (value) => `${Math.round(value * 100)}%`;
 const whole = (value) => Math.round(value).toLocaleString("en-US");
 const esc = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+const clockLabel = (minutes) => {
+  const value = Math.floor(minutes + 1e-6);
+  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+};
+const shortTruck = (id) => id.replace("SYN-TRK-", "T");
 const svgNS = "http://www.w3.org/2000/svg";
 
-const colors = { ink: "#1b1f23", warehouse: "#5b6268", risk: "#b42318", amber: "#c27c0e" };
+const colors = {
+  ink: "#1b1f23",
+  muted: "#5b6268",
+  stopped: "#7c858c",
+  accent: "#24508f",
+  selected: "#6a3fb5",
+  risk: "#b42318",
+  amber: "#c27c0e",
+  route: "#8a939b",
+};
 const attentionStatuses = new Set(["at-risk", "watch", "unassigned"]);
 const shipmentStatus = {
   "on-time": ["On time", "ok"],
@@ -15,132 +30,549 @@ const shipmentStatus = {
   "at-risk": ["At risk", "risk"],
   unassigned: ["Unassigned", "risk"],
 };
-const truckStatus = {
-  "en-route": ["En route", "ok"],
-  "available-soon": ["Available soon", "watch"],
-  "at-terminal": ["At terminal", "planned"],
-  waiting: ["Waiting", "watch"],
+// Playback segment kinds: label, status tone, and whether the truck is moving.
+const activity = {
+  driving: ["Driving", "ok", true],
+  empty: ["Driving empty", "ok", true],
+  detour: ["On detour", "watch", true],
+  waiting: ["Waiting", "planned", false],
+  loading: ["Loading", "planned", false],
+  unloading: ["Unloading", "planned", false],
+  transfer: ["Swapping load", "watch", false],
+  busy: ["Finishing job", "planned", false],
+  blocked: ["Stuck", "risk", false],
+  idle: ["Done", "planned", false],
 };
 const observationLabels = {
   blocked: "the feed reported the road blocked",
   clear: "the feed reported the road clear",
   inconclusive: "an inconclusive feed result",
 };
-const truckIsWaiting = (truck) => truck.status === "waiting" || truck.status === "available-soon";
 const tag = ([label, tone]) => `<span class="status ${tone}">${label}</span>`;
 
 let scenario;
 let activeScenario = "disruption";
 let shipmentFilter = "attention";
 let selectedTruck = null;
-let mapLayers = [];
 
-function project(lat, lon) {
-  const b = scenario.map_bounds;
-  return [30 + ((lon - b.west) / (b.east - b.west)) * 700, 25 + ((b.north - lat) / (b.north - b.south)) * 320];
+// ---------------------------------------------------------------------------
+// Playback model
+// ---------------------------------------------------------------------------
+let playback = null;
+let tracks = [];
+let currentTime = 0;
+let playing = false;
+let speed = 5; // Simulated minutes per real second.
+let lastFrame = 0;
+let renderer = null;
+let plan = { action: "hold-course", road: "open" };
+const liveKeys = new Map();
+
+// Planar distance in metres, good enough for interpolation over a few kilometres.
+function metres([lon1, lat1], [lon2, lat2]) {
+  const k = Math.cos(((lat1 + lat2) / 2) * (Math.PI / 180));
+  return Math.hypot((lon2 - lon1) * k, lat2 - lat1) * 111320;
 }
 
+function bearing([lon1, lat1], [lon2, lat2]) {
+  const k = Math.cos(((lat1 + lat2) / 2) * (Math.PI / 180));
+  return (Math.atan2((lon2 - lon1) * k, lat2 - lat1) * 180) / Math.PI;
+}
+
+function prepareTrack(track) {
+  const full = [];
+  const along = [];
+  let total = 0;
+  const segments = track.segments.map((segment) => {
+    const moving = segment.path.length > 1 && segment.t1 > segment.t0;
+    const prepared = { ...segment, moving, startDist: total, lens: [0], length: 0 };
+    if (moving) {
+      for (let i = 1; i < segment.path.length; i += 1) prepared.lens.push(prepared.lens[i - 1] + metres(segment.path[i - 1], segment.path[i]));
+      prepared.length = prepared.lens.at(-1);
+      segment.path.forEach((point, i) => {
+        full.push(point);
+        along.push(total + prepared.lens[i]);
+      });
+      total += prepared.length;
+    } else if (!full.length) {
+      full.push(segment.path[0]);
+      along.push(0);
+    }
+    return prepared;
+  });
+  return { id: track.id, segments, full, along, total, heading: 0 };
+}
+
+function stateAt(track, t) {
+  const index = Math.max(0, track.segments.findIndex((s) => t >= s.t0 && t < s.t1));
+  const segment = t >= track.segments.at(-1).t1 ? track.segments.at(-1) : track.segments[index];
+  const segmentIndex = track.segments.indexOf(segment);
+  if (!segment.moving) {
+    return { id: track.id, track, segment, segmentIndex, pos: segment.path[0], dist: segment.startDist, moving: false, heading: track.heading };
+  }
+  const d = clamp((t - segment.t0) / (segment.t1 - segment.t0), 0, 1) * segment.length;
+  let i = 1;
+  while (i < segment.lens.length - 1 && segment.lens[i] < d) i += 1;
+  const a = segment.path[i - 1];
+  const b = segment.path[i];
+  const span = segment.lens[i] - segment.lens[i - 1] || 1;
+  const f = clamp((d - segment.lens[i - 1]) / span, 0, 1);
+  const pos = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  track.heading = bearing(a, b);
+  return { id: track.id, track, segment, segmentIndex, pos, dist: segment.startDist + d, moving: true, heading: track.heading };
+}
+
+// Split a truck's whole route into the part already driven and the part ahead.
+function splitRoute(state) {
+  const { track, dist, pos } = state;
+  if (track.full.length < 2) return [[], []];
+  let i = 0;
+  while (i < track.along.length && track.along[i] <= dist) i += 1;
+  const behind = [...track.full.slice(0, i), pos];
+  const ahead = [pos, ...track.full.slice(i)];
+  return [behind.length > 1 ? behind : [], ahead.length > 1 ? ahead : []];
+}
+
+function truckTone(state) {
+  if (state.segment.kind === "blocked") return colors.risk;
+  if (state.segment.kind === "detour" || state.segment.kind === "transfer") return colors.amber;
+  return state.moving ? colors.ink : colors.stopped;
+}
+
+async function loadPlayback({ keepTime = false } = {}) {
+  const params = new URLSearchParams({ scenario: activeScenario, action: plan.action, road: plan.road });
+  const response = await fetch(`/api/playback?${params}`);
+  if (!response.ok) throw new Error("The playback failed to load");
+  playback = await response.json();
+  tracks = playback.tracks.map(prepareTrack);
+  liveKeys.clear();
+  const slider = $("#timeline");
+  slider.min = playback.start;
+  slider.max = playback.end;
+  currentTime = keepTime ? clamp(currentTime, playback.start, playback.end) : playback.start;
+  $("#timeline-start").textContent = clockLabel(playback.start);
+  $("#timeline-end").textContent = clockLabel(playback.end);
+  renderTicks();
+  renderPlanNote();
+  renderer?.setPlayback(playback, tracks);
+  updateFrame();
+}
+
+function renderTicks() {
+  const span = playback.end - playback.start;
+  const marks = playback.events.filter((event) => event.tone !== "info");
+  $("#timeline-ticks").innerHTML = marks.map((event) => {
+    const left = ((event.t - playback.start) / span) * 100;
+    const mine = selectedTruck && event.truck === selectedTruck;
+    return `<i class="tick ${event.tone}${mine ? " mine" : ""}" style="left:${left.toFixed(2)}%"></i>`;
+  }).join("");
+}
+
+function renderPlanNote() {
+  if (scenario.scenario_type !== "disruption") return;
+  const best = scenario.analysis.before[0];
+  $$("#playback-action option").forEach((option) => {
+    const action = scenario.decision_model.actions.find((a) => a.id === option.value);
+    option.textContent = action.label + (option.value === best.id ? " (model’s pick)" : "");
+  });
+  $("#playback-action").value = plan.action;
+  $(`#road-${plan.road}`).checked = true;
+  const outcome = scenario.decision_model.actions.find((a) => a.id === plan.action).outcomes[plan.road];
+  $("#plan-note").textContent = outcome.lateness_min > 0
+    ? `${affectedShipment().id} arrives about ${outcome.lateness_min} min late in this case.`
+    : `${affectedShipment().id} arrives on time in this case.`;
+}
+
+function updateFrame() {
+  if (!playback) return;
+  const slider = $("#timeline");
+  slider.value = currentTime;
+  slider.style.setProperty("--p", `${((currentTime - playback.start) / (playback.end - playback.start)) * 100}%`);
+  slider.setAttribute("aria-valuetext", clockLabel(currentTime));
+  $("#map-clock").textContent = clockLabel(currentTime);
+  const states = tracks.map((track) => stateAt(track, currentTime));
+  renderer?.update(states);
+  updateFleetLive(states);
+  updateTruckCard(states);
+  updateEventFeed();
+}
+
+function frame(now) {
+  if (!playing) return;
+  const elapsed = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
+  lastFrame = now;
+  currentTime = Math.min(playback.end, currentTime + elapsed * speed);
+  updateFrame();
+  if (currentTime >= playback.end) setPlaying(false);
+  else requestAnimationFrame(frame);
+}
+
+function setPlaying(value) {
+  if (!playback) return;
+  if (value && currentTime >= playback.end) currentTime = playback.start;
+  playing = value;
+  lastFrame = 0;
+  const button = $("#play");
+  button.classList.toggle("playing", value);
+  button.setAttribute("aria-label", value ? "Pause" : "Play");
+  if (value) requestAnimationFrame(frame);
+}
+
+function updateFleetLive(states) {
+  states.forEach((state) => {
+    const key = `${state.segmentIndex}`;
+    if (liveKeys.get(state.id) === key) return;
+    liveKeys.set(state.id, key);
+    const cell = document.querySelector(`[data-live="${state.id}"]`);
+    if (!cell) return;
+    const [label, tone] = activity[state.segment.kind] ?? [state.segment.kind, "planned"];
+    cell.innerHTML = `${tag([label, tone])}<span class="detail">${esc(state.segment.text)}</span>`;
+  });
+}
+
+function updateTruckCard(states) {
+  const card = $("#truck-card");
+  const state = states.find((item) => item.id === selectedTruck);
+  if (!state) {
+    card.hidden = true;
+    return;
+  }
+  const truck = scenario.trucks.find((item) => item.id === state.id);
+  const [label, tone] = activity[state.segment.kind] ?? [state.segment.kind, "planned"];
+  const next = playback.events.find((event) => event.truck === state.id && event.t > currentTime + 0.01);
+  const until = state.segment.kind === "idle" ? "" : ` until ${clockLabel(state.segment.t1)}`;
+  card.hidden = false;
+  card.innerHTML = `<div class="truck-card-head"><b>${esc(state.id)}</b>${tag([label, tone])}<button class="link" type="button" data-truck="${esc(state.id)}">Close</button></div>
+    <p>${esc(state.segment.text)}${until}.</p>
+    ${next ? `<p class="muted">Next, ${clockLabel(next.t)}: ${esc(next.text)}</p>` : ""}
+    <p class="muted">${esc(truck.fuel)}, ${truck.duty_remaining_hr} h duty left at ${clockLabel(playback.start)}</p>`;
+}
+
+let feedKey = "";
+function updateEventFeed() {
+  const relevant = playback.events.filter((event) => !selectedTruck || event.truck === selectedTruck);
+  const past = relevant.filter((event) => event.t <= currentTime + 0.01).slice(-3);
+  const next = relevant.find((event) => event.t > currentTime + 0.01);
+  const key = `${selectedTruck}|${past.map((e) => e.t + e.truck).join()}|${next?.t}`;
+  if (key === feedKey) return;
+  feedKey = key;
+  const row = (event, upcoming) => `<li class="${upcoming ? "upcoming" : event.tone}">
+    <time>${clockLabel(event.t)}</time>
+    <button class="link quiet" type="button" data-truck="${esc(event.truck)}">${esc(shortTruck(event.truck))}</button>
+    <span>${upcoming ? "Next: " : ""}${esc(event.text)}</span></li>`;
+  const rows = [...past.map((event) => row(event, false)), next ? row(next, true) : ""];
+  $("#event-feed").innerHTML = rows.join("") || '<li class="upcoming"><span>Press play to watch the morning unfold.</span></li>';
+}
+
+function selectTruck(id) {
+  selectedTruck = id;
+  renderShipments();
+  renderFleet();
+  renderTicks();
+  renderer?.setSelected(id);
+  updateFrame();
+}
+
+// ---------------------------------------------------------------------------
+// Map renderers. Both draw the same playback: ArcGIS on wide screens,
+// an SVG schematic on narrow screens or when ArcGIS cannot load.
+// ---------------------------------------------------------------------------
 function visibleLocations() {
   return scenario.locations.filter((location) => location.kind !== "incident" || scenario.scenario_type === "disruption");
 }
 
-function drawSchematicMap() {
+function alternativeEmphasis(id) {
+  if (plan.action === "hold-course") return id === "current";
+  if (plan.action === "reroute") return id === "detour";
+  return false;
+}
+
+function createSchematicRenderer() {
   const routes = $("#routes");
   const markers = $("#markers");
-  routes.replaceChildren();
-  markers.replaceChildren();
-
-  scenario.routes.forEach((route) => {
-    const line = document.createElementNS(svgNS, "polyline");
-    line.setAttribute("points", route.points.map(([lat, lon]) => project(lat, lon).join(",")).join(" "));
-    line.setAttribute("stroke", route.color);
-    line.setAttribute("class", `route ${route.role}`);
-    routes.appendChild(line);
-  });
-
-  visibleLocations().forEach((location) => {
-    const [x, y] = project(location.lat, location.lon);
-    const group = document.createElementNS(svgNS, "g");
-    group.setAttribute("class", "marker");
-    const color = { terminal: colors.ink, warehouse: colors.warehouse, incident: colors.risk }[location.kind];
-    group.innerHTML = `<circle cx="${x}" cy="${y}" r="6" fill="${color}"/><text x="${x + 9}" y="${y - 8}">${esc(location.name)}</text>`;
-    markers.appendChild(group);
-  });
-
-  scenario.trucks.forEach((truck) => {
-    const [x, y] = project(truck.lat, truck.lon);
-    const group = document.createElementNS(svgNS, "g");
-    group.setAttribute("class", `truck-marker${truckIsWaiting(truck) ? " waiting" : ""}`);
-    group.innerHTML = `<rect x="${x - 5}" y="${y - 5}" width="10" height="10" transform="rotate(45 ${x} ${y})"/><text x="${x + 9}" y="${y + 4}">${esc(truck.id.replace("SYN-TRK-", "T"))}</text>`;
-    markers.appendChild(group);
-  });
+  const truckMarks = $("#truck-marks");
+  const items = new Map();
+  const project = ([lon, lat]) => {
+    const b = scenario.map_bounds;
+    return [30 + ((lon - b.west) / (b.east - b.west)) * 700, 25 + ((b.north - lat) / (b.north - b.south)) * 320];
+  };
+  const points = (path) => path.map((p) => project(p).map((v) => v.toFixed(1)).join(",")).join(" ");
+  const el = (name, attrs) => {
+    const node = document.createElementNS(svgNS, name);
+    Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+    return node;
+  };
+  return {
+    setScenario() {
+      markers.replaceChildren();
+      visibleLocations().forEach((location) => {
+        const [x, y] = project([location.lon, location.lat]);
+        const group = el("g", { class: `place ${location.kind}` });
+        group.innerHTML = location.kind === "terminal"
+          ? `<rect x="${x - 5}" y="${y - 5}" width="10" height="10"/>`
+          : `<circle cx="${x}" cy="${y}" r="${location.kind === "incident" ? 7 : 5}"/>`;
+        group.innerHTML += `<text x="${x + 9}" y="${y + 4}">${esc(location.name)}</text>`;
+        markers.appendChild(group);
+      });
+    },
+    setPlayback(data, prepared) {
+      routes.replaceChildren();
+      truckMarks.replaceChildren();
+      items.clear();
+      if (scenario.scenario_type === "disruption") {
+        data.alternatives.forEach((alt) => {
+          routes.appendChild(el("polyline", { class: `alt ${alt.id}${alternativeEmphasis(alt.id) ? " active" : ""}`, points: points(alt.path) }));
+        });
+      }
+      prepared.forEach((track) => {
+        const behind = el("polyline", { class: "trail behind", points: "" });
+        const ahead = el("polyline", { class: "trail ahead", points: "" });
+        routes.append(behind, ahead);
+        const group = el("g", { class: "truck", "data-truck": track.id });
+        group.innerHTML = '<path class="arrow" d="M0 -8 L6 7 L0 3.5 L-6 7 Z"/><rect class="stop" x="-4.5" y="-4.5" width="9" height="9" transform="rotate(45)"/>'
+          + `<text y="-11">${esc(shortTruck(track.id))}</text>`;
+        truckMarks.appendChild(group);
+        items.set(track.id, { behind, ahead, group, dist: -1 });
+      });
+      this.setSelected(selectedTruck);
+    },
+    setSelected(id) {
+      items.forEach((item, truckId) => {
+        item.group.classList.toggle("selected", truckId === id);
+        item.ahead.classList.toggle("selected", truckId === id);
+        item.behind.classList.toggle("selected", truckId === id);
+        item.dist = -1;
+      });
+    },
+    update(states) {
+      states.forEach((state) => {
+        const item = items.get(state.id);
+        if (!item) return;
+        if (Math.abs(item.dist - state.dist) > 1) {
+          const [behind, ahead] = splitRoute(state);
+          item.behind.setAttribute("points", points(behind));
+          item.ahead.setAttribute("points", points(ahead));
+          item.dist = state.dist;
+        }
+        const [x, y] = project(state.pos);
+        item.group.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+        item.group.querySelector(".arrow").setAttribute("transform", `rotate(${state.heading.toFixed(0)})`);
+        item.group.classList.toggle("moving", state.moving);
+        item.group.style.setProperty("--tone", truckTone(state));
+      });
+    },
+  };
 }
 
-async function drawArcGISMap() {
+async function createArcGISRenderer() {
   const arcgis = globalThis.$arcgis;
   if (!arcgis?.import) throw new Error("ArcGIS SDK unavailable");
-  const [GraphicsLayer, Graphic] = await arcgis.import([
+  const [GraphicsLayer, Graphic, Basemap, TileLayer, Extent] = await arcgis.import([
     "@arcgis/core/layers/GraphicsLayer.js",
     "@arcgis/core/Graphic.js",
+    "@arcgis/core/Basemap.js",
+    "@arcgis/core/layers/TileLayer.js",
+    "@arcgis/core/geometry/Extent.js",
   ]);
-  const routeLayer = new GraphicsLayer({ title: "Routes" });
-  const markerLayer = new GraphicsLayer({ title: "Terminals and warehouses" });
-  const truckLayer = new GraphicsLayer({ title: "Trucks" });
+  const viewElement = $("#arcgis-map");
+  // Esri's public light gray canvas: quiet enough for routes and trucks to stand out, no API key needed.
+  const canvas = "https://services.arcgisonline.com/arcgis/rest/services/Canvas/";
+  const base = new TileLayer({ url: `${canvas}World_Light_Gray_Base/MapServer` });
+  viewElement.basemap = new Basemap({
+    title: "Light gray canvas",
+    baseLayers: [base],
+    referenceLayers: [new TileLayer({ url: `${canvas}World_Light_Gray_Reference/MapServer`, opacity: 0.8 })],
+  });
+  await viewElement.viewOnReady();
+  let basemapNote = "Basemap: Esri light gray canvas.";
+  try {
+    await base.load();
+  } catch (error) {
+    console.warn("Light gray canvas unavailable, using OpenStreetMap:", error);
+    viewElement.basemap = "osm";
+    basemapNote = "Basemap: OpenStreetMap.";
+  }
+  viewElement.view.constraints = { minZoom: 10, maxZoom: 16, snapToZoom: false };
 
-  scenario.routes.forEach((route) => {
-    routeLayer.add(new Graphic({
-      geometry: { type: "polyline", paths: [route.points.map(([lat, lon]) => [lon, lat])], spatialReference: { wkid: 4326 } },
-      symbol: { type: "simple-line", color: route.color, width: route.role === "fleet" ? 2 : 4, style: route.role === "detour" ? "short-dash" : "solid" },
-      attributes: { name: route.name, role: route.role },
-      popupTemplate: { title: "{name}", content: "Route type: {role}" },
-    }));
+  const layers = {
+    alternatives: new GraphicsLayer({ title: "Route options" }),
+    trails: new GraphicsLayer({ title: "Truck routes" }),
+    places: new GraphicsLayer({ title: "Terminals and warehouses" }),
+    trucks: new GraphicsLayer({ title: "Trucks" }),
+  };
+  viewElement.map.addMany(Object.values(layers));
+
+  const rgba = (hex, alpha = 1) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16), alpha];
+  const line = (path) => ({ type: "polyline", paths: path.length > 1 ? [path] : [], spatialReference: { wkid: 4326 } });
+  const point = ([lon, lat]) => ({ type: "point", longitude: lon, latitude: lat });
+  const arrow = "M12 1 L22 23 L12 17 L2 23 Z";
+  const items = new Map();
+  let fitted = false;
+
+  const trailSymbols = (selected) => ({
+    casing: { type: "simple-line", color: rgba("#ffffff", selected ? 0.95 : 0), width: 7, cap: "round", join: "round" },
+    ahead: selected
+      ? { type: "simple-line", color: rgba(colors.selected), width: 4, cap: "round", join: "round" }
+      : { type: "simple-line", color: rgba(colors.route, 0.6), width: 2.25, cap: "round", join: "round" },
+    behind: selected
+      ? { type: "simple-line", color: rgba(colors.selected, 0.45), width: 2.5, style: "short-dot", cap: "round" }
+      : { type: "simple-line", color: rgba(colors.route, 0.3), width: 1.5, style: "short-dot", cap: "round" },
   });
 
-  const markerColors = { terminal: colors.ink, warehouse: colors.warehouse, incident: colors.risk };
-  visibleLocations().forEach((location) => markerLayer.add(new Graphic({
-    geometry: { type: "point", longitude: location.lon, latitude: location.lat },
-    symbol: { type: "simple-marker", color: markerColors[location.kind], size: location.kind === "incident" ? 13 : 9, outline: { color: "white", width: 1.5 } },
-    attributes: { name: location.name, kind: location.kind },
-    popupTemplate: { title: "{name}", content: "Location type: {kind}" },
-  })));
+  const truckSymbol = (state, selected) => {
+    const color = selected ? colors.selected : truckTone(state);
+    return state.moving
+      ? { type: "simple-marker", style: "path", path: arrow, size: selected ? 20 : 16, angle: state.heading, color, outline: { color: "#ffffff", width: 1.5 } }
+      : { type: "simple-marker", style: "diamond", size: selected ? 15 : 12, color, outline: { color: "#ffffff", width: 2 } };
+  };
 
-  scenario.trucks.forEach((truck) => truckLayer.add(new Graphic({
-    geometry: { type: "point", longitude: truck.lon, latitude: truck.lat },
-    symbol: { type: "simple-marker", style: "diamond", color: truckIsWaiting(truck) ? colors.amber : colors.ink, size: 10, outline: { color: "#ffffff", width: 1.5 } },
-    attributes: { id: truck.id, status: truckStatus[truck.status]?.[0] ?? truck.status, assignment: truck.assignment, fuel: truck.fuel, duty: truck.duty_remaining_hr },
-    popupTemplate: { title: "{id}", content: "Status: {status}<br>Load: {assignment}<br>Fuel: {fuel}<br>Duty time left: {duty} h<br>Simulated record" },
-  })));
+  viewElement.addEventListener("arcgisViewClick", async (event) => {
+    const hit = await viewElement.hitTest(event.detail, { include: [layers.trucks] });
+    const id = hit.results.find((result) => result.graphic?.attributes?.truck)?.graphic.attributes.truck ?? null;
+    selectTruck(id && id === selectedTruck ? null : id);
+  });
 
-  const viewElement = $("#arcgis-map");
-  await viewElement.viewOnReady();
-  if (mapLayers.length) viewElement.map.removeMany(mapLayers);
-  mapLayers = [routeLayer, markerLayer, truckLayer];
-  viewElement.map.addMany(mapLayers);
-  const visibleGraphics = [...routeLayer.graphics.toArray(), ...markerLayer.graphics.toArray(), ...truckLayer.graphics.toArray()];
-  await viewElement.view.goTo(visibleGraphics, { animate: false, padding: 32 });
-  $("#arcgis-map").classList.remove("hidden");
-  $("#map-fallback").classList.add("hidden");
-  $("#map-provider").textContent = "OpenStreetMap basemap. Truck positions are simulated.";
-}
-
-function showSchematic(message) {
-  $("#arcgis-map").classList.add("hidden");
-  $("#map-fallback").classList.remove("hidden");
-  $("#map-provider").textContent = message;
+  return {
+    basemapNote,
+    setScenario() {
+      layers.places.removeAll();
+      const style = {
+        terminal: { type: "simple-marker", style: "square", size: 11, color: colors.ink, outline: { color: "#ffffff", width: 2 } },
+        warehouse: { type: "simple-marker", style: "circle", size: 11, color: "#ffffff", outline: { color: colors.muted, width: 2.5 } },
+        incident: { type: "simple-marker", style: "circle", size: 18, color: rgba(colors.risk, 0.9), outline: { color: "#ffffff", width: 2.5 } },
+      };
+      visibleLocations().forEach((location) => {
+        const geometry = { type: "point", longitude: location.lon, latitude: location.lat };
+        layers.places.add(new Graphic({ geometry, symbol: style[location.kind] }));
+        if (location.kind === "incident") {
+          layers.places.add(new Graphic({ geometry, symbol: { type: "text", text: "!", color: "#ffffff", yoffset: -4, font: { size: 12, weight: "bold" } } }));
+        }
+        layers.places.add(new Graphic({
+          geometry,
+          symbol: {
+            type: "text", text: location.name, color: location.kind === "incident" ? colors.risk : "#2f353a",
+            haloColor: "#ffffff", haloSize: 2, xoffset: 10, yoffset: -4, horizontalAlignment: "left",
+            font: { size: 11, weight: location.kind === "warehouse" ? "normal" : "bold" },
+          },
+        }));
+      });
+    },
+    setPlayback(data, prepared) {
+      layers.alternatives.removeAll();
+      layers.trails.removeAll();
+      layers.trucks.removeAll();
+      items.clear();
+      if (scenario.scenario_type === "disruption") {
+        data.alternatives.forEach((alt) => {
+          const strong = alternativeEmphasis(alt.id);
+          const color = alt.id === "current" ? colors.accent : colors.amber;
+          layers.alternatives.addMany([
+            new Graphic({ geometry: line(alt.path), symbol: { type: "simple-line", color: rgba("#ffffff", strong ? 0.9 : 0.6), width: 9, cap: "round", join: "round" } }),
+            new Graphic({ geometry: line(alt.path), symbol: { type: "simple-line", color: rgba(color, strong ? 0.95 : 0.4), width: 5, cap: "round", join: "round", style: alt.id === "detour" ? "short-dash" : "solid" } }),
+          ]);
+        });
+      }
+      prepared.forEach((track) => {
+        const symbols = trailSymbols(track.id === selectedTruck);
+        const casing = new Graphic({ geometry: line([]), symbol: symbols.casing });
+        const behind = new Graphic({ geometry: line([]), symbol: symbols.behind });
+        const ahead = new Graphic({ geometry: line(track.full), symbol: symbols.ahead });
+        const marker = new Graphic({ geometry: point(track.full[0]), attributes: { truck: track.id } });
+        const label = new Graphic({
+          geometry: point(track.full[0]),
+          attributes: { truck: track.id },
+          symbol: { type: "text", text: shortTruck(track.id), color: colors.ink, haloColor: "#ffffff", haloSize: 2, yoffset: 12, font: { size: 10, weight: "bold" } },
+        });
+        layers.trails.addMany([casing, behind, ahead]);
+        layers.trucks.addMany([marker, label]);
+        items.set(track.id, { casing, behind, ahead, marker, label, dist: -1, key: "" });
+      });
+      this.setSelected(selectedTruck);
+      if (!fitted) {
+        fitted = true;
+        // Fit every terminal and warehouse, with room for labels and the clock overlay.
+        const lons = scenario.locations.map((l) => l.lon);
+        const lats = scenario.locations.map((l) => l.lat);
+        const [west, east, south, north] = [Math.min(...lons), Math.max(...lons), Math.min(...lats), Math.max(...lats)];
+        const padX = (east - west) * 0.12;
+        const padY = (north - south) * 0.1;
+        viewElement.view.goTo(new Extent({
+          xmin: west - padX, xmax: east + padX * 2.2, ymin: south - padY * 1.3, ymax: north + padY, spatialReference: { wkid: 4326 },
+        }), { animate: false }).catch(() => {});
+      }
+    },
+    setSelected(id) {
+      items.forEach((item, truckId) => {
+        const symbols = trailSymbols(truckId === id);
+        item.casing.symbol = symbols.casing;
+        item.ahead.symbol = symbols.ahead;
+        item.behind.symbol = symbols.behind;
+        item.dist = -1;
+        item.key = "";
+      });
+      // Draw the selected truck on top of the others.
+      const selected = items.get(id);
+      if (selected) {
+        const trails = layers.trails.graphics;
+        const trucks = layers.trucks.graphics;
+        trails.reorder(selected.casing, trails.length - 1);
+        trails.reorder(selected.ahead, trails.length - 1);
+        trucks.reorder(selected.marker, trucks.length - 1);
+        trucks.reorder(selected.label, trucks.length - 1);
+      }
+    },
+    update(states) {
+      states.forEach((state) => {
+        const item = items.get(state.id);
+        if (!item) return;
+        const selected = state.id === selectedTruck;
+        if (Math.abs(item.dist - state.dist) > 2) {
+          const [behind, ahead] = splitRoute(state);
+          item.behind.geometry = line(behind);
+          item.ahead.geometry = line(ahead);
+          if (selected) item.casing.geometry = line(ahead);
+          item.dist = state.dist;
+        }
+        item.marker.geometry = point(state.pos);
+        item.label.geometry = point(state.pos);
+        const key = `${state.moving}|${truckTone(state)}|${selected}|${state.moving ? Math.round(state.heading / 3) : ""}`;
+        if (key !== item.key) {
+          item.key = key;
+          item.marker.symbol = truckSymbol(state, selected);
+        }
+      });
+    },
+  };
 }
 
 async function drawMap() {
-  drawSchematicMap();
-  if (window.innerWidth < 920) {
-    showSchematic("Schematic map (ArcGIS loads at 920px and wider). Truck positions are simulated.");
-    return;
+  if (!renderer) {
+    if (window.innerWidth < 920) {
+      renderer = createSchematicRenderer();
+      showSchematic("Schematic map (the street map loads at 920px and wider).");
+    } else {
+      try {
+        renderer = await createArcGISRenderer();
+        $("#map-fallback").classList.add("hidden");
+        $("#arcgis-map").classList.remove("hidden");
+        $("#map-provider").textContent = `${renderer.basemapNote} Road paths from OpenStreetMap via OSRM. Trucks and schedules are simulated.`;
+      } catch (error) {
+        console.warn("Using the schematic map because ArcGIS failed to load:", error);
+        renderer = createSchematicRenderer();
+        showSchematic("The street map did not load, so this is a schematic.");
+      }
+    }
   }
-  try {
-    await drawArcGISMap();
-  } catch (error) {
-    console.warn("Using the schematic map because ArcGIS failed to load:", error);
-    showSchematic("ArcGIS did not load, so this is a schematic. Truck positions are simulated.");
-  }
+  renderer.setScenario();
+  if (playback) renderer.setPlayback(playback, tracks);
+  updateFrame();
+}
+
+function showSchematic(message) {
+  $(".map-shell").classList.add("schematic");
+  $("#arcgis-map").classList.add("hidden");
+  $("#map-fallback").classList.remove("hidden");
+  $("#map-provider").textContent = `${message} Trucks and schedules are simulated.`;
 }
 
 function affectedShipment() {
@@ -228,9 +660,10 @@ function renderFleet() {
   $("#fleet-count").textContent = `${scenario.trucks.length} trucks, ${electric} battery electric`;
   $("#fleet-list").innerHTML = scenario.trucks.map((truck) => `<tr class="${truck.id === selectedTruck ? "selected" : ""}">
     <td><button class="link" type="button" data-truck="${esc(truck.id)}" aria-pressed="${truck.id === selectedTruck}">${esc(truck.id)}</button><span class="detail">${esc(truck.assignment)}, ${esc(truck.fuel.toLowerCase())}</span></td>
-    <td>${tag(truckStatus[truck.status] ?? [truck.status, "planned"])}</td>
+    <td class="live" data-live="${esc(truck.id)}"></td>
     <td class="num">${truck.duty_remaining_hr} h</td>
   </tr>`).join("");
+  liveKeys.clear();
 }
 
 function renderConditions() {
@@ -284,17 +717,26 @@ async function observe(observation) {
     inconclusive: `The feed result was inconclusive, so the blockage probability stays at ${prior} and the ranking is the same as before.`,
   }[observation];
   $("#posterior").hidden = false;
+  // Play the map out with the new best option and the now more likely road state.
+  plan = { action: analysis.after[0].id, road: analysis.posterior_blocked_probability >= 0.5 ? "blocked" : "open" };
+  await loadPlayback({ keepTime: true });
 }
 
 async function loadScenario(id) {
   activeScenario = id;
   selectedTruck = null;
+  setPlaying(false);
   const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(id)}`);
   if (!response.ok) throw new Error("The scenario failed to load");
   scenario = await response.json();
   $(`#scenario-${id}`).checked = true;
   document.body.dataset.scenario = scenario.scenario_type;
   $("#drone-note").textContent = scenario.decision_model.drone.note;
+  $("#playback-action").innerHTML = scenario.decision_model.actions.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join("");
+  plan = {
+    action: scenario.analysis.before[0].id,
+    road: scenario.disruption.prior_blocked_probability >= 0.5 ? "blocked" : "open",
+  };
   resetObservation();
   renderDecision();
   renderRankings(scenario.analysis.before);
@@ -304,6 +746,7 @@ async function loadScenario(id) {
   renderConditions();
   renderProvenance();
   renderDefinitions();
+  await loadPlayback();
   await drawMap();
 }
 
@@ -320,23 +763,36 @@ function bindEvents() {
   $$('input[name="scenario"]').forEach((input) => input.addEventListener("change", () => loadScenario(input.value)));
   $$('input[name="shipment-filter"]').forEach((input) => input.addEventListener("change", () => {
     shipmentFilter = input.value;
-    selectedTruck = null;
-    renderShipments();
-    renderFleet();
+    selectTruck(null);
   }));
-  $("#clear-truck").addEventListener("click", () => {
-    selectedTruck = null;
-    renderShipments();
-    renderFleet();
-  });
+  $("#clear-truck").addEventListener("click", () => selectTruck(null));
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-truck]");
     if (!button) return;
-    const fromFleet = Boolean(button.closest("#fleet-list"));
-    selectedTruck = selectedTruck === button.dataset.truck ? null : button.dataset.truck;
-    renderShipments();
-    renderFleet();
-    if (fromFleet && selectedTruck) $("#shipments").scrollIntoView({ behavior: "smooth", block: "start" });
+    selectTruck(selectedTruck === button.dataset.truck ? null : button.dataset.truck);
+  });
+
+  $("#play").addEventListener("click", () => setPlaying(!playing));
+  $("#timeline").addEventListener("input", (event) => {
+    currentTime = Number(event.target.value);
+    updateFrame();
+  });
+  $("#playback-speed").addEventListener("change", (event) => {
+    speed = Number(event.target.value);
+  });
+  $("#playback-action").addEventListener("change", (event) => {
+    plan = { ...plan, action: event.target.value };
+    loadPlayback({ keepTime: true });
+  });
+  $$('input[name="road"]').forEach((input) => input.addEventListener("change", () => {
+    plan = { ...plan, road: input.value };
+    loadPlayback({ keepTime: true });
+  }));
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== " " || event.target.closest("input:not([type=range]), select, button, textarea")) return;
+    if (!event.target.closest(".row-map")) return;
+    event.preventDefault();
+    setPlaying(!playing);
   });
 }
 

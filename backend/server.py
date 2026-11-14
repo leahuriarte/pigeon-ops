@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from backend.decision_engine import analyze
+from backend.playback import build_playback
 from backend.scenario import available_scenarios, load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +47,19 @@ class DemoHandler(BaseHTTPRequestHandler):
             except ValueError as error:
                 return self._json({"error": str(error)}, 404)
             return self._json(analyze(scenario, observation))
+        if parsed.path == "/api/playback":
+            params = parse_qs(parsed.query)
+            variant = params.get("scenario", ["disruption"])[0]
+            try:
+                scenario = load_scenario(variant=variant)
+                playback = build_playback(
+                    scenario,
+                    action=params.get("action", ["hold-course"])[0],
+                    road=params.get("road", ["open"])[0],
+                )
+            except ValueError as error:
+                return self._json({"error": str(error)}, 400)
+            return self._json(playback)
         return self._static(parsed.path)
 
     def _static(self, request_path):
