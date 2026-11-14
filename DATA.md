@@ -96,7 +96,7 @@ Expected loss is the probability-weighted average across open and blocked states
 ```text
 best expected loss when acting now
 − expected best loss after an imperfect observation
-− observation direct and delay cost
+− observation direct cost
 ```
 
 Lower loss is better. The score is decision-support logic, not a market price, invoice, safety determination, or autonomous dispatch command.
@@ -110,7 +110,7 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 - Driver hours are synthetic summaries and do not implement hours-of-service compliance.
 - Community exposure is described qualitatively; the demo does not yet calculate population-weighted pollution or noise exposure.
 - Action outcomes are point estimates from route data and assumed rates (see [docs/METHODS.md](docs/METHODS.md)) rather than Monte Carlo distributions.
-- Inspection delay is monetized as a configured cost; a future model should also propagate the six-minute wait through every shipment ETA and appointment constraint.
+- The six-minute inspection delay holds free pool trucks (SYN-TRK-07) before the chosen action starts and moves their arrivals; shipments outside the assignment pool are not delayed (docs/METHODS.md section 5).
 
 ## Recommended next data step
 

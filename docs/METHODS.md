@@ -136,8 +136,6 @@ For `hold-course` and `reroute` the other shipments run on plan, so these equal 
 
 ## 5. Ranking and value of inspection
 
-These formulas are unchanged from the kickoff version.
-
 ```text
 loss = lateness_min × lateness_cost_per_minute
      + incremental_cost
@@ -158,13 +156,37 @@ P(blocked | says clear)   = (1 − accuracy) × p / ((1 − accuracy) × p + acc
 
 An "inconclusive" result leaves the probability unchanged.
 
+### Inspection delay
+
+An inspection takes `drone.launch_and_review_minutes` (6 minutes). It starts at the scenario time, `generated_at` (09:12), and ends at 09:18. No pool truck acts on the decision before then.
+
+```text
+hold = max(0, scenario time + launch_and_review_minutes − latest of (truck available_at, scenario time))
+```
+
+A held truck waits where it is. The wait is added to the front of its trip, so it moves the arrival, the slack, the lateness and the missed-window check of sections 3 and 4, and it is paid driver time. SYN-TRK-07 is free at 09:12, so it waits 6 minutes. SYN-TRK-12 is not free until 09:25, so it does not wait.
+
+Each action and each assignment therefore has two sets of outcomes: `outcomes` (act now) and `outcomes_after_inspection` (act after the wait). After the wait in the worked example:
+
+| Action | Road | SYN-SHP-1042 arrival, slack | SYN-SHP-1048 arrival, slack | Late min | Added cost $ |
+| --- | --- | --- | --- | --- | --- |
+| hold-course | open | 10:09, +6 min | 10:42, +18 min | 0 | 3.50 |
+| hold-course | blocked | 11:09, −53.9 min | 10:42, +18 min | 53.9 | 62.96 |
+| reroute | either | 10:35, −20 min | 10:42, +18 min | 20.0 | 32.96 |
+| swap-truck | open | 10:39, −23.8 min | 10:58, +2.2 min | 23.8 | 38.47 |
+| swap-truck | blocked | 11:39, −83.7 min | 10:58, +2.2 min | 83.7 | 97.94 |
+
+On a clear road the 6-minute wait uses half of SYN-SHP-1042's 12-minute slack and causes no lateness. A wait longer than 12 minutes would make it late even on a clear road. The swap barely changes, because SYN-TRK-12 could not start before 09:25 anyway.
+
 ```text
 P(says blocked)          = accuracy × p + (1 − accuracy) × (1 − p)
-loss with inspection     = P(says blocked) × best loss after "blocked" + P(says clear) × best loss after "clear"
+loss with inspection     = P(says blocked) × best delayed loss after "blocked" + P(says clear) × best delayed loss after "clear"
 gross value              = best expected loss now − loss with inspection
-net value                = gross value − (drone.direct_cost + drone.delay_cost)
+net value                = gross value − drone.direct_cost
 recommend inspection     = net value > 0
 ```
+
+"Delayed loss" uses `outcomes_after_inspection`. The ranking shown after an observation (`after`, `assignments.after`) uses them too. The earlier flat `delay_cost` of $75 is gone, so the wait is counted once. Gross value can now be negative: evidence that cannot change the action still costs the wait.
 
 The sensitivity curve repeats the net value at 21 evenly spaced priors from 0 to 1.
 
@@ -172,13 +194,17 @@ The sensitivity curve repeats the net value at 21 evenly spaced priors from 0 to
 
 | Variant | Prior P(blocked) | Best action now | Best loss now $ | Loss with inspection $ | Net value $ | Inspect? |
 | --- | --- | --- | --- | --- | --- | --- |
-| normal | 0.02 | hold-course | 120.72 | 68.23 | −112.51 | no |
-| disruption | 0.40 | reroute | 1227.11 | 782.81 | +279.30 | yes |
-| disruption_b | 0.80 | reroute | 1227.11 | 1227.11 | −165.00 | no |
+| normal | 0.02 | hold-course | 120.72 | 131.90 | −101.18 | no |
+| disruption | 0.40 | reroute | 1227.11 | 1020.91 | +116.20 | yes |
+| disruption_b | 0.80 | reroute | 1227.11 | 1740.61 | −603.50 | no |
 
-In `disruption` an inspection can change the decision. A "clear" result drops the blockage probability to 7%, and keeping the current route becomes best.
+Net value is best loss now minus loss with inspection minus the $90 direct cost.
 
-In `disruption_b` the reports are corroborated, so the prior is 80%. Even after a "clear" result the probability stays at 31%, and rerouting is still best. The inspection cannot change the decision, so its gross value is zero and its net value is minus its cost.
+In `disruption` an inspection can change the decision. A "clear" result drops the blockage probability to 7%, and keeping the current route becomes best. Inspecting is still worth it, by $116.20 instead of the $279.30 the flat delay cost gave. The inspection pays off once its evidence is at least 86.4% accurate (`evoi.break_even_accuracy`); the assumed accuracy is 90%.
+
+In `disruption_b` the reports are corroborated, so the prior is 80%. Even after a "clear" result the probability stays at 31%, and rerouting is still best. The inspection cannot change the decision. It only makes the reroute start 6 minutes later: 6 more late minutes at $85 plus $3.50 of paid waiting, $513.50, plus the $90 direct cost.
+
+In `normal`, waiting costs only $3.50 of driver time because SYN-SHP-1042 has 21 minutes of slack, but there is almost nothing to learn.
 
 ## 6. Plan indicators
 
@@ -224,7 +250,9 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 
 - Rerouting is modeled as driving back to the start of the current route. A real dispatcher would use the nearest junction, so detour costs are overstated.
 - Waiting in the queue counts toward driver time and cost but not toward emissions. Idling emissions are left out.
-- The inspection's six-minute delay is a fixed `delay_cost`; it does not move the truck's arrival time.
+- During an inspection a free pool truck waits where it is. A real driver might keep driving toward the obstruction, which would cost nothing if the road is clear and add backtracking if it is not.
+- The wait applies to every pool truck that is free before the inspection ends, even one that ends up keeping its own load.
+- An action outcome entered as an `override` does not move with the inspection delay.
 - Only pool shipments respond to the disruption. Shipments outside the pool run on plan.
 - The drive to the load is a straight line at a fixed speed. It ignores the blockage, so in the blocked state it understates how long SYN-TRK-12 needs to reach SYN-TRK-07 from beyond the obstruction.
 - Each reassigned shipment is computed on its own. In a swap each truck drives to the other's position instead of both meeting once, which overstates the swap's driving.
