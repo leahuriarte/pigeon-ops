@@ -462,8 +462,8 @@ function selectTruck(id) {
 }
 
 // ---------------------------------------------------------------------------
-// Map renderers. Both draw the same playback: ArcGIS on wide screens,
-// an SVG schematic on narrow screens or when ArcGIS cannot load.
+// Map renderers. Both draw the same playback: ArcGIS at every width,
+// and an SVG schematic when ArcGIS cannot load.
 // ---------------------------------------------------------------------------
 function visibleLocations() {
   return scenario.locations.filter((location) => location.kind !== "incident" || scenario.scenario_type === "disruption");
@@ -720,20 +720,15 @@ async function createArcGISRenderer() {
 
 async function drawMap() {
   if (!renderer) {
-    if (window.innerWidth < 920) {
+    try {
+      renderer = await createArcGISRenderer();
+      $("#map-fallback").classList.add("hidden");
+      $("#arcgis-map").classList.remove("hidden");
+      $("#map-provider").textContent = "Basemap and road paths from OpenStreetMap (roads routed with OSRM). Trucks and schedules are simulated.";
+    } catch (error) {
+      console.warn("Using the schematic map because ArcGIS failed to load:", error);
       renderer = createSchematicRenderer();
-      showSchematic("Schematic map (the street map loads at 920px and wider).");
-    } else {
-      try {
-        renderer = await createArcGISRenderer();
-        $("#map-fallback").classList.add("hidden");
-        $("#arcgis-map").classList.remove("hidden");
-        $("#map-provider").textContent = "Basemap and road paths from OpenStreetMap (roads routed with OSRM). Trucks and schedules are simulated.";
-      } catch (error) {
-        console.warn("Using the schematic map because ArcGIS failed to load:", error);
-        renderer = createSchematicRenderer();
-        showSchematic("The street map did not load, so this is a schematic.");
-      }
+      showSchematic("The street map did not load, so this is a schematic.");
     }
   }
   renderer.setScenario();
