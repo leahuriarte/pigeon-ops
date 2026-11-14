@@ -26,6 +26,16 @@ class ScenarioContractTests(unittest.TestCase):
                 for clip_id in s["disruption"].get("evidence_clips", []):
                     self.assertTrue((EVIDENCE_DIR / f"{clip_id}.json").is_file(), clip_id)
 
+    def test_every_route_has_network_geometry(self):
+        for item in available_scenarios():
+            for route in load_scenario(variant=item["id"])["routes"]:
+                with self.subTest(variant=item["id"], route=route["id"]):
+                    geometry = route.get("geometry")
+                    self.assertIsNotNone(geometry)
+                    self.assertEqual("LineString", geometry["type"])
+                    self.assertGreaterEqual(len(geometry["coordinates"]), 2)
+                    self.assertGreater(route.get("distance_m", 0), 0)
+
     def test_disruption_lists_evidence(self):
         self.assertTrue(load_scenario(variant="disruption")["disruption"]["evidence_clips"])
 
