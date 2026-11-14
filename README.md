@@ -2,6 +2,8 @@
 
 A dependency-light, one-day-hackathon starter for deciding **whether more information is worth gathering before a dispatcher acts**. The demo uses synthetic Port of Los Angeles / Long Beach operations, a simulated road disruption, and a simulated observation feed. It never controls or deploys a real drone.
 
+The network view uses ArcGIS Maps SDK for JavaScript 5.2 with an OpenStreetMap basemap, so it does not require an ArcGIS API key or a paid ArcGIS location service. If the CDN or map tiles are unavailable, the original schematic remains as an offline fallback.
+
 Repository slug: `pigeon-ops`
 
 ## Run it
@@ -81,7 +83,7 @@ Useful endpoints:
 ## Extend it quickly
 
 - Add actions or tune weights in `config/port_scenario.json`; no UI code changes are needed.
-- Replace the schematic SVG renderer with MapLibre/Leaflet once internet tiles are acceptable.
+- Add an ArcGIS Location Platform API key only if Esri-hosted basemaps, routing, geocoding, or other metered services are needed. Review current quotas before enabling them.
 - Replace the observation buttons with a prerecorded video plus a CV adapter that returns `blocked`, `clear`, or `inconclusive` and confidence.
 - Add a `ScenarioRepository` behind `scenario.py` for SQLite, Postgres, or a logistics API.
 - Add authentication, audit logs, geofencing, aviation checks, and explicit authorization before considering any real-world field integration.
@@ -112,3 +114,11 @@ Useful endpoints:
 - No real drone command, mission planning, or automated deployment.
 - No action is executed; recommendations remain advisory.
 - Real deployment would require operator authorization, safety review, airspace/legal compliance, privacy controls, and validated data sources.
+
+## ArcGIS licensing and cost boundary
+
+- ArcGIS Maps SDK for JavaScript requires no additional purchase when used with ArcGIS Location Platform. This demo loads the SDK from Esri's CDN.
+- ArcGIS Location Platform uses pay-as-you-go pricing. Esri-hosted basemap tiles currently include a free monthly allowance, then charge for additional usage.
+- PigeonOps deliberately does not configure an ArcGIS token or call a metered ArcGIS location service. Its basemap is OpenStreetMap and its route/marker data stays client-side.
+
+Official references: [SDK terms of use](https://developers.arcgis.com/javascript/latest/licensing/) and [ArcGIS Location Platform pricing](https://developers.arcgis.com/pricing/).

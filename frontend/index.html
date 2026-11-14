@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PigeonOps — Drone-Assisted Logistics Intelligence</title>
+  <link rel="stylesheet" href="https://js.arcgis.com/5.2/esri/themes/light/main.css">
+  <script type="module" src="https://js.arcgis.com/5.2/"></script>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/arcgis.css">
 </head>
 <body>
   <header class="topbar">
@@ -20,12 +23,19 @@
       <div class="left-column">
         <section class="panel map-panel">
           <div class="panel-heading"><div><p class="eyebrow">NETWORK VIEW</p><h2>Port movement map</h2></div><div class="legend"><i class="route-primary"></i> Current <i class="route-detour"></i> Detour</div></div>
-          <svg id="map" viewBox="0 0 760 390" role="img" aria-label="Schematic map of Port of Los Angeles and Long Beach routes">
-            <defs><pattern id="grid" width="38" height="38" patternUnits="userSpaceOnUse"><path d="M38 0L0 0 0 38" fill="none" stroke="#d8e0e5"/></pattern></defs>
-            <rect width="760" height="390" fill="#edf3f5" rx="12"/><rect width="760" height="390" fill="url(#grid)" rx="12"/>
-            <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#c5e1e8"/>
-            <g id="routes"></g><g id="markers"></g><text x="20" y="370" class="water-label">SAN PEDRO BAY • SCHEMATIC</text>
-          </svg>
+          <div class="map-shell">
+            <arcgis-map id="arcgis-map" class="arcgis-map" basemap="osm" center="-118.2325, 33.76" zoom="12" aria-label="Interactive ArcGIS map of Port of Los Angeles and Long Beach routes">
+              <arcgis-zoom slot="top-left"></arcgis-zoom>
+              <arcgis-popup slot="popup"></arcgis-popup>
+            </arcgis-map>
+            <svg id="map-fallback" class="hidden" viewBox="0 0 760 390" role="img" aria-label="Offline schematic map of Port of Los Angeles and Long Beach routes">
+              <defs><pattern id="grid" width="38" height="38" patternUnits="userSpaceOnUse"><path d="M38 0L0 0 0 38" fill="none" stroke="#d8e0e5"/></pattern></defs>
+              <rect width="760" height="390" fill="#edf3f5"/><rect width="760" height="390" fill="url(#grid)"/>
+              <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#c5e1e8"/>
+              <g id="routes"></g><g id="markers"></g><text x="20" y="370" class="water-label">SAN PEDRO BAY • OFFLINE SCHEMATIC</text>
+            </svg>
+            <span id="map-provider" class="map-provider">Loading ArcGIS map…</span>
+          </div>
           <div id="shipment-strip" class="shipment-strip"></div>
         </section>
         <section class="panel">
@@ -54,6 +64,6 @@
       </aside>
     </section>
   </main>
-  <script src="/app.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

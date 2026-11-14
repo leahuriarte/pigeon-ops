@@ -9,7 +9,7 @@ function project(lat, lon) {
   return [30 + ((lon - b.west) / (b.east - b.west)) * 700, 25 + ((b.north - lat) / (b.north - b.south)) * 320];
 }
 
-function drawMap() {
+function drawSchematicMap() {
   const routes = $("#routes");
   scenario.routes.forEach((route, index) => {
     const line = document.createElementNS(svgNS, "polyline");
@@ -27,6 +27,79 @@ function drawMap() {
     group.innerHTML = `<circle cx="${x}" cy="${y}" r="8" fill="${color}"/>${location.kind === "incident" ? `<circle class="incident-ring" cx="${x}" cy="${y}" r="9"/>` : ""}<text x="${x + 12}" y="${y - 10}">${location.name}</text>`;
     markers.appendChild(group);
   });
+}
+
+async function drawArcGISMap() {
+  const arcgis = globalThis.$arcgis;
+  if (!arcgis?.import) throw new Error("ArcGIS SDK unavailable");
+
+  const [GraphicsLayer, Graphic] = await arcgis.import([
+    "@arcgis/core/layers/GraphicsLayer.js",
+    "@arcgis/core/Graphic.js",
+  ]);
+
+  const routeLayer = new GraphicsLayer({ title: "Dispatch routes" });
+  const markerLayer = new GraphicsLayer({ title: "Operations locations" });
+
+  scenario.routes.forEach((route, index) => {
+    routeLayer.add(new Graphic({
+      geometry: {
+        type: "polyline",
+        paths: [route.points.map(([lat, lon]) => [lon, lat])],
+        spatialReference: { wkid: 4326 },
+      },
+      symbol: {
+        type: "simple-line",
+        color: route.color,
+        width: index ? 4 : 5,
+        style: index ? "short-dash" : "solid",
+      },
+      attributes: { name: route.name },
+      popupTemplate: { title: "{name}" },
+    }));
+  });
+
+  const markerColors = { terminal: "#087f75", warehouse: "#2e5868", incident: "#c94c4c" };
+  scenario.locations.forEach((location) => {
+    markerLayer.add(new Graphic({
+      geometry: {
+        type: "point",
+        longitude: location.lon,
+        latitude: location.lat,
+      },
+      symbol: {
+        type: "simple-marker",
+        color: markerColors[location.kind],
+        size: location.kind === "incident" ? 14 : 11,
+        outline: { color: "white", width: 2 },
+      },
+      attributes: { name: location.name, kind: location.kind },
+      popupTemplate: { title: "{name}", content: "{kind}" },
+    }));
+  });
+
+  const viewElement = $("#arcgis-map");
+  viewElement.center = [
+    (scenario.map_bounds.west + scenario.map_bounds.east) / 2,
+    (scenario.map_bounds.south + scenario.map_bounds.north) / 2,
+  ];
+  viewElement.zoom = 12;
+  await viewElement.viewOnReady();
+  viewElement.map.addMany([routeLayer, markerLayer]);
+  $("#map-fallback").classList.add("hidden");
+  $("#map-provider").textContent = "ArcGIS Maps SDK • OpenStreetMap";
+}
+
+async function drawMap() {
+  drawSchematicMap();
+  try {
+    await drawArcGISMap();
+  } catch (error) {
+    console.warn("Using offline map fallback:", error);
+    $("#arcgis-map").classList.add("hidden");
+    $("#map-fallback").classList.remove("hidden");
+    $("#map-provider").textContent = "Offline schematic • ArcGIS unavailable";
+  }
 }
 
 function renderShipments() {
