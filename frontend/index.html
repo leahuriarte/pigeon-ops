@@ -11,7 +11,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><strong>PigeonOps</strong><span>Port of Los Angeles and Long Beach dispatch, simulated data</span></div>
+    <div class="brand"><strong>PigeonOps</strong><span>Simulated dispatch data for the ports of Los Angeles and Long Beach</span></div>
     <div class="topbar-controls">
       <fieldset class="segmented" style="--n:2">
         <legend class="visually-hidden">Scenario</legend>
@@ -48,21 +48,21 @@
             <tbody id="rankings"></tbody>
           </table>
         </div>
-        <p class="note">Each figure is weighted by the blockage probability. A dispatcher approves any action before it goes to a driver.</p>
+        <p class="note">Delay, cost, CO₂ and breaches are averages of the open and blocked outcomes, weighted by the blockage probability. This page does not contact trucks or drivers.</p>
       </section>
 
       <section class="block" aria-labelledby="inspection-title">
         <h2 id="inspection-title">Inspection</h2>
         <p id="recommendation" class="recommendation">Calculating…</p>
         <dl class="ledger">
-          <div><dt>Best expected loss, acting now</dt><dd id="act-loss">—</dd></div>
-          <div><dt>Expected loss after inspecting</dt><dd id="evidence-loss">—</dd></div>
-          <div><dt>Inspection cost, direct and delay</dt><dd id="inspection-cost">—</dd></div>
+          <div><dt>Expected loss if you act now</dt><dd id="act-loss">—</dd></div>
+          <div><dt>Expected loss if you inspect first</dt><dd id="evidence-loss">—</dd></div>
+          <div><dt>Cost of inspecting</dt><dd id="inspection-cost">—</dd></div>
           <div class="total"><dt>Net value of inspecting</dt><dd id="net-value">—</dd></div>
         </dl>
         <button id="inspect-button" class="button" type="button">Run simulated inspection</button>
         <div id="observation-buttons" class="choices" hidden>
-          <p>Pick the result the simulated feed returns:</p>
+          <p>Choose what the simulated feed reports:</p>
           <div>
             <button class="choice" type="button" data-observation="blocked">Road blocked</button>
             <button class="choice" type="button" data-observation="clear">Road clear</button>
@@ -143,7 +143,7 @@
             <tbody id="provenance"></tbody>
           </table>
         </div>
-        <p class="note">Every shipment, truck, appointment, incident, and inspection record is fictional. DATA.md lists the sources and modeling choices.</p>
+        <p class="note">The shipments, trucks, appointments, incident and inspection results are made up. DATA.md lists the sources and how the numbers were chosen.</p>
       </section>
       <section class="block" aria-labelledby="definitions-title">
         <h2 id="definitions-title">Definitions</h2>

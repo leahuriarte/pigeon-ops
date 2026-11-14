@@ -21,7 +21,11 @@ const truckStatus = {
   "at-terminal": ["At terminal", "planned"],
   waiting: ["Waiting", "watch"],
 };
-const observationLabels = { blocked: "road blocked", clear: "road clear", inconclusive: "inconclusive" };
+const observationLabels = {
+  blocked: "the feed reported the road blocked",
+  clear: "the feed reported the road clear",
+  inconclusive: "an inconclusive feed result",
+};
 const truckIsWaiting = (truck) => truck.status === "waiting" || truck.status === "available-soon";
 const tag = ([label, tone]) => `<span class="status ${tone}">${label}</span>`;
 
@@ -128,7 +132,7 @@ function showSchematic(message) {
 async function drawMap() {
   drawSchematicMap();
   if (window.innerWidth < 920) {
-    showSchematic("Schematic map on narrow screens. Truck positions are simulated.");
+    showSchematic("Schematic map (ArcGIS loads at 920px and wider). Truck positions are simulated.");
     return;
   }
   try {
@@ -157,7 +161,7 @@ function renderDecision() {
 
 function renderRankings(items, observation = null) {
   $("#ranking-state").textContent = observation
-    ? `Ranked by expected loss after a “${observationLabels[observation]}” result`
+    ? `Ranked by expected loss after ${observationLabels[observation]}`
     : "Ranked by expected loss before inspection";
   $("#rankings").innerHTML = items.map((item) => {
     const e = item.expected;
@@ -177,11 +181,11 @@ function renderEvoi(analysis) {
   const e = analysis.evoi;
   const best = analysis.before[0];
   $("#recommendation").textContent = e.recommend_inspection
-    ? `Inspect before acting. Inspecting is expected to save ${money(e.gross_value_of_information)}, which is ${money(e.net_value_of_information)} more than it costs.`
-    : `Act now without inspecting. Inspecting costs ${money(e.inspection_cost)} and is expected to save ${money(e.gross_value_of_information)}.`;
+    ? `Inspect CA-47 before acting. Inspecting lowers the expected loss by ${money(e.gross_value_of_information)} and costs ${money(e.inspection_cost)}, so it comes out ${money(e.net_value_of_information)} ahead.`
+    : `Act now. Inspecting costs ${money(e.inspection_cost)} and lowers the expected loss by ${money(e.gross_value_of_information)}.`;
   $("#recommendation-short").innerHTML = e.recommend_inspection
-    ? `Inspect, then decide<small>Lowest expected loss now: ${esc(best.label)}</small>`
-    : `${esc(best.label)}<small>No inspection needed</small>`;
+    ? `Inspect CA-47 first<small>If you act now: ${esc(best.label)}</small>`
+    : `${esc(best.label)}<small>Inspecting costs more than it saves</small>`;
   $("#act-loss").textContent = money(e.best_act_now_loss);
   $("#evidence-loss").textContent = money(e.expected_loss_after_inspection);
   $("#inspection-cost").textContent = money(e.inspection_cost);
@@ -235,7 +239,13 @@ function renderConditions() {
 }
 
 function renderProvenance() {
-  $("#provenance").innerHTML = scenario.data_provenance.map((item) => `<tr><td>${esc(item.label)}</td><td>${esc(item.kind[0].toUpperCase() + item.kind.slice(1))}</td><td>${esc(item.source)}</td></tr>`).join("");
+  const kinds = {
+    "public baseline": "Public data",
+    "publicly calibrated": "Simulated to match public data",
+    synthetic: "Simulated",
+    assumed: "Assumed",
+  };
+  $("#provenance").innerHTML = scenario.data_provenance.map((item) => `<tr><td>${esc(item.label)}</td><td>${esc(kinds[item.kind] ?? item.kind)}</td><td>${esc(item.source)}</td></tr>`).join("");
 }
 
 function renderDefinitions() {
@@ -243,10 +253,10 @@ function renderDefinitions() {
   const definitions = [
     ["Needs attention", "A shipment with status at risk, watch, or unassigned."],
     ["Slack", "Minutes between a shipment’s ETA and the start of its appointment window."],
-    ["Blockage probability", "The chance CA-47 is blocked, estimated from the incident reports. A simulated inspection result updates it with Bayes’ rule."],
-    ["Breach", "A hard rule an outcome violates, such as a missed appointment window."],
+    ["Blockage probability", "The chance that CA-47 is blocked. It starts at the value set in the scenario and is recalculated with Bayes’ rule after an inspection result."],
+    ["Breach", "A hard rule that an outcome breaks, such as missing an appointment window."],
     ["Expected loss", `Delay × ${money(m.lateness_cost_per_minute)} per minute, plus direct cost, plus CO₂ × $${m.emissions_cost_per_kg.toFixed(2)} per kg, plus breaches × ${money(m.hard_constraint_penalty)}. The blocked and open outcomes are averaged using the blockage probability.`],
-    ["Net value of inspecting", "Best expected loss when acting now, minus the expected loss after inspecting, minus the inspection cost. Inspection is recommended when this is above zero."],
+    ["Net value of inspecting", "Expected loss if you act now, minus expected loss if you inspect first, minus the cost of inspecting. The page recommends inspecting when the net value is above zero."],
   ];
   $("#definitions").innerHTML = definitions.map(([term, text]) => `<dt>${term}</dt><dd>${esc(text)}</dd>`).join("");
 }
@@ -267,10 +277,12 @@ async function observe(observation) {
   renderRankings(analysis.after, observation);
   const prior = pct(analysis.prior_blocked_probability);
   const posterior = pct(analysis.posterior_blocked_probability);
-  const change = observation === "inconclusive"
-    ? `An inconclusive result leaves the blockage probability at ${prior}.`
-    : `After a “${observationLabels[observation]}” result, the blockage probability moves from ${prior} to ${posterior}.`;
-  $("#posterior").textContent = `${change} Lowest expected loss: ${analysis.after[0].label}. A dispatcher still approves the action.`;
+  const best = analysis.after[0].label;
+  $("#posterior").textContent = {
+    blocked: `The feed reported the road blocked, so the blockage probability rises from ${prior} to ${posterior}. “${best}” has the lowest expected loss.`,
+    clear: `The feed reported the road clear, so the blockage probability drops from ${prior} to ${posterior}. “${best}” has the lowest expected loss.`,
+    inconclusive: `The feed result was inconclusive, so the blockage probability stays at ${prior} and the ranking is the same as before.`,
+  }[observation];
   $("#posterior").hidden = false;
 }
 
