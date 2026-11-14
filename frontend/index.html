@@ -31,8 +31,15 @@
     <!-- Left: the operating picture. One view at a time. -->
     <section class="stage" aria-label="Operations">
       <div class="stats-bar">
-        <ul id="indicators" class="stats" aria-label="Plan indicators"></ul>
+        <div class="table-wrap scenario-comparison">
+          <table class="data">
+            <caption id="comparison-caption">Normal morning · baseline</caption>
+            <thead><tr><th>Indicator</th><th class="num">Normal</th><th class="num">Current</th><th class="num">Change</th></tr></thead>
+            <tbody id="scenario-comparison"></tbody>
+          </table>
+        </div>
         <p id="indicators-note" class="stats-note"></p>
+        <details class="more"><summary>Other plan indicators</summary><ul id="indicators" class="stats" aria-label="Other plan indicators"></ul></details>
       </div>
 
       <div class="views" role="tablist" aria-label="Views">
@@ -147,15 +154,15 @@
 
       <div class="panel-body">
         <section class="step step-start" data-step="start" aria-labelledby="start-title">
-          <h1 id="start-title">Plan the morning</h1>
-          <p class="lede">Check a road report, compare the options, and choose a response.</p>
+          <h1 id="start-title">Normal morning vs incident</h1>
+          <p class="lede">See the normal plan, introduce a road incident, then decide whether a drone check is worth its cost.</p>
           <fieldset class="story-picker">
-            <legend>Scenario</legend>
+            <legend>Normal baseline + two drone checks</legend>
             <ul id="story-options" class="options"></ul>
           </fieldset>
           <div class="actions">
-            <button id="start-button" class="btn primary big" type="button">Start</button>
-            <button id="jump-button" class="btn" type="button">Skip to incident</button>
+            <button id="start-button" class="btn primary big" type="button" disabled>Start normal morning</button>
+            <button id="jump-button" class="btn" type="button" hidden disabled>Watch from start</button>
           </div>
           <p id="start-note" class="note"></p>
           <p class="fine-print">Simulation only. You approve each response. No drones or drivers are dispatched.</p>
@@ -163,14 +170,20 @@
 
         <section class="step step-monitor" data-step="monitor" aria-labelledby="monitor-title" hidden>
           <p class="tag-line"><span class="tag ok">No incident</span><span>Regular morning</span></p>
-          <h1 id="monitor-title">Running to plan</h1>
-          <p class="lede">No incidents reported. Trucks are following the planned routes.</p>
+          <h1 id="monitor-title">Fleet and environment</h1>
+          <p class="lede">No incidents reported. Follow the simulated trucks and their estimated environmental impact as the shift runs.</p>
           <dl class="facts">
-            <div><dt>Chance CA-47 is blocked</dt><dd id="monitor-risk">—</dd></div>
-            <div><dt>Drone check</dt><dd id="monitor-check">—</dd></div>
+            <div><dt>Trucks moving now</dt><dd id="monitor-moving">—</dd></div>
+            <div><dt>CO₂ emitted so far</dt><dd id="monitor-co2">—</dd></div>
             <div><dt>Appointments within reach</dt><dd id="monitor-feasible">—</dd></div>
           </dl>
+          <p id="monitor-environment" class="note"></p>
           <p id="monitor-note" class="note"></p>
+          <div class="jump">
+            <h2>Introduce an incident</h2>
+            <p>Compare the changed plan with normal operations, then review one drone clip for that check.</p>
+            <div id="monitor-incidents" class="jump-list"></div>
+          </div>
           <div class="actions">
             <button id="monitor-skip" class="btn" type="button">View shift report</button>
           </div>
@@ -208,7 +221,7 @@
           </div>
 
           <div class="actions">
-            <button id="inspect-button" class="btn primary" type="button">Review footage</button>
+            <button id="inspect-button" class="btn primary" type="button">Run drone check</button>
             <button id="skip-inspection" class="btn" type="button">Skip inspection</button>
           </div>
           <div id="observation-buttons" class="choices" hidden>
@@ -264,8 +277,8 @@
             </div>
             <p id="tally-scope" class="subhead"></p>
             <ul id="tally" class="tally-tiles"></ul>
-            <h3 class="tally-race-title">Cost of each response <span id="tally-race-road"></span></h3>
-            <ol id="tally-race" class="tally-race-list"></ol>
+            <div id="tally-alternatives"><h3 class="tally-race-title">Cost of each response <span id="tally-race-road"></span></h3>
+              <ol id="tally-race" class="tally-race-list"></ol></div>
             <details class="more"><summary>What the cost includes</summary><p id="tally-note" class="note"></p></details>
           </section>
 
@@ -273,11 +286,11 @@
             <h2 id="report-indicators-title">Plan comparison</h2>
             <div class="table-wrap">
               <table class="data">
-                <thead><tr><th>Indicator</th><th class="num">Usual</th><th class="num">Today</th><th>Change</th></tr></thead>
+                <thead><tr><th>Indicator</th><th id="report-usual-head" class="num">Usual</th><th id="report-today-head" class="num">Today</th><th id="report-change-head">Change</th></tr></thead>
                 <tbody id="report-indicators"></tbody>
               </table>
             </div>
-            <p class="note">Whole-plan estimates for the top-ranked response before inspection.</p>
+            <p id="report-indicators-note" class="note">Whole-plan estimates for the top-ranked response before inspection.</p>
             <h2 id="report-log-title">Decision log</h2>
             <ol id="report-log" class="report-log"></ol>
           </div>
@@ -316,13 +329,12 @@
     <header class="inspection-header">
       <div>
         <h2 id="inspection-dialog-heading">Review footage</h2>
-        <p class="inspection-scope">Stock footage from another location, used for this simulation.</p>
+        <p class="inspection-scope">Simulated drone check · pre-recorded stock footage from another location.</p>
       </div>
       <button id="inspection-close" class="btn small" type="button">Close</button>
     </header>
     <div class="inspection-body">
       <div class="inspection-media">
-        <div id="inspection-clips" class="clip-tabs" role="tablist" aria-label="Inspection clip"></div>
         <video id="inspection-video" class="inspection-photo" autoplay loop muted playsinline aria-label="Annotated drone clip"></video>
         <img id="inspection-photo" class="inspection-photo" alt="Unannotated source frame" hidden>
         <div class="inspection-photo-caption"><button id="inspection-image-toggle" class="link" type="button">Show source frame</button></div>
@@ -353,7 +365,7 @@
           <p class="fine-print">Reviews are saved locally.</p>
         </details>
         <p id="inspection-error" class="inspection-error" role="alert"></p>
-        <button id="inspection-apply" class="btn primary" type="button" disabled>Apply to scenario</button>
+        <button id="inspection-apply" class="btn primary" type="button" disabled>Confirm drone observation</button>
       </div>
     </div>
   </dialog>
