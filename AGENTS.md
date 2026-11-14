@@ -47,15 +47,16 @@ One shared operating picture plus named variants:
 - `assignments` is `{shipments[], trucks[], count, before[], after[]}`: every assignment of the `decision_model.assignment_pool` trucks to its shipments, ranked by expected loss (`after` is empty without an observation). Each option has `id`, `trucks` (shipment id to truck id), `planned`, `action` (matching action id or `null`), `rank`, `expected_loss` and `outcomes`. Every computed outcome, for options and for actions, carries `detail.shipments[]`, one row per pool shipment with at least `shipment`, `truck`, `route`, `reassigned`, `arrival` (HH:MM), `appointment`, `slack_min`, `lateness_min`, `constraint_breaches` and `basis`.
 - `indicators` is a list of `{id, label, value, unit, basis}`, plus `of` for `appointments_feasible`. Ids: `shipments_at_risk`, `appointments_feasible`, `expected_delay_min`, `added_miles`, `co2_kg`, `community_exposure`. `basis` is `stub`, `estimated`, `simulated` or `measured`. `value` may be `null` while not yet computed. Indicators describe the whole plan under the top-ranked option before any inspection.
 
-### 3. Inspection images: `cv/outputs/review-cases/library.json`
+### 3. Drone inspection library: `cv/review_library/library.json`
 
-Built offline by `python -m cv.prepare_review` (gitignored) and served without CV dependencies:
+Built offline from top-down drone clips by `python -m cv.prepare_review` (catalog `cv/drone_review.json`) and committed, so the demo works without CV dependencies:
 
-- `GET /api/inspection-cases` returns `{available, cases[]}`; `available` is false and `cases` empty when the library has not been built, and the page falls back to simulated observation buttons.
-- Each case has `id`, `title`, `visual_label`, `review_note`, `image_quality`, `annotated_image` and `source_image` (served under `/inspection-assets/`), `vehicle_detections`, `excluded_detections`, `allowed_observations` (a subset of `blocked`, `clear`, `inconclusive`) and `source` (`source_url`, `sha256`, `credit`, `license`, `location`, `historical`).
-- `POST /api/inspection-review` takes `{case_id, scenario, observation, note, simulated_application: true}`, appends the review to `cv/outputs/inspection-reviews.jsonl` and returns `{analysis, review}`. An observation outside the case's `allowed_observations` returns 400.
+- `GET /api/inspection-cases` returns `{available, cases[]}`; `available` is false and `cases` empty when the library is missing, and the page falls back to simulated observation buttons.
+- Each case has `id`, `title`, `visual_label`, `review_note`, `image_quality`, `annotated_video`, `annotated_image` and `source_image` (served under `/inspection-assets/`), `vehicle_detections`, `excluded_detections`, `allowed_observations` (a subset of `blocked`, `clear`, `inconclusive`), `cv_assessment` and `source` (`source_url`, `sha256`, `credit`, `license`, `location`, `historical`).
+- `cv_assessment` is the CV suggestion from vehicle motion on the marked road: `suggested_observation`, `motion_state`, `reason`, `vehicles_on_road`, `stopped`, `moving` and `basis`. It is unvalidated; the dialog preselects it and the dispatcher confirms or overrides it.
+- `POST /api/inspection-review` takes `{case_id, scenario, observation, note, simulated_application: true}`, appends the review (with `cv_suggestion` and `agrees_with_cv`) to `cv/outputs/inspection-reviews.jsonl` and returns `{analysis, review}`. An observation outside the case's `allowed_observations` returns 400.
 
-A reviewed image is an illustration applied to the fictional scenario. The Bayes update uses `decision_model.drone.accuracy` (assumed, for reviewed imagery); `decision_model.drone.cv_only` holds the measured table for automated CV alone, shown for comparison only.
+A reviewed clip is an illustration applied to the fictional scenario. The Bayes update uses `decision_model.drone.accuracy` (assumed, for dispatcher-reviewed footage); `decision_model.drone.cv_only` holds the measured table for automated still-image CV alone, shown for comparison only.
 
 ## Gotchas
 

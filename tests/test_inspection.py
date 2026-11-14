@@ -23,6 +23,7 @@ class InspectionReviewTests(unittest.TestCase):
         self.audit = root / "reviews.jsonl"
         self.library.write_text(json.dumps({"available": True, "cases": [
             {"id": "road", "allowed_observations": ["blocked", "clear", "inconclusive"],
+             "cv_assessment": {"suggested_observation": "blocked"},
              "source": {"source_url": "https://example.com/road", "sha256": "abc"}},
             {"id": "unavailable", "allowed_observations": ["inconclusive"],
              "source": {"source_url": "https://example.com/unavailable", "sha256": "def"}},
@@ -36,6 +37,12 @@ class InspectionReviewTests(unittest.TestCase):
         record = json.loads(self.audit.read_text(encoding="utf-8"))
         self.assertEqual("abc", record["source_sha256"])
         self.assertTrue(record["simulated_application"])
+
+    def test_review_records_whether_the_dispatcher_overrode_the_cv_suggestion(self):
+        review_inspection(self.payload, self.library, self.audit)
+        review_inspection({**self.payload, "observation": "blocked"}, self.library, self.audit)
+        records = [json.loads(line) for line in self.audit.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([("blocked", False), ("blocked", True)], [(r["cv_suggestion"], r["agrees_with_cv"]) for r in records])
 
     def test_unavailable_camera_cannot_be_submitted_as_clear(self):
         self.payload["case_id"] = "unavailable"

@@ -921,7 +921,7 @@ function resetObservation() {
   $("#observation-buttons").hidden = true;
   $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", "false"));
   $("#inspect-button").disabled = false;
-  $("#inspect-button").textContent = "Review inspection images";
+  $("#inspect-button").textContent = "Review drone footage";
 }
 
 async function observe(observation) {
@@ -1043,12 +1043,15 @@ window.addEventListener("inspection-reviewed", ({ detail }) => {
   showObservation(detail.analysis).catch((error) => {
     $("#posterior").textContent += ` Playback could not update: ${error.message}`;
   });
-  const finding = { blocked: "visible obstruction", clear: "no visible obstruction in this view", inconclusive: "insufficient evidence" }[detail.review.observation];
-  $("#posterior").textContent = `Reviewed illustration: ${finding}. For this fictional scenario, the model's blockage probability changes from ${pct(detail.analysis.prior_blocked_probability)} to ${pct(detail.analysis.posterior_blocked_probability)}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
+  const finding = { blocked: "road blocked", clear: "road clear", inconclusive: "inconclusive" };
+  const cv = detail.review.cv_suggestion;
+  const choice = detail.review.observation;
+  const agreement = !cv ? "" : cv === choice ? ` (matches the CV suggestion)` : ` (CV suggested ${finding[cv]}; you overrode it)`;
+  $("#posterior").textContent = `Drone footage reviewed: ${finding[choice]}${agreement}. For this fictional scenario, the blockage probability changes from ${pct(detail.analysis.prior_blocked_probability)} to ${pct(detail.analysis.posterior_blocked_probability)}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;
-  $("#inspect-button").textContent = "Review another image";
+  $("#inspect-button").textContent = "Review another clip";
 });
 
 bindEvents();

@@ -1,6 +1,8 @@
 const dialog = document.querySelector("#inspection-dialog");
 const picker = document.querySelector("#inspection-case");
+const video = document.querySelector("#inspection-video");
 const photo = document.querySelector("#inspection-photo");
+const toggle = document.querySelector("#inspection-image-toggle");
 let libraryPromise;
 let cases = [];
 let selected;
@@ -9,47 +11,62 @@ let showSource = false;
 let submitting = false;
 
 const labels = {
+  visible_obstruction: "Wreck and debris across the travel lanes",
   no_visible_obstruction: "No visible obstruction in this view",
-  traffic_present: "Traffic visible · movement unknown",
+  dense_slow_traffic: "Dense, slow traffic · cause not visible",
   insufficient_detail: "Insufficient detail",
-  construction_visible: "Construction visible · lane status uncertain",
-  image_unavailable: "Camera image unavailable",
-  visible_obstruction: "Debris visible on roadway",
+  image_unavailable: "Footage unavailable",
 };
+const signalLabels = {
+  blocked: "Road blocked",
+  clear: "Road clear: traffic gets through",
+  inconclusive: "Inconclusive",
+};
+
+function showMedia() {
+  video.hidden = showSource;
+  photo.hidden = !showSource;
+  if (showSource) video.pause();
+  else video.play().catch(() => {});
+  toggle.textContent = showSource ? "Show CV overlay" : "Show source frame";
+}
 
 function renderCase() {
   selected = cases.find((item) => item.id === picker.value);
   if (!selected) return;
   showSource = false;
-  photo.src = selected.annotated_image;
-  photo.alt = `${selected.title}. ${selected.review_note}`;
+  video.src = selected.annotated_video;
+  video.poster = selected.annotated_image;
+  photo.src = selected.source_image;
+  photo.alt = `${selected.title}, unannotated source frame`;
+  showMedia();
+  const cv = selected.cv_assessment;
   document.querySelector("#inspection-case-title").textContent = selected.title;
   document.querySelector("#inspection-finding").textContent = labels[selected.visual_label] || "Visual review required";
   document.querySelector("#inspection-note").textContent = selected.review_note;
-  document.querySelector("#inspection-count").textContent = selected.image_quality === "unavailable"
-    ? "No image analysis available"
-    : `${selected.vehicle_detections} detections in marked road area · ${selected.excluded_detections} outside it`;
-  document.querySelector("#inspection-image-toggle").textContent = "Show source image";
+  document.querySelector("#inspection-count").textContent =
+    `${cv.window_seconds} s of footage at ${cv.sample_fps} frames/s · ${selected.vehicle_detections} vehicles on the marked road, ${selected.excluded_detections} outside it (median per frame)`;
+  document.querySelector("#inspection-cv").dataset.signal = cv.suggested_observation;
+  document.querySelector("#inspection-cv-signal").textContent = signalLabels[cv.suggested_observation];
+  document.querySelector("#inspection-cv-reason").textContent = `${cv.reason[0].toUpperCase()}${cv.reason.slice(1)}.`;
+  document.querySelector("#inspection-cv-basis").textContent = cv.basis;
   document.querySelector("#inspection-date").textContent = selected.source.historical
-    ? `Historical image · ${selected.source.source_date} · ${selected.source.date_description}`
-    : `Saved ${new Date(selected.source.retrieved_at).toLocaleString()} · capture time: see image overlay`;
-  const location = selected.source.location;
-  document.querySelector("#inspection-location").textContent = location.latitude
-    ? `${location.route} · ${Number(location.latitude).toFixed(4)}, ${Number(location.longitude).toFixed(4)}`
-    : location.locationName;
+    ? `Pre-recorded · ${selected.source.date_description || selected.source.source_date}`
+    : `Saved ${new Date(selected.source.retrieved_at).toLocaleString()}`;
+  document.querySelector("#inspection-location").textContent = selected.source.location.locationName;
   const source = document.querySelector("#inspection-source");
   source.textContent = `${selected.source.credit} · ${selected.source.license}`;
   source.href = selected.source.source_url;
   document.querySelector("#inspection-review-note").value = "";
   document.querySelector("#inspection-error").textContent = "";
   document.querySelectorAll("[name=inspection-observation]").forEach((radio) => {
-    radio.checked = false;
     radio.disabled = !selected.allowed_observations.includes(radio.value);
+    radio.checked = radio.value === cv.suggested_observation && !radio.disabled;
   });
-  document.querySelector("#inspection-apply").disabled = true;
+  document.querySelector("#inspection-apply").disabled = !document.querySelector("[name=inspection-observation]:checked");
   document.querySelector("#inspection-restriction").textContent = selected.allowed_observations.length === 1
-    ? "This image supports an inconclusive observation only."
-    : "Choose what this view supports. No visible obstruction does not establish road safety.";
+    ? "This clip supports an inconclusive observation only."
+    : "Confirm or change the suggestion. Traffic getting through this frame does not prove the road is safe beyond it.";
 }
 
 export async function openInspection(id) {
@@ -64,8 +81,8 @@ export async function openInspection(id) {
   if (!cases.length) return false;
   scenarioId = id;
   picker.replaceChildren(...cases.map((item) => new Option(
-    `${item.source.historical ? "Historical · " : ""}${item.title}`, item.id)));
-  picker.value = cases.find((item) => item.id === "caltrans-i405335wilmingtonave")?.id || cases[0].id;
+    `${item.title} · CV: ${signalLabels[item.cv_assessment.suggested_observation].split(":")[0].toLowerCase()}`, item.id)));
+  picker.value = cases[0].id;
   renderCase();
   dialog.showModal();
   return true;
@@ -77,11 +94,11 @@ export function resetInspection() {
 }
 
 picker.addEventListener("change", renderCase);
-document.querySelector("#inspection-image-toggle").addEventListener("click", () => {
+toggle.addEventListener("click", () => {
   showSource = !showSource;
-  photo.src = showSource ? selected.source_image : selected.annotated_image;
-  document.querySelector("#inspection-image-toggle").textContent = showSource ? "Show marked road area" : "Show source image";
+  showMedia();
 });
+dialog.addEventListener("close", () => video.pause());
 document.querySelector("#inspection-close").addEventListener("click", () => dialog.close());
 document.querySelectorAll("[name=inspection-observation]").forEach((radio) => radio.addEventListener("change", () => {
   document.querySelector("#inspection-apply").disabled = submitting;
@@ -112,7 +129,7 @@ document.querySelector("#inspection-apply").addEventListener("click", async () =
   } finally {
     submitting = false;
     button.disabled = false;
-    button.textContent = "Use for demo";
+    button.textContent = "Apply to scenario";
     picker.disabled = false;
   }
 });

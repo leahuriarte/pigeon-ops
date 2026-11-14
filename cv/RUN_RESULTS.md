@@ -91,32 +91,29 @@ an inspection based on it alone is not worth its $165 cost. The dashboard shows
 this next to the assumed 90% reviewed-imagery figure and the accuracy at which an
 inspection pays off (80% in the disruption scenario).
 
-## Completed review and dashboard integration
+## Drone inspection library (dashboard)
 
-The prepared review library contains 19 California cases: 16 selected Caltrans
-camera snapshots and three historical images from Caltrans and USGS. Road areas
-were marked where visible. The Caltrans Regent's Slide photo shows debris on
-SR-1, supported by a February 17, 2026 closure release; it is explicitly historical
-and unrelated to the fictional CA-47 incident.
+The dashboard library now uses five top-down Pexels drone clips instead of
+side-on Caltrans cameras, because the demo's inspection is a drone flight.
+`python -m cv.prepare_review` samples 4 seconds of each clip at 8 frames per
+second with `drone-ensemble`, removes camera motion, measures vehicle speeds
+and applies the motion rule to the marked road (`cv/README.md`).
 
-Visual notes and region polygons are provisional AI-assisted annotations, not
-independent ground truth. Of 65 vehicle detections across the selected source
-images, 33 fall inside the marked road areas and 32 are excluded. This measures
-region filtering, not a validated accuracy improvement. The debris outline was
-added by visual review; the vehicle model did not detect the debris.
+| Case | Visual review | CV suggestion | Why |
+| --- | --- | --- | --- |
+| crash-lanes-blocked | wreck across lanes | blocked | crashed trailer standing at 0 km/h; one car crawling at about 7 km/h |
+| crash-orbit | wreck across lanes | inconclusive | the detector does not recognise the jackknifed wreck, so the road looks empty |
+| highway-free-flow | no obstruction | clear | 11 of 11 vehicles moving at 60–100 km/h |
+| city-highway-flow | no obstruction | clear | 6 of 6 vehicles moving |
+| rest-area-parked-trucks | no obstruction | clear | 12 moving on the motorway; 63 parked trucks excluded by the road region |
 
-The dashboard now displays each image, its marked road area, location, source,
-date and limitations. Reviewers can switch to an unmarked source view and choose
-an observation for the synthetic scenario. Unavailable and insufficient-detail
-cases permit only an inconclusive signal. The review endpoint records the source
-hash, scenario, observation, note and time in a local audit log.
+These are five hand-picked clips, not an accuracy measurement. A dense close-up
+clip (`38774214`) was dropped: cars fill the frame and the camera-motion estimate
+fails. Speeds in the rest-area clip read about 16 km/h, which suggests slowed
+stock footage; the 10 km/h moving threshold still classifies it correctly.
 
-Browser checks on November 14 verified all three flows in the updated disruption
-scenario: prior 40%; clear illustration → 7% and keep course; historical debris
-illustration → 86% and reroute; unavailable camera → 40%, inconclusive. These are
-scenario-model results, not measured California road probabilities. Scenario
-changes reset the selected evidence. The review dialog was also checked at
-390 × 844 pixels without horizontal overflow.
-
-Start the app with `python run.py`, then open `http://127.0.0.1:8000` and select
-**Review inspection images**. See `cv/README.md` to regenerate the prepared library.
+Browser check on November 14: confirming the crash suggestion moves the
+disruption scenario from 40% to 86% and the best option to the Anaheim St
+reroute; overriding the inconclusive crash clip to blocked gives the same
+result and is logged as an override; confirming the rest-area clip drops the
+probability to 7% and the best option to keeping the current route.

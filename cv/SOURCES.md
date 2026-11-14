@@ -18,7 +18,7 @@ fictional incident, and do not turn detection confidence into inspection accurac
   camera metadata, a filtered camera GeoJSON, individual JPEGs, checksums,
   retrieval times and lane-closure records.
 
-These are roadside cameras, not drone images. Some cameras marked in service
+These are roadside cameras, not drone images, so the dashboard library no longer uses them; they remain for the detector checks in RUN_RESULTS.md. Some cameras marked in service
 return a “Temporarily Unavailable” card. Camera-record timestamps describe metadata
 updates, not image capture time. Keep the original image overlay visible. Camera
 images are not annotated evaluation data. Lane-closure feeds also contain planned,
@@ -68,19 +68,32 @@ These metrics are not official oriented-box mAP. Neither dataset labels road
 blockage, congestion severity, travel speed or road safety. No model was trained
 on these data during setup.
 
-## Historical California review cases
+## Drone inspection clips (dashboard library)
 
-The review library adds three attributed historical examples:
+The dashboard's inspection library (`cv/review_library/`, built by
+`python -m cv.prepare_review` from `cv/drone_review.json`) uses only top-down
+drone footage, because the demo's inspection is a drone flight over the road.
+Raw clips go in `cv/clips/raw/` (ignored by Git); the committed library holds a
+4-second annotated excerpt, one source frame and one annotated frame per clip.
+All are 1920×1080 Pexels downloads under the [Pexels license](https://www.pexels.com/license/),
+fetched November 14, 2026. None was filmed near the Port of Los Angeles or
+Long Beach, and capture dates are not published.
 
-- [Regent's Slide, Caltrans publication February 17, 2026](https://dot.ca.gov/caltrans-near-me/district-5/d5-news/d5-news-2-17-2026): rocks and soil visibly cover SR-1; the accompanying release reported a closure. Exact photo capture time is unspecified. Caltrans Conditions of Use apply.
-- [Mud Creek aerial image, July 7, 2017](https://www.usgs.gov/media/images/big-sur-landslide-july-7-2017): Bob Van Wagenen / USGS, public domain. Landslide and roadworks are visible; temporary-route access remains inconclusive from this photo.
-- [Big Sur coast, July 12, 2017](https://www.usgs.gov/media/images/big-sur-coast): Shawn Harrison / USGS, public domain. No obstruction is visible in the photographed road segment; this does not establish current road access or safety.
+| File | Library case | Creator | Source |
+| --- | --- | --- | --- |
+| `blocked_crash_topdown_12753260.mp4` | crash-lanes-blocked | K | https://www.pexels.com/video/aerial-shot-of-a-car-accident-on-a-highway-12753260/ |
+| `blocked_crash_topdown_12901485.mp4` | crash-orbit | K | https://www.pexels.com/video/accident-on-highway-12901485/ |
+| `clear_topdown_13376785.mp4` | highway-free-flow | tal molcho | https://www.pexels.com/video/traffic-on-highway-13376785/ |
+| `clear_topdown_31570754.mp4` | city-highway-flow | Kenan Turguç | https://www.pexels.com/video/aerial-view-of-city-highway-traffic-31570754/ |
+| `ambiguous_rest_area_15978611.mp4` | rest-area-parked-trucks | DeLuca G | https://www.pexels.com/video/aerial-view-of-a-highway-with-many-trucks-15978611/ |
 
-The source files are downloaded to `cv/data/california-hazards/`. The preparer
-records image hashes, date descriptions and credits in the generated library.
-Road polygons and visual notes in `california_review.json` were produced through
-AI-assisted visual review and remain provisional. No independent annotator has
-validated these labels, and no blockage-accuracy score is reported from them.
+Download each clip's 1920×1080 file from its page and save it under the file
+name above. Two earlier candidates, `blocked_port_queue_13742716.mp4` and
+`blocked_highway_queue_13171071.mp4`, are oblique views and are not used. `ambiguous_dense_moving_38774214.mp4` (Kelly) is top-down but so close that cars fill the frame, which defeats the camera-motion estimate; it is left out.
+
+Road regions and visual notes in `drone_review.json` are AI-assisted and
+provisional. No independent annotator has validated them, and no blockage
+accuracy is reported from five hand-picked clips.
 
 ## Pretrained models
 

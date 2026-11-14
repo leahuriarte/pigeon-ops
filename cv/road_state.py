@@ -4,6 +4,10 @@ A still image shows how tightly vehicles are packed on one road segment. It
 does not show whether they are moving or why. Densely packed traffic is
 evidence for a blockage further along the road, so the engine weighs it with
 measured detector error and an explicit, assumed traffic model.
+
+Drone video also shows movement. `assess_motion` uses vehicle speeds on the
+road region: stopped traffic suggests a blockage, free-flowing traffic an open
+road, and anything else stays inconclusive.
 """
 import math
 
@@ -79,6 +83,78 @@ def assess_road(boxes, road, rule=DEFAULT_RULE, frame_brightness=None):
     return {
         "visual_state": state, "signal": SIGNAL_FOR_STATE[state], "reason": reason,
         "vehicles_on_road": len(road_boxes), "closely_spaced_vehicles": close, "rule": dict(rule),
+    }
+
+
+# Drone video adds what a still image lacks: whether vehicles on the road move.
+# Speeds are approximate km/h after removing camera motion (cv/motion.py).
+# Thresholds are set by hand, not fitted. They are deliberately low: a queue
+# behind a full blockage stands still, while traffic crawling at 10 km/h is
+# still getting through. Stock footage may also be slowed down.
+DEFAULT_MOTION_RULE = {
+    "stopped_below_kmh": 3,
+    "moving_above_kmh": 10,
+    # A heavy vehicle standing in a highway travel lane is itself evidence;
+    # traffic crawling past it counts toward a queue, not toward an open road.
+    "min_stopped_for_blocked": 1,
+    "blocked_not_moving_share": 0.6,
+    # An open road needs traffic seen passing through it.
+    "min_moving_for_clear": 2,
+    "clear_moving_share": 0.8,
+}
+MOTION_STATES = ("stopped_traffic", "free_flow", "mixed_flow", "no_traffic")
+SIGNAL_FOR_MOTION = {"stopped_traffic": "blocked", "free_flow": "clear",
+                     "mixed_flow": "inconclusive", "no_traffic": "inconclusive"}
+
+
+def median(values):
+    values = sorted(values)
+    if not values:
+        return 0
+    middle = len(values) // 2
+    return values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2
+
+
+def classify_speed(speed, rule=DEFAULT_MOTION_RULE):
+    if speed < rule["stopped_below_kmh"]:
+        return "stopped"
+    return "moving" if speed > rule["moving_above_kmh"] else "slow"
+
+
+def assess_motion(samples, rule=DEFAULT_MOTION_RULE):
+    """Classify a road region from several video samples.
+
+    `samples` holds one list per sampled frame with the speed of every vehicle
+    found on the road region. Each count is the median over samples, so one
+    frame's missed or duplicate detections do not flip the result.
+    """
+    kinds = [[classify_speed(speed, rule) for speed in speeds] for speeds in samples]
+    on_road = median([len(row) for row in kinds])
+    stopped = median([row.count("stopped") for row in kinds])
+    moving = median([row.count("moving") for row in kinds])
+    slow = median([row.count("slow") for row in kinds])
+    stopped_share = median([row.count("stopped") / len(row) for row in kinds if row])
+    not_moving_share = median([(len(row) - row.count("moving")) / len(row) for row in kinds if row])
+    moving_share = median([row.count("moving") / len(row) for row in kinds if row])
+    if not on_road:
+        state = "no_traffic"
+        reason = ("no vehicles found on the marked road; an empty road can also mean a closure upstream, "
+                  "so it is not evidence that the road is open")
+    elif stopped >= rule["min_stopped_for_blocked"] and not_moving_share >= rule["blocked_not_moving_share"]:
+        state = "stopped_traffic"
+        crawling = f" and {slow:g} crawling under {rule['moving_above_kmh']} km/h" if slow else ""
+        reason = f"{stopped:g} vehicle(s) standing still{crawling}, of {on_road:g} on the marked road; nothing moves through"
+    elif moving >= rule["min_moving_for_clear"] and moving_share >= rule["clear_moving_share"]:
+        state = "free_flow"
+        reason = f"{moving:g} of {on_road:g} vehicles on the marked road are moving through"
+    else:
+        state = "mixed_flow"
+        reason = f"{stopped:g} standing, {moving:g} moving of {on_road:g} vehicles on the marked road; flow is unclear"
+    return {
+        "motion_state": state, "signal": SIGNAL_FOR_MOTION[state], "reason": reason,
+        "vehicles_on_road": on_road, "stopped": stopped, "slow": slow, "moving": moving,
+        "stopped_share": round(stopped_share, 3), "moving_share": round(moving_share, 3),
+        "samples": len(samples), "rule": dict(rule),
     }
 
 

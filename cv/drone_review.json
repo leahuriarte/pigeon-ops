@@ -1,0 +1,148 @@
+{
+  "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+  "scope": "Pre-recorded top-down drone clips from Pexels illustrate a synthetic logistics scenario. None was filmed at the fictional CA-47 incident or near the Port of Los Angeles or Long Beach.",
+  "license": "Pexels License",
+  "license_url": "https://www.pexels.com/license/",
+  "clips": [
+    {
+      "id": "crash-lanes-blocked",
+      "file": "blocked_crash_topdown_12753260.mp4",
+      "title": "Truck crash across travel lanes",
+      "source_url": "https://www.pexels.com/video/aerial-shot-of-a-car-accident-on-a-highway-12753260/",
+      "credit": "K on Pexels",
+      "start_seconds": 1.0,
+      "visual_label": "visible_obstruction",
+      "road": [
+        [
+          0.0,
+          0.5
+        ],
+        [
+          1.0,
+          0.5
+        ],
+        [
+          1.0,
+          0.86
+        ],
+        [
+          0.0,
+          0.86
+        ]
+      ],
+      "note": "A jackknifed tractor-trailer and spilled load lie across the marked carriageway, with a second truck stopped beside it. No traffic passes the wreck in this direction. The opposite carriageway, outside the marked region, keeps moving."
+    },
+    {
+      "id": "crash-orbit",
+      "file": "blocked_crash_topdown_12901485.mp4",
+      "title": "Same crash, closer pass",
+      "source_url": "https://www.pexels.com/video/accident-on-highway-12901485/",
+      "credit": "K on Pexels",
+      "start_seconds": 0.5,
+      "visual_label": "visible_obstruction",
+      "road": [
+        [
+          0.0,
+          0.06
+        ],
+        [
+          1.0,
+          0.06
+        ],
+        [
+          1.0,
+          0.47
+        ],
+        [
+          0.0,
+          0.47
+        ]
+      ],
+      "note": "The wrecked cab, its trailer and a fuel or fluid spill cover the marked carriageway, which is otherwise empty. Traffic on the far carriageway, outside the marked region, is moving. The detector does not recognise the jackknifed wreck as a vehicle, so the CV sees an empty road and stays inconclusive; the dispatcher can see the wreck and override it. The camera turns during the clip; the road region follows it."
+    },
+    {
+      "id": "highway-free-flow",
+      "file": "clear_topdown_13376785.mp4",
+      "title": "Divided highway, light traffic",
+      "source_url": "https://www.pexels.com/video/traffic-on-highway-13376785/",
+      "credit": "tal molcho on Pexels",
+      "start_seconds": 10.0,
+      "visual_label": "no_visible_obstruction",
+      "road": [
+        [
+          0.0,
+          0.22
+        ],
+        [
+          1.0,
+          0.22
+        ],
+        [
+          1.0,
+          0.86
+        ],
+        [
+          0.0,
+          0.86
+        ]
+      ],
+      "note": "Cars and a bus move freely on all three carriageways. No obstruction is visible on the photographed stretch; this does not establish road safety beyond the frame."
+    },
+    {
+      "id": "city-highway-flow",
+      "file": "clear_topdown_31570754.mp4",
+      "title": "City expressway, light traffic",
+      "source_url": "https://www.pexels.com/video/aerial-view-of-city-highway-traffic-31570754/",
+      "credit": "Kenan Turguç on Pexels",
+      "start_seconds": 3.0,
+      "visual_label": "no_visible_obstruction",
+      "road": [
+        [
+          0.0,
+          0.3
+        ],
+        [
+          1.0,
+          0.3
+        ],
+        [
+          1.0,
+          0.66
+        ],
+        [
+          0.0,
+          0.66
+        ]
+      ],
+      "note": "A few vehicles travel in both directions with wide gaps. No obstruction is visible on either carriageway."
+    },
+    {
+      "id": "rest-area-parked-trucks",
+      "file": "ambiguous_rest_area_15978611.mp4",
+      "title": "Motorway beside a truck rest area",
+      "source_url": "https://www.pexels.com/video/aerial-view-of-a-highway-with-many-trucks-15978611/",
+      "credit": "DeLuca G on Pexels",
+      "start_seconds": 10.0,
+      "visual_label": "no_visible_obstruction",
+      "road": [
+        [
+          0.0,
+          0.44
+        ],
+        [
+          1.0,
+          0.44
+        ],
+        [
+          1.0,
+          0.63
+        ],
+        [
+          0.0,
+          0.63
+        ]
+      ],
+      "note": "Dozens of trucks stand still in the rest areas on both sides, outside the marked motorway. Traffic on the motorway itself keeps moving. Counting every stationary truck in frame would wrongly suggest a jam; the road region prevents that."
+    }
+  ]
+}

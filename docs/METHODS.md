@@ -156,6 +156,8 @@ P(blocked | says clear)   = (1 − accuracy) × p / ((1 − accuracy) × p + acc
 
 An "inconclusive" result leaves the probability unchanged.
 
+In the demo the observation is the dispatcher's verdict on a drone clip. The CV pipeline preselects a suggestion from vehicle motion on the marked road (`cv/README.md`), and the dispatcher confirms or overrides it. `drone.accuracy` describes that reviewed verdict, not the CV suggestion alone; `drone.cv_only` is the measured table for still-image CV alone, used only for the comparison line.
+
 ### Inspection delay
 
 An inspection takes `drone.launch_and_review_minutes` (6 minutes). It starts at the scenario time, `generated_at` (09:12), and ends at 09:18. No pool truck acts on the decision before then.

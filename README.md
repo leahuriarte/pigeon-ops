@@ -6,8 +6,9 @@ The network view uses ArcGIS Maps SDK for JavaScript 5.2 with a muted OpenStreet
 
 Repository slug: `pigeon-ops`
 
-Optional computer-vision setup, California highway snapshots, and annotated image
-inspection are documented in [cv/README.md](cv/README.md).
+The inspection step plays top-down drone clips annotated by an offline CV pipeline
+(vehicle detection, speed net of camera motion, a road-state suggestion). The
+annotated library is committed; rebuilding it is documented in [cv/README.md](cv/README.md).
 
 ## Run it
 
@@ -17,7 +18,7 @@ Requires Python 3.9+ and no package installation.
 python3 run.py
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flow** and **Changed condition**, inspect the shipment and truck network, then click **Review inspection images**. The ranked dispatcher options and blockage probability update immediately.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flow** and **Changed condition**, inspect the shipment and truck network, then click **Review drone footage**. The ranked dispatcher options and blockage probability update immediately.
 
 The demo includes 12 fictional shipments, 9 fictional trucks, multiple port-to-warehouse corridors, appointment and readiness context, and visible data-provenance labels. Read [DATA.md](DATA.md) for the source inventory, modeling choices, and limitations.
 
@@ -34,7 +35,7 @@ python3 -m unittest discover -s tests -v
 3. Compare keep course, reroute, and truck-swap options, including stakeholder and environmental effects.
 4. Show why a six-minute simulated inspection is worth gathering in this condition.
 5. Press play under the map to watch the model's pick unfold. Switch **Play out** or the CA-47 toggle to compare options, and click a truck to follow it.
-6. Click **Review inspection images**, pick a California image, and choose the observation it supports. The map switches to the new best option. Without the prepared image library (`python -m cv.prepare_review`), simulated **Road blocked**, **Road clear** and **Inconclusive** buttons appear instead.
+6. Click **Review drone footage**. The first clip shows a truck crash across the travel lanes: the CV marks the crashed truck as standing still on the road and suggests **Road blocked**. Confirm it; the blockage probability rises from 40% to 86% and the map switches to the reroute. Reopen it and try the rest-area clip: dozens of parked trucks are excluded because they are off the marked road, traffic on the motorway is moving, and the suggestion is **Road clear**. Without the library, simulated **Road blocked**, **Road clear** and **Inconclusive** buttons appear instead.
 7. Show the posterior blockage probability and newly ranked options. Point out the measured line: automated CV alone is not yet worth an inspection, and the page states the accuracy at which it would be. Emphasize that a dispatcher approves any action.
 
 ## How the decision model works

@@ -1,0 +1,427 @@
+{
+  "available": true,
+  "scope": "Pre-recorded top-down drone clips from Pexels illustrate a synthetic logistics scenario. None was filmed at the fictional CA-47 incident or near the Port of Los Angeles or Long Beach.",
+  "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+  "motion_rule": {
+    "stopped_below_kmh": 3,
+    "moving_above_kmh": 10,
+    "min_stopped_for_blocked": 1,
+    "blocked_not_moving_share": 0.6,
+    "min_moving_for_clear": 2,
+    "clear_moving_share": 0.8
+  },
+  "created_at": "2026-11-14T20:42:17.776882+00:00",
+  "summary": {
+    "cases": 5,
+    "model": "drone-ensemble",
+    "suggestions": {
+      "blocked": 1,
+      "clear": 3,
+      "inconclusive": 1
+    },
+    "blocked_suggestion_matches_visual_review": "4 of 5",
+    "interpretation": "A demonstration on hand-picked clips, not an accuracy measurement."
+  },
+  "cases": [
+    {
+      "id": "crash-lanes-blocked",
+      "title": "Truck crash across travel lanes",
+      "visual_label": "visible_obstruction",
+      "review_note": "A jackknifed tractor-trailer and spilled load lie across the marked carriageway, with a second truck stopped beside it. No traffic passes the wreck in this direction. The opposite carriageway, outside the marked region, keeps moving.",
+      "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+      "image_quality": "reviewable",
+      "road_region": [
+        [
+          0.0,
+          0.5
+        ],
+        [
+          1.0,
+          0.5
+        ],
+        [
+          1.0,
+          0.86
+        ],
+        [
+          0.0,
+          0.86
+        ]
+      ],
+      "source_image": "/inspection-assets/crash-lanes-blocked/source.jpg",
+      "annotated_image": "/inspection-assets/crash-lanes-blocked/annotated.jpg",
+      "annotated_video": "/inspection-assets/crash-lanes-blocked/annotated.mp4",
+      "vehicle_detections": 2,
+      "excluded_detections": 4,
+      "allowed_observations": [
+        "blocked",
+        "clear",
+        "inconclusive"
+      ],
+      "cv_assessment": {
+        "motion_state": "stopped_traffic",
+        "signal": "blocked",
+        "reason": "1 vehicle(s) standing still and 1 crawling under 10 km/h, of 2 on the marked road; nothing moves through",
+        "vehicles_on_road": 2.0,
+        "stopped": 1.0,
+        "slow": 1.0,
+        "moving": 0.0,
+        "stopped_share": 0.5,
+        "moving_share": 0.0,
+        "samples": 32,
+        "rule": {
+          "stopped_below_kmh": 3,
+          "moving_above_kmh": 10,
+          "min_stopped_for_blocked": 1,
+          "blocked_not_moving_share": 0.6,
+          "min_moving_for_clear": 2,
+          "clear_moving_share": 0.8
+        },
+        "suggested_observation": "blocked",
+        "model": "drone-ensemble, confidence 0.25",
+        "window_seconds": 3.88,
+        "fps": 23.976023976023978,
+        "metres_per_pixel": 0.0316,
+        "sample_fps": 7.99,
+        "speed_gap_seconds": 0.25,
+        "basis": "Unvalidated rule: hand-set speed thresholds, approximate speeds from an assumed 2 m vehicle width, no labelled blockage footage to score it against. A dispatcher confirms or overrides it."
+      },
+      "source": {
+        "publisher": "Pexels",
+        "credit": "K on Pexels",
+        "source_url": "https://www.pexels.com/video/aerial-shot-of-a-car-accident-on-a-highway-12753260/",
+        "license": "Pexels License",
+        "terms_url": "https://www.pexels.com/license/",
+        "sha256": "3006a539d2c27c21c5a5c32b30ec81a2f1a7a17419414678eded010fe09248a1",
+        "clip_start_seconds": 1.0,
+        "location": {
+          "locationName": "Not stated by the source; shown on the simulated CA-47 connector"
+        },
+        "historical": true,
+        "date_description": "Pre-recorded stock footage; capture date not published"
+      },
+      "review_status": "needs_dispatcher_review",
+      "simulated_application": true
+    },
+    {
+      "id": "crash-orbit",
+      "title": "Same crash, closer pass",
+      "visual_label": "visible_obstruction",
+      "review_note": "The wrecked cab, its trailer and a fuel or fluid spill cover the marked carriageway, which is otherwise empty. Traffic on the far carriageway, outside the marked region, is moving. The detector does not recognise the jackknifed wreck as a vehicle, so the CV sees an empty road and stays inconclusive; the dispatcher can see the wreck and override it. The camera turns during the clip; the road region follows it.",
+      "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+      "image_quality": "reviewable",
+      "road_region": [
+        [
+          0.0,
+          0.06
+        ],
+        [
+          1.0,
+          0.06
+        ],
+        [
+          1.0,
+          0.47
+        ],
+        [
+          0.0,
+          0.47
+        ]
+      ],
+      "source_image": "/inspection-assets/crash-orbit/source.jpg",
+      "annotated_image": "/inspection-assets/crash-orbit/annotated.jpg",
+      "annotated_video": "/inspection-assets/crash-orbit/annotated.mp4",
+      "vehicle_detections": 0,
+      "excluded_detections": 2,
+      "allowed_observations": [
+        "blocked",
+        "clear",
+        "inconclusive"
+      ],
+      "cv_assessment": {
+        "motion_state": "no_traffic",
+        "signal": "inconclusive",
+        "reason": "no vehicles found on the marked road; an empty road can also mean a closure upstream, so it is not evidence that the road is open",
+        "vehicles_on_road": 0.0,
+        "stopped": 0.0,
+        "slow": 0.0,
+        "moving": 0.0,
+        "stopped_share": 0.0,
+        "moving_share": 0.5,
+        "samples": 32,
+        "rule": {
+          "stopped_below_kmh": 3,
+          "moving_above_kmh": 10,
+          "min_stopped_for_blocked": 1,
+          "blocked_not_moving_share": 0.6,
+          "min_moving_for_clear": 2,
+          "clear_moving_share": 0.8
+        },
+        "suggested_observation": "inconclusive",
+        "model": "drone-ensemble, confidence 0.25",
+        "window_seconds": 3.88,
+        "fps": 23.976023976023978,
+        "metres_per_pixel": 0.0234,
+        "sample_fps": 7.99,
+        "speed_gap_seconds": 0.25,
+        "basis": "Unvalidated rule: hand-set speed thresholds, approximate speeds from an assumed 2 m vehicle width, no labelled blockage footage to score it against. A dispatcher confirms or overrides it."
+      },
+      "source": {
+        "publisher": "Pexels",
+        "credit": "K on Pexels",
+        "source_url": "https://www.pexels.com/video/accident-on-highway-12901485/",
+        "license": "Pexels License",
+        "terms_url": "https://www.pexels.com/license/",
+        "sha256": "897272fd22a577d111f8252ccccf37634f3c658e11510a2771029b108a10262d",
+        "clip_start_seconds": 0.5,
+        "location": {
+          "locationName": "Not stated by the source; shown on the simulated CA-47 connector"
+        },
+        "historical": true,
+        "date_description": "Pre-recorded stock footage; capture date not published"
+      },
+      "review_status": "needs_dispatcher_review",
+      "simulated_application": true
+    },
+    {
+      "id": "highway-free-flow",
+      "title": "Divided highway, light traffic",
+      "visual_label": "no_visible_obstruction",
+      "review_note": "Cars and a bus move freely on all three carriageways. No obstruction is visible on the photographed stretch; this does not establish road safety beyond the frame.",
+      "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+      "image_quality": "reviewable",
+      "road_region": [
+        [
+          0.0,
+          0.22
+        ],
+        [
+          1.0,
+          0.22
+        ],
+        [
+          1.0,
+          0.86
+        ],
+        [
+          0.0,
+          0.86
+        ]
+      ],
+      "source_image": "/inspection-assets/highway-free-flow/source.jpg",
+      "annotated_image": "/inspection-assets/highway-free-flow/annotated.jpg",
+      "annotated_video": "/inspection-assets/highway-free-flow/annotated.mp4",
+      "vehicle_detections": 12,
+      "excluded_detections": 0,
+      "allowed_observations": [
+        "blocked",
+        "clear",
+        "inconclusive"
+      ],
+      "cv_assessment": {
+        "motion_state": "free_flow",
+        "signal": "clear",
+        "reason": "11 of 11 vehicles on the marked road are moving through",
+        "vehicles_on_road": 11.0,
+        "stopped": 0.0,
+        "slow": 0.0,
+        "moving": 11.0,
+        "stopped_share": 0.0,
+        "moving_share": 1.0,
+        "samples": 30,
+        "rule": {
+          "stopped_below_kmh": 3,
+          "moving_above_kmh": 10,
+          "min_stopped_for_blocked": 1,
+          "blocked_not_moving_share": 0.6,
+          "min_moving_for_clear": 2,
+          "clear_moving_share": 0.8
+        },
+        "suggested_observation": "clear",
+        "model": "drone-ensemble, confidence 0.25",
+        "window_seconds": 3.87,
+        "fps": 29.97002997002997,
+        "metres_per_pixel": 0.0726,
+        "sample_fps": 7.49,
+        "speed_gap_seconds": 0.234,
+        "basis": "Unvalidated rule: hand-set speed thresholds, approximate speeds from an assumed 2 m vehicle width, no labelled blockage footage to score it against. A dispatcher confirms or overrides it."
+      },
+      "source": {
+        "publisher": "Pexels",
+        "credit": "tal molcho on Pexels",
+        "source_url": "https://www.pexels.com/video/traffic-on-highway-13376785/",
+        "license": "Pexels License",
+        "terms_url": "https://www.pexels.com/license/",
+        "sha256": "90e8478ee309344f6ad24e7c2e80663e15f7d63be7fd746e4b3283396eb9914f",
+        "clip_start_seconds": 10.0,
+        "location": {
+          "locationName": "Not stated by the source; shown on the simulated CA-47 connector"
+        },
+        "historical": true,
+        "date_description": "Pre-recorded stock footage; capture date not published"
+      },
+      "review_status": "needs_dispatcher_review",
+      "simulated_application": true
+    },
+    {
+      "id": "city-highway-flow",
+      "title": "City expressway, light traffic",
+      "visual_label": "no_visible_obstruction",
+      "review_note": "A few vehicles travel in both directions with wide gaps. No obstruction is visible on either carriageway.",
+      "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+      "image_quality": "reviewable",
+      "road_region": [
+        [
+          0.0,
+          0.3
+        ],
+        [
+          1.0,
+          0.3
+        ],
+        [
+          1.0,
+          0.66
+        ],
+        [
+          0.0,
+          0.66
+        ]
+      ],
+      "source_image": "/inspection-assets/city-highway-flow/source.jpg",
+      "annotated_image": "/inspection-assets/city-highway-flow/annotated.jpg",
+      "annotated_video": "/inspection-assets/city-highway-flow/annotated.mp4",
+      "vehicle_detections": 7,
+      "excluded_detections": 0,
+      "allowed_observations": [
+        "blocked",
+        "clear",
+        "inconclusive"
+      ],
+      "cv_assessment": {
+        "motion_state": "free_flow",
+        "signal": "clear",
+        "reason": "6 of 6 vehicles on the marked road are moving through",
+        "vehicles_on_road": 6.0,
+        "stopped": 0.0,
+        "slow": 0.0,
+        "moving": 6.0,
+        "stopped_share": 0.0,
+        "moving_share": 1.0,
+        "samples": 30,
+        "rule": {
+          "stopped_below_kmh": 3,
+          "moving_above_kmh": 10,
+          "min_stopped_for_blocked": 1,
+          "blocked_not_moving_share": 0.6,
+          "min_moving_for_clear": 2,
+          "clear_moving_share": 0.8
+        },
+        "suggested_observation": "clear",
+        "model": "drone-ensemble, confidence 0.25",
+        "window_seconds": 3.87,
+        "fps": 60.0,
+        "metres_per_pixel": 0.054,
+        "sample_fps": 7.5,
+        "speed_gap_seconds": 0.25,
+        "basis": "Unvalidated rule: hand-set speed thresholds, approximate speeds from an assumed 2 m vehicle width, no labelled blockage footage to score it against. A dispatcher confirms or overrides it."
+      },
+      "source": {
+        "publisher": "Pexels",
+        "credit": "Kenan Turguç on Pexels",
+        "source_url": "https://www.pexels.com/video/aerial-view-of-city-highway-traffic-31570754/",
+        "license": "Pexels License",
+        "terms_url": "https://www.pexels.com/license/",
+        "sha256": "426ea2fb75c7f3f58815e6498b0b6e9bf6b50b740fb2692b07c5e7f2cd715698",
+        "clip_start_seconds": 3.0,
+        "location": {
+          "locationName": "Not stated by the source; shown on the simulated CA-47 connector"
+        },
+        "historical": true,
+        "date_description": "Pre-recorded stock footage; capture date not published"
+      },
+      "review_status": "needs_dispatcher_review",
+      "simulated_application": true
+    },
+    {
+      "id": "rest-area-parked-trucks",
+      "title": "Motorway beside a truck rest area",
+      "visual_label": "no_visible_obstruction",
+      "review_note": "Dozens of trucks stand still in the rest areas on both sides, outside the marked motorway. Traffic on the motorway itself keeps moving. Counting every stationary truck in frame would wrongly suggest a jam; the road region prevents that.",
+      "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+      "image_quality": "reviewable",
+      "road_region": [
+        [
+          0.0,
+          0.44
+        ],
+        [
+          1.0,
+          0.44
+        ],
+        [
+          1.0,
+          0.63
+        ],
+        [
+          0.0,
+          0.63
+        ]
+      ],
+      "source_image": "/inspection-assets/rest-area-parked-trucks/source.jpg",
+      "annotated_image": "/inspection-assets/rest-area-parked-trucks/annotated.jpg",
+      "annotated_video": "/inspection-assets/rest-area-parked-trucks/annotated.mp4",
+      "vehicle_detections": 12,
+      "excluded_detections": 64,
+      "allowed_observations": [
+        "blocked",
+        "clear",
+        "inconclusive"
+      ],
+      "cv_assessment": {
+        "motion_state": "free_flow",
+        "signal": "clear",
+        "reason": "12 of 12 vehicles on the marked road are moving through",
+        "vehicles_on_road": 12.0,
+        "stopped": 0.0,
+        "slow": 0.0,
+        "moving": 12.0,
+        "stopped_share": 0.0,
+        "moving_share": 1.0,
+        "samples": 30,
+        "rule": {
+          "stopped_below_kmh": 3,
+          "moving_above_kmh": 10,
+          "min_stopped_for_blocked": 1,
+          "blocked_not_moving_share": 0.6,
+          "min_moving_for_clear": 2,
+          "clear_moving_share": 0.8
+        },
+        "suggested_observation": "clear",
+        "model": "drone-ensemble, confidence 0.25",
+        "window_seconds": 3.87,
+        "fps": 29.97002997002997,
+        "metres_per_pixel": 0.043,
+        "sample_fps": 7.49,
+        "speed_gap_seconds": 0.234,
+        "basis": "Unvalidated rule: hand-set speed thresholds, approximate speeds from an assumed 2 m vehicle width, no labelled blockage footage to score it against. A dispatcher confirms or overrides it."
+      },
+      "source": {
+        "publisher": "Pexels",
+        "credit": "DeLuca G on Pexels",
+        "source_url": "https://www.pexels.com/video/aerial-view-of-a-highway-with-many-trucks-15978611/",
+        "license": "Pexels License",
+        "terms_url": "https://www.pexels.com/license/",
+        "sha256": "04907e1c4660e177b7f0f3798f73015c5a126aa991450fafedc352b4233c6fd2",
+        "clip_start_seconds": 10.0,
+        "location": {
+          "locationName": "Not stated by the source; shown on the simulated CA-47 connector"
+        },
+        "historical": true,
+        "date_description": "Pre-recorded stock footage; capture date not published"
+      },
+      "review_status": "needs_dispatcher_review",
+      "simulated_application": true
+    }
+  ]
+}

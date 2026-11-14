@@ -7,7 +7,7 @@ from backend.decision_engine import analyze
 from backend.scenario import available_scenarios, load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
-LIBRARY = ROOT / "cv" / "outputs" / "review-cases" / "library.json"
+LIBRARY = ROOT / "cv" / "review_library" / "library.json"
 INDICATOR_IDS = {"shipments_at_risk", "appointments_feasible", "expected_delay_min", "added_miles", "co2_kg", "community_exposure"}
 BASES = {"stub", "estimated", "simulated", "measured"}
 SHIPMENT_ROW = {"shipment", "truck", "route", "reassigned", "arrival", "appointment", "slack_min", "lateness_min",
@@ -71,19 +71,31 @@ class ScenarioContractTests(unittest.TestCase):
 
 class InspectionLibraryContractTests(unittest.TestCase):
     CASE = {"id", "title", "visual_label", "review_note", "image_quality", "annotated_image", "source_image",
-            "vehicle_detections", "excluded_detections", "allowed_observations", "source"}
+            "annotated_video", "vehicle_detections", "excluded_detections", "allowed_observations", "cv_assessment",
+            "source"}
     SOURCE = {"source_url", "sha256", "credit", "license", "location", "historical"}
+    ASSESSMENT = {"suggested_observation", "motion_state", "reason", "vehicles_on_road", "stopped", "moving", "basis"}
+    SIGNALS = {"blocked", "clear", "inconclusive"}
 
-    @unittest.skipUnless(LIBRARY.is_file(), "build it with python -m cv.prepare_review")
-    def test_prepared_library_matches_contract(self):
+    def test_committed_library_matches_contract(self):
         library = json.loads(LIBRARY.read_text(encoding="utf-8"))
         self.assertTrue(library["available"])
+        self.assertTrue(library["cases"])
         for case in library["cases"]:
             with self.subTest(case=case["id"]):
                 self.assertLessEqual(self.CASE, set(case))
                 self.assertLessEqual(self.SOURCE, set(case["source"]))
+                self.assertLessEqual(self.ASSESSMENT, set(case["cv_assessment"]))
+                self.assertIn(case["cv_assessment"]["suggested_observation"], self.SIGNALS)
                 self.assertTrue(case["allowed_observations"])
-                self.assertLessEqual(set(case["allowed_observations"]), {"blocked", "clear", "inconclusive"})
+                self.assertLessEqual(set(case["allowed_observations"]), self.SIGNALS)
+                for key in ("source_image", "annotated_image", "annotated_video"):
+                    self.assertTrue((LIBRARY.parent / case[key].removeprefix("/inspection-assets/")).is_file())
+
+    def test_library_covers_every_observation(self):
+        suggestions = {case["cv_assessment"]["suggested_observation"]
+                       for case in json.loads(LIBRARY.read_text(encoding="utf-8"))["cases"]}
+        self.assertEqual(self.SIGNALS, suggestions)
 
 
 if __name__ == "__main__":

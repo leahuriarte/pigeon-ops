@@ -175,8 +175,8 @@
             <div class="total"><dt>Net value of inspecting</dt><dd id="net-value">—</dd></div>
           </dl>
           <p id="cv-only" class="note"></p>
-          <figure id="selected-evidence" class="selected-evidence" hidden><img id="selected-evidence-image" alt="Reviewed road image"><figcaption id="selected-evidence-title"></figcaption><small>Reviewed external illustration applied to this fictional scenario.</small></figure>
-          <button id="inspect-button" class="button" type="button">Review inspection images</button>
+          <figure id="selected-evidence" class="selected-evidence" hidden><img id="selected-evidence-image" alt="Reviewed drone frame"><figcaption id="selected-evidence-title"></figcaption><small>Reviewed stock drone footage applied to this fictional scenario.</small></figure>
+          <button id="inspect-button" class="button" type="button">Review drone footage</button>
           <div id="observation-buttons" class="choices" hidden>
             <p>Choose what the simulated feed reports:</p>
             <div>
@@ -211,7 +211,7 @@
               <tbody id="provenance"></tbody>
             </table>
           </div>
-          <p class="note">Shipments, trucks, appointments and the incident are fictional. Inspection photos are attributed external examples, separate from that incident. DATA.md lists sources and assumptions.</p>
+          <p class="note">Shipments, trucks, appointments and the incident are fictional. Inspection clips are attributed stock drone footage, separate from that incident. DATA.md lists sources and assumptions.</p>
         </section>
         <section aria-labelledby="definitions-title">
           <h3 id="definitions-title">Definitions</h3>
@@ -221,24 +221,27 @@
     </div>
   </main>
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">
-    <div class="inspection-header"><div><p class="eyebrow">EXTERNAL IMAGE · DISPATCHER REVIEW</p><h2 id="inspection-dialog-heading">Review visual evidence</h2></div><button id="inspection-close" class="inspection-close">Close</button></div>
+    <div class="inspection-header"><div><p class="eyebrow">DRONE INSPECTION · DISPATCHER REVIEW</p><h2 id="inspection-dialog-heading">Review drone footage</h2></div><button id="inspection-close" class="inspection-close">Close</button></div>
     <div class="inspection-body">
-      <p class="inspection-scope">These California images illustrate the demo. Applying an observation updates the fictional logistics scenario; it does not report current conditions or dispatch a vehicle.</p>
-      <label class="inspection-picker">Inspection image<select id="inspection-case"></select></label>
-      <img id="inspection-photo" class="inspection-photo" alt="Road inspection image">
-      <div class="inspection-photo-caption"><span id="inspection-count"></span><button id="inspection-image-toggle">Show source image</button></div>
+      <p class="inspection-scope">Pre-recorded top-down drone clips stand in for the inspection flight. None was filmed at CA-47. Applying an observation updates the fictional scenario; it does not report current conditions or fly a drone.</p>
+      <label class="inspection-picker">Inspection clip<select id="inspection-case"></select></label>
+      <video id="inspection-video" class="inspection-photo" autoplay loop muted playsinline aria-label="Annotated drone clip"></video>
+      <img id="inspection-photo" class="inspection-photo" alt="Unannotated source frame" hidden>
+      <div class="inspection-photo-caption"><span id="inspection-count"></span><button id="inspection-image-toggle">Show source frame</button></div>
+      <p class="inspection-legend"><span class="swatch road"></span>Marked road <span class="swatch stopped"></span>Standing <span class="swatch slow"></span>Slow <span class="swatch moving"></span>Moving <span class="swatch other"></span>Off road or not re-found</p>
+      <div id="inspection-cv" class="inspection-cv"><p class="eyebrow">CV SUGGESTION · UNVALIDATED</p><h3 id="inspection-cv-signal"></h3><p id="inspection-cv-reason"></p><p id="inspection-cv-basis" class="fine-print"></p></div>
       <strong id="inspection-case-title"></strong><h3 id="inspection-finding" class="inspection-finding"></h3><p id="inspection-note" class="inspection-note"></p>
-      <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Road and debris markings are provisional visual annotations. Green boxes are vehicle detections.</span></div>
-      <fieldset class="inspection-choices"><legend>Observation to use in the demo</legend>
-        <label><input type="radio" name="inspection-observation" value="blocked">Visible obstruction</label>
-        <label><input type="radio" name="inspection-observation" value="clear">No visible obstruction in this view</label>
-        <label><input type="radio" name="inspection-observation" value="inconclusive">Insufficient evidence</label>
+      <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Road regions and visual notes are provisional annotations. Speeds are approximate.</span></div>
+      <fieldset class="inspection-choices"><legend>Your observation (the CV suggestion is preselected)</legend>
+        <label><input type="radio" name="inspection-observation" value="blocked">Road blocked</label>
+        <label><input type="radio" name="inspection-observation" value="clear">Road clear: traffic gets through</label>
+        <label><input type="radio" name="inspection-observation" value="inconclusive">Inconclusive</label>
       </fieldset>
       <p id="inspection-restriction" class="note"></p>
       <label class="inspection-review-note">Review note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
       <p id="inspection-error" class="inspection-error" role="alert"></p>
     </div>
-    <div class="inspection-footer"><p>The source, observation and review time are saved locally. A dispatcher approves any logistics action.</p><button id="inspection-apply" class="button" disabled>Use for demo</button></div>
+    <div class="inspection-footer"><p>The clip, CV suggestion, your observation and the time are saved locally. A dispatcher approves any logistics action.</p><button id="inspection-apply" class="button" disabled>Apply to scenario</button></div>
   </dialog>
   <script type="module" src="/app.js"></script>
 </body>

@@ -1,7 +1,7 @@
 # PigeonOps data methodology
 
-Optional external imagery and California highway camera/closure snapshots are
-documented separately in [cv/SOURCES.md](cv/SOURCES.md). They are not evidence of
+The stock drone clips used in the inspection step, and the California highway
+camera/closure snapshots used for detector checks, are documented separately in [cv/SOURCES.md](cv/SOURCES.md). They are not evidence of
 the fictional demo incident and do not replace the synthetic operational records.
 
 PigeonOps uses **publicly calibrated synthetic data**. Public sources shape plausible geography, traffic, cargo, truck, cost, and emissions patterns, while every operational record shown in the demo is fictional. The prototype does not contain carrier, terminal, driver, appointment, container, or drone-operation records.
@@ -106,7 +106,7 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 - Route lines are illustrative and must not be used for navigation. Playback paths use a car routing profile, not the California Truck Network.
 - Playback times are derived, not simulated traffic: SYN-TRK-07 arrives at the time the outcome model computes for the chosen option and road state; other trucks arrive at their scenario ETA, drive at up to 1.5× the network travel time, and otherwise wait at the destination. Load, unload, and transfer times (15, 20, and 10 min) are assumptions. Only SYN-TRK-07 and SYN-TRK-12 change with the dispatch option and road state.
 - Terminal turn time, traffic speed, and emissions are not live measurements.
-- The 90% accuracy for reviewed imagery is assumed. Automated CV alone is measured on 27 annotated aerial frames and shown separately; it is not yet worth an inspection (cv/RUN_RESULTS.md).
+- The 90% accuracy for dispatcher-reviewed drone footage is assumed. The CV suggestion shown with each clip comes from hand-set speed thresholds and is not validated. Automated CV alone is measured on 27 annotated aerial frames and shown separately; it is not yet worth an inspection (cv/RUN_RESULTS.md).
 - Driver hours are synthetic summaries and do not implement hours-of-service compliance.
 - Community exposure is described qualitatively; the demo does not yet calculate population-weighted pollution or noise exposure.
 - Action outcomes are point estimates from route data and assumed rates (see [docs/METHODS.md](docs/METHODS.md)) rather than Monte Carlo distributions.

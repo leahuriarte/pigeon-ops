@@ -12,7 +12,12 @@ ROOT = Path(__file__).resolve().parent
 VEHICLE_NAMES = {"car", "bus", "truck", "small vehicle", "large vehicle"}
 # The COCO and DOTA models miss different vehicles, so their union recovers
 # far more of them. Each member runs at the size that scored best on UAV-OBB.
-ENSEMBLES = {"aerial-ensemble": [("yolo11s.pt", 1280), ("yolo11m-obb.pt", 1024)]}
+ENSEMBLES = {
+    "aerial-ensemble": [("yolo11s.pt", 1280), ("yolo11m-obb.pt", 1024)],
+    # Low-altitude drone clips show trucks several hundred pixels long, larger
+    # than DOTA's training objects; a 640 px pass finds them. Not benchmarked.
+    "drone-ensemble": [("yolo11s.pt", 1280), ("yolo11m-obb.pt", 1024), ("yolo11m-obb.pt", 640)],
+}
 MODEL_CHOICES = ["yolo11n.pt", "yolo11s.pt", "yolo11s-obb.pt", "yolo11m-obb.pt", *ENSEMBLES]
 
 REPORT_STYLE = ("body{font:16px system-ui;background:#102a35;color:#edf5f4;max-width:1150px;margin:30px auto;padding:20px}"
