@@ -13,7 +13,7 @@
   min-height: 240px;
   overflow: hidden;
   border: var(--frame);
-  background: #f2f3f1;
+  background: #eef0f0;
 }
 /* Absolute so the map fills the flexed shell without relying on percentage heights. */
 .arcgis-map, #map-fallback {
@@ -176,7 +176,7 @@
   cursor: pointer;
   appearance: none;
 }
-/* Hard colour stop, not a gradient: orange up to the playhead, hairline after. */
+/* Hard colour stop, not a gradient: yellow up to the playhead, hairline after. */
 .timeline input::-webkit-slider-runnable-track {
   height: 6px;
   background: linear-gradient(to right, var(--signal) var(--p), var(--hair) var(--p));

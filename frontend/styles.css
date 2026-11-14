@@ -1,25 +1,27 @@
-/* PigeonOps: shipping label and road sign.
-   Ink lines on paper, one action colour (container orange), hard offset shadows on
-   things you can press. Map and playback live in arcgis.css, the dialog in inspection.css. */
+/* PigeonOps: harbor yard and road sign.
+   Navy chart ink on concrete grey, one action colour (crane yellow, ink text on it),
+   chart magenta for the selected truck, hard offset shadows on things you can press.
+   Map and playback live in arcgis.css, the dialog in inspection.css. */
 
 :root {
-  --paper: #efe9dd;
-  --card: #fbf8f1;
+  --paper: #e6e9ea;
+  --card: #f5f6f6;
   --white: #fff;
-  --ink: #15181c;
-  --ink-2: #55514a;
-  --hair: #cdc5b5;
-  --signal: #f2612a;
-  --signal-dark: #d94e1b;
-  --risk: #bf2a1e;
-  --risk-bg: #f9e1dc;
-  --ok: #1f7a4a;
-  --ok-bg: #dcefe2;
-  --watch: #8f5b00;
-  --watch-bg: #fbeac4;
-  --selected: #6a3fb5; /* the map JS draws the selected truck in this colour */
-  --planned: #55514a;
-  --checked: #fff3ea;
+  --ink: #142231;
+  --ink-2: #4a5866;
+  --hair: #c2c9ce;
+  --signal: #f2b705;
+  --signal-dark: #6e5300;
+  --risk: #b3261e;
+  --risk-bg: #f7dfdc;
+  --ok: #1d7347;
+  --ok-bg: #dbede2;
+  --watch: #8a5300;
+  --watch-bg: #f6e5c8;
+  --selected: #a3176e; /* the map JS draws the selected truck in this colour */
+  --selected-bg: #f6e3ee;
+  --planned: #4a5866;
+  --checked: #fff5d1;
 
   --font-display: "Bahnschrift", "DIN Alternate", "DIN Condensed", "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   --font-body: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -99,7 +101,7 @@ body:not([data-scenario="disruption"]) .only-disruption { display: none !importa
 }
 .btn:not(:disabled):hover, .choice:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
 .btn:not(:disabled):active, .choice:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-/* Ink text on orange: white on --signal fails contrast, and so would ink on --signal-dark. */
+/* Ink text on yellow: white on --signal fails contrast. */
 .btn.primary { background: var(--signal); }
 .btn:disabled {
   border-color: var(--ink-2);
@@ -334,7 +336,7 @@ body:not([data-scenario="disruption"]) .only-disruption { display: none !importa
 .data .num { font-family: var(--font-mono); font-size: 12.5px; text-align: right; white-space: nowrap; }
 .data th.num { font-family: var(--font-display); font-size: 12px; }
 .detail { display: block; margin-top: 2px; color: var(--ink-2); font-size: 12.5px; }
-.data tr.selected td { background: #efe8fa; }
+.data tr.selected td { background: var(--selected-bg); }
 /* The one coloured left marker allowed: it matches the selected truck on the map. */
 .data tr.selected td:first-child { box-shadow: inset 3px 0 var(--selected); }
 .shipments td { white-space: nowrap; }
@@ -527,8 +529,9 @@ details.more > :not(summary) { margin-top: 8px; }
 }
 .option label:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
 .option label:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-.option input:checked + label { background: var(--checked); box-shadow: 3px 3px 0 var(--signal); }
-.option input:checked + label:hover { box-shadow: 4px 4px 0 var(--signal); }
+/* Yellow is too pale for a shadow on grey, so a checked card gets a heavier frame instead. */
+.option input:checked + label { background: var(--checked); box-shadow: inset 0 0 0 1.5px var(--ink), 3px 3px 0 var(--ink); }
+.option input:checked + label:hover { box-shadow: inset 0 0 0 1.5px var(--ink), 4px 4px 0 var(--ink); }
 .option input:focus-visible + label { outline: 2px solid var(--ink); outline-offset: 2px; }
 .option-head { display: flex; align-items: center; gap: 8px; }
 .rank {

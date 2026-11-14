@@ -28,13 +28,13 @@ export function accuracyNote(evoi) {
     : breakEven >= 0.995
       ? "Only a near-perfect check, right more than 99% of the time, would pay for itself here."
       : `The check has to be right at least ${pct(breakEven)} of the time to pay for itself.`;
-  const assumed = `This page assumes ${pct(a.inspection_accuracy)} for a dispatcher reviewing the footage with the CV suggestion. That figure is assumed, not measured.`;
+  const assumed = `The page assumes a dispatcher who reviews the footage alongside the CV suggestion is right ${pct(a.inspection_accuracy)} of the time. Nobody has measured that figure.`;
   const cv = evoi.cv_only;
   if (!cv) return `${need} ${assumed}`;
   const alone = cv.recommend_inspection
     ? `would be worth ${money(cv.net_value_of_information)}`
     : `would lose ${money(-cv.net_value_of_information)}`;
-  return `${need} ${assumed} Automated CV with no dispatcher, measured on still aerial frames, ${alone} here, so the dispatcher confirms every suggestion.`;
+  return `${need} ${assumed} Automated CV on its own, measured on still aerial frames, ${alone} here. That is why a dispatcher confirms every suggestion.`;
 }
 
 // Ranges of blockage chance where the net value of inspecting is above zero, as [low, high] pairs.
@@ -108,8 +108,8 @@ export function renderSensitivity(container, analysis, words = { bad: "blocked" 
 
   const range = windows.map(([a, b]) => `${pct(a)} and ${pct(b)}`).join(", or between ");
   const first = windows.length
-    ? `A drone check pays for itself when the chance of a blockage is between ${range}. Below that the road is very likely open. Above it you would change plans anyway. In both cases the check would rarely change your decision.`
-    : "At no chance of a blockage would a drone check pay for itself in this situation.";
+    ? `A drone check pays for itself when the chance of a blockage is between ${range}. Below that range the road is very likely open, and above it you would change plans anyway, so the check would rarely change your decision.`
+    : "Here a drone check does not pay for itself at any chance of a blockage.";
   const inWindow = windows.some(([a, b]) => now > a && now < b);
   const second = inspected
     ? `Before the footage the chance was ${pct(before)}. Now it is ${pct(now)}, so ${inWindow ? "a second check could still pay" : "a second check would not pay"}.`

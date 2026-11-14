@@ -17,11 +17,11 @@ const shortTruck = (id) => id.replace("SYN-TRK-", "T");
 const svgNS = "http://www.w3.org/2000/svg";
 
 const colors = {
-  ink: "#1b1f23",
-  muted: "#5b6268",
+  ink: "#142231",
+  muted: "#4a5866",
   stopped: "#7c858c",
   accent: "#24508f",
-  selected: "#6a3fb5",
+  selected: "#a3176e",
   risk: "#b42318",
   amber: "#c27c0e",
   route: "#8a939b",
@@ -794,7 +794,7 @@ function renderIndicators(indicators) {
   const compare = scenario.scenario_type !== "normal" && baseline;
   const missing = indicators.filter((item) => item.value === null || item.value === undefined);
   const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
-  $("#indicators-note").textContent = `Whole plan, estimated. Assumes the top-ranked response with no inspection.${compare ? " Arrows compare with the usual morning." : ""}${pending}`;
+  $("#indicators-note").textContent = `Estimates for the whole plan, assuming the top-ranked response and no inspection.${compare ? " Arrows compare with the usual morning." : ""}${pending}`;
   $("#indicators").innerHTML = indicators.filter((item) => !missing.includes(item)).map((item) => {
     const label = shortLabels[item.id] ?? indicatorLabel(item);
     const basis = basisLabel[item.basis] ?? item.basis;
@@ -942,7 +942,7 @@ function renderDefinitions() {
     ["Needs attention", "A shipment with status at risk, watch, or unassigned."],
     ["Slack", "Minutes between a shipment’s ETA and the start of its appointment window."],
     ["Blockage probability", "The chance that the reported problem really stops or holds up trucks on CA-47: a blocked road for a crash, a standing queue for heavy traffic, an impassable road for road damage. It starts at the value set for the incident report and is recalculated with Bayes’ rule after an inspection result."],
-    ["Missed appointment (breach)", "A hard rule that an outcome breaks, such as missing an appointment window."],
+    ["Missed appointment (breach)", "An outcome that breaks a hard rule, such as a truck arriving after its appointment window closes."],
     ["Expected loss", `Delay × ${money(m.lateness_cost_per_minute)} per minute, plus direct cost, plus CO₂ × $${m.emissions_cost_per_kg.toFixed(2)} per kg, plus missed appointments × ${money(m.hard_constraint_penalty)}. The blocked and open outcomes are averaged using the blockage probability.`],
     ["Net value of inspecting", "Expected loss if you act now, minus expected loss if you inspect first, minus the cost of inspecting. The page recommends inspecting when the net value is above zero."],
   ];
@@ -1211,8 +1211,8 @@ function renderReport() {
 
   const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
   const closing = plan.action === modelPick?.id
-    ? `Response on the map at the end of the shift: ${action.label}, the model’s pick.`
-    : `Response on the map at the end of the shift: ${action.label}. The model ranked ${modelPick.label} first.`;
+    ? `At the end of the shift the map showed ${action.label}, the model’s pick.`
+    : `At the end of the shift the map showed ${action.label}. The model ranked ${modelPick.label} first.`;
   $("#report-log").innerHTML = [...decisionLog, { t: currentTime, text: closing }]
     .map((entry) => `<li><time>${clockLabel(entry.t)}</time><span>${esc(entry.text)}</span></li>`).join("");
 }
