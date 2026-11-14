@@ -61,6 +61,7 @@ are not published.
 | `blocked_crash_topdown_12901485.mp4` | crash-orbit | crash | K | https://www.pexels.com/video/accident-on-highway-12901485/ |
 | `blocked_port_queue_13742716.mp4` | terminal-truck-queue | congestion | Kelly | https://www.pexels.com/video/trucks-in-port-13742716/ |
 | `ambiguous_dense_moving_38774214.mp4` | highway-dense-slow | congestion | Kelly | https://www.pexels.com/video/aerial-view-of-vehicles-on-highway-traffic-38774214/ |
+| `flooded_road_topdown_4945596.mp4` | flooded-lane | environment | Shubh Haque | https://www.pexels.com/video/drone-footage-of-a-flooded-area-4945596/ |
 | `clear_topdown_13376785.mp4` | highway-free-flow | crash, congestion, environment | tal molcho | https://www.pexels.com/video/traffic-on-highway-13376785/ |
 | `clear_topdown_31570754.mp4` | city-highway-flow | crash, congestion, environment | Kenan Turguç | https://www.pexels.com/video/aerial-view-of-city-highway-traffic-31570754/ |
 | `ambiguous_rest_area_15978611.mp4` | rest-area-parked-trucks | crash, congestion, environment | DeLuca G | https://www.pexels.com/video/aerial-view-of-a-highway-with-many-trucks-15978611/ |

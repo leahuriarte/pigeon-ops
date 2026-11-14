@@ -91,7 +91,7 @@ observations on the drone clips has not been measured.
 
 ## Drone inspection library (dashboard)
 
-The dashboard library uses seven Pexels drone clips (six top-down, one oblique),
+The dashboard library uses eight Pexels drone clips (seven top-down, one oblique),
 because the demo's inspection is a drone flight. Each clip lists the check types
 it can illustrate (`crash`, `congestion`, `environment`); the three clear-road
 clips carry all three.
@@ -105,11 +105,12 @@ and applies the motion rule to the marked road (`cv/README.md`).
 | crash-orbit | wreck across lanes | inconclusive | the detector does not recognise the jackknifed wreck, so the road looks empty |
 | terminal-truck-queue | standing truck queue | blocked | 16 of 16 trucks in the marked lanes standing at 0 km/h |
 | highway-dense-slow | dense, slow traffic | clear | 10 of 10 vehicles moving at about 10–25 km/h, all above the 10 km/h moving threshold |
+| flooded-lane | floodwater across the lane | inconclusive | no vehicles in view; the CV tracks vehicles and cannot see water |
 | highway-free-flow | no obstruction | clear | 11 of 11 vehicles moving at 60–100 km/h |
 | city-highway-flow | no obstruction | clear | 6 of 6 vehicles moving |
 | rest-area-parked-trucks | no obstruction | clear | 12 moving on the motorway; 63 parked trucks excluded by the road region |
 
-These are seven hand-picked clips, not an accuracy measurement. In the dense
+These are eight hand-picked clips, not an accuracy measurement. In the dense
 close-up clip (`38774214`, highway-dense-slow) cars fill the frame and the
 camera-motion estimate follows the traffic: the road region slid off the road,
 speeds read 0–19 km/h, and the suggestion changed with the start time (blocked

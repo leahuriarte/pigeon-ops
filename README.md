@@ -41,7 +41,7 @@ python3 -m unittest discover -s tests -v
    | Burst water main, possible flooding | Road damage check | 25% impassable | Reroute | Yes, worth $220 |
 
 3. Open **Show the numbers** for the calculation, the chart of when a check pays off, and the accuracy the check needs.
-4. Click **Review drone footage**. The dialog shows the clips that fit the kind of check. The CV suggestion is preselected and marked unvalidated; you confirm or change it. To show a check changing the decision, pick a clear-road clip in the crash incident: the chance drops from 40% to 7%, **Keep current route** becomes best, and the 11-mile detour past 6 schools is avoided. The library has no flooded-road clip yet, so the road damage check falls back to simulated result buttons.
+4. Click **Review drone footage**. The dialog shows the clips that fit the kind of check. The CV suggestion is preselected and marked unvalidated; you confirm or change it. To show a check changing the decision, pick a clear-road clip in the crash incident: the chance drops from 40% to 7%, **Keep current route** becomes best, and the 11-mile detour past 6 schools is avoided. The road damage check shows a flooded lane with no vehicles in view: the CV, which only tracks vehicles, stays inconclusive, and the dispatcher decides from what they see.
 5. Choose a response. Each card shows delay, cost, CO₂ and the schools within 300 m of its route. Picking a response the model did not rank first asks for a reason, which goes in the decision log.
 6. Watch it play out, then open the shift report: the usual morning against today on six indicators, and the decision log.
 

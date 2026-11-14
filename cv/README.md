@@ -5,8 +5,8 @@ measures whether they move, and turns that into reviewable evidence. Nothing
 here controls a drone or changes a dispatch decision on its own. It feeds the
 dashboard in two ways:
 
-1. **Drone inspection library (used live, committed).** Seven drone clips (two
-   crash, two heavy traffic, three clear road) with a marked road region,
+1. **Drone inspection library (used live, committed).** Eight drone clips (two
+   crash, two heavy traffic, one flooded lane, three clear road) with a marked road region,
    annotated playback, a suggested observation and the check types
    (`crash`, `congestion`, `environment`) each clip can illustrate. The
    dialog preselects the suggestion; the dispatcher confirms or overrides it, and
@@ -16,7 +16,7 @@ dashboard in two ways:
    frames. Its error table becomes `decision_model.drone.cv_only` in the scenario
    config, and the dashboard shows what that CV alone would be worth. The motion
    rule (`assess_motion`) that suggests observations on the clips has no measured
-   accuracy yet; seven self-labelled clips are too few to estimate one.
+   accuracy yet; eight self-labelled clips are too few to estimate one.
 
 [SOURCES.md](SOURCES.md) lists data and model provenance and terms.
 [RUN_RESULTS.md](RUN_RESULTS.md) records the measured results.

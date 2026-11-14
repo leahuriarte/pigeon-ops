@@ -10,16 +10,16 @@
     "min_moving_for_clear": 2,
     "clear_moving_share": 0.8
   },
-  "created_at": "2026-11-14T22:07:26.214005+00:00",
+  "created_at": "2026-11-14T22:28:23.017306+00:00",
   "summary": {
-    "cases": 7,
+    "cases": 8,
     "model": "drone-ensemble",
     "suggestions": {
       "blocked": 2,
       "clear": 4,
-      "inconclusive": 1
+      "inconclusive": 2
     },
-    "blocked_suggestion_matches_visual_review": "6 of 7",
+    "blocked_suggestion_matches_visual_review": "6 of 8",
     "interpretation": "A demonstration on hand-picked clips, not an accuracy measurement."
   },
   "cases": [
@@ -350,6 +350,122 @@
         "terms_url": "https://www.pexels.com/license/",
         "sha256": "3131f291d558d7af1e16f0d4f2e2e2f320efe1dc9f280ca4c1a7cf74ad657b76",
         "clip_start_seconds": 6.0,
+        "location": {
+          "locationName": "Not stated by the source; shown on the simulated CA-47 connector"
+        },
+        "historical": true,
+        "date_description": "Pre-recorded stock footage; capture date not published"
+      },
+      "review_status": "needs_dispatcher_review",
+      "simulated_application": true
+    },
+    {
+      "id": "flooded-lane",
+      "title": "Floodwater across a lane",
+      "visual_label": "flooded_road",
+      "check_types": [
+        "environment"
+      ],
+      "review_note": "A narrow lane runs from the left edge to the bottom of the frame, where floodwater pours across it and covers the rest of its length. Fields and buildings on both sides are under water. No vehicle is in view, so the CV, which only tracks vehicles, has nothing to measure and stays inconclusive; the dispatcher can see the water and decide. This is a village lane, not a highway, and the depth of the water cannot be read from above.",
+      "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
+      "image_quality": "reviewable",
+      "road_region": [
+        [
+          0.0,
+          0.47
+        ],
+        [
+          0.12,
+          0.53
+        ],
+        [
+          0.25,
+          0.65
+        ],
+        [
+          0.36,
+          0.8
+        ],
+        [
+          0.5,
+          0.86
+        ],
+        [
+          0.7,
+          0.9
+        ],
+        [
+          0.7,
+          0.99
+        ],
+        [
+          0.48,
+          0.96
+        ],
+        [
+          0.32,
+          0.9
+        ],
+        [
+          0.2,
+          0.75
+        ],
+        [
+          0.08,
+          0.62
+        ],
+        [
+          0.0,
+          0.56
+        ]
+      ],
+      "source_image": "/inspection-assets/flooded-lane/source.jpg",
+      "annotated_image": "/inspection-assets/flooded-lane/annotated.jpg",
+      "annotated_video": "/inspection-assets/flooded-lane/annotated.mp4",
+      "vehicle_detections": 0,
+      "excluded_detections": 0,
+      "allowed_observations": [
+        "blocked",
+        "clear",
+        "inconclusive"
+      ],
+      "cv_assessment": {
+        "motion_state": "no_traffic",
+        "signal": "inconclusive",
+        "reason": "no vehicles found on the marked road; an empty road can also mean a closure upstream, so it is not evidence that the road is open",
+        "vehicles_on_road": 0.0,
+        "stopped": 0.0,
+        "slow": 0.0,
+        "moving": 0.0,
+        "stopped_share": 0,
+        "moving_share": 0,
+        "samples": 30,
+        "rule": {
+          "stopped_below_kmh": 3,
+          "moving_above_kmh": 10,
+          "min_stopped_for_blocked": 1,
+          "blocked_not_moving_share": 0.6,
+          "min_moving_for_clear": 2,
+          "clear_moving_share": 0.8
+        },
+        "suggested_observation": "inconclusive",
+        "model": "drone-ensemble, confidence 0.25",
+        "window_seconds": 3.87,
+        "fps": 29.97002997002997,
+        "metres_per_pixel": null,
+        "sample_fps": 7.49,
+        "speed_gap_seconds": 0.234,
+        "camera_motion": "assumed none (hovering drone, set by hand)",
+        "basis": "Unvalidated rule: hand-set speed thresholds, approximate speeds from an assumed 2 m vehicle width, no labelled blockage footage to score it against. A dispatcher confirms or overrides it."
+      },
+      "source": {
+        "publisher": "Pexels",
+        "credit": "Shubh Haque on Pexels",
+        "source_url": "https://www.pexels.com/video/drone-footage-of-a-flooded-area-4945596/",
+        "license": "Pexels License",
+        "terms_url": "https://www.pexels.com/license/",
+        "sha256": "dc114a38da5b3cfd5529d136583edabdc987ff927357f38da5d277446908405a",
+        "clip_start_seconds": 1.0,
         "location": {
           "locationName": "Not stated by the source; shown on the simulated CA-47 connector"
         },
