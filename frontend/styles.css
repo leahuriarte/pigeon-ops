@@ -258,6 +258,12 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
 .stat-delta.worse, .kpi-delta.worse { color: var(--risk); }
 .stat-delta.better, .kpi-delta.better { color: var(--ok); }
 .stats-note { overflow: hidden; color: var(--ink-2); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.scenario-comparison { border: var(--frame); background: var(--card); }
+.scenario-comparison caption { padding: 6px 10px; text-align: left; font-weight: 600; color: var(--ink); }
+.scenario-comparison .worse { color: var(--risk); }
+.scenario-comparison .better { color: var(--ok); }
+.scenario-comparison tbody th { text-align: left; font-weight: 400; }
+.stats-bar > .stats-note { white-space: normal; }
 
 /* View tabs: index-card tabs; the selected one overlaps the view's top border. */
 .views {

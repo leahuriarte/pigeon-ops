@@ -30,8 +30,15 @@
     <!-- Left: the operating picture. One view at a time. -->
     <section class="stage" aria-label="Operations">
       <div class="stats-bar">
-        <ul id="indicators" class="stats" aria-label="Plan indicators"></ul>
+        <div class="table-wrap scenario-comparison">
+          <table class="data">
+            <caption id="comparison-caption">Normal morning · baseline</caption>
+            <thead><tr><th>Indicator</th><th class="num">Normal</th><th class="num">Current</th><th class="num">Change</th></tr></thead>
+            <tbody id="scenario-comparison"></tbody>
+          </table>
+        </div>
         <p id="indicators-note" class="stats-note"></p>
+        <details class="more"><summary>Other plan indicators</summary><ul id="indicators" class="stats" aria-label="Other plan indicators"></ul></details>
       </div>
 
       <div class="views" role="tablist" aria-label="Views">
@@ -146,15 +153,15 @@
 
       <div class="panel-body">
         <section class="step step-start" data-step="start" aria-labelledby="start-title">
-          <h1 id="start-title">Is a drone check worth it?</h1>
-          <p class="lede">A delivery is at risk. Decide whether a drone view is worth the cost, review the footage, then approve a response.</p>
+          <h1 id="start-title">Normal morning vs incident</h1>
+          <p class="lede">See the normal plan, introduce a road incident, then decide whether a drone check is worth its cost.</p>
           <fieldset class="story-picker">
-            <legend>Choose an incident</legend>
+            <legend>Normal baseline + two drone checks</legend>
             <ul id="story-options" class="options"></ul>
           </fieldset>
           <div class="actions">
-            <button id="start-button" class="btn primary big" type="button">Open incident</button>
-            <button id="jump-button" class="btn" type="button">Watch from start</button>
+            <button id="start-button" class="btn primary big" type="button" disabled>Start normal morning</button>
+            <button id="jump-button" class="btn" type="button" hidden disabled>Watch from start</button>
           </div>
           <p id="start-note" class="note"></p>
           <p class="fine-print">Simulation only. You approve each response. No drones or drivers are dispatched.</p>
@@ -171,6 +178,11 @@
           </dl>
           <p id="monitor-environment" class="note"></p>
           <p id="monitor-note" class="note"></p>
+          <div class="jump">
+            <h2>Introduce an incident</h2>
+            <p>Compare the changed plan with normal operations, then review one drone clip for that check.</p>
+            <div id="monitor-incidents" class="jump-list"></div>
+          </div>
           <div class="actions">
             <button id="monitor-skip" class="btn" type="button">View shift report</button>
           </div>
