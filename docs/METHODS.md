@@ -149,7 +149,7 @@ P(blocked | says blocked) = accuracy × p / (accuracy × p + (1 − accuracy) ×
 P(blocked | says clear)   = (1 − accuracy) × p / ((1 − accuracy) × p + accuracy × (1 − p))
 ```
 
-An "inconclusive" result leaves the probability unchanged.
+An "inconclusive" result leaves the probability unchanged. The headline inspection value assumes reviewed footage always gives a definite answer (P(inconclusive) = 0), so it is an upper bound when clips can be inconclusive; only the `cv_only` comparison models inconclusive results.
 
 In the demo the observation is the dispatcher's verdict on a drone clip. The CV pipeline preselects a suggestion from vehicle motion on the marked road (`cv/README.md`), and the dispatcher confirms or overrides it. `drone.accuracy` describes that reviewed verdict, not the CV suggestion alone; `drone.cv_only` is the measured table for still-image CV alone, used only for the comparison line.
 

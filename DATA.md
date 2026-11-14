@@ -108,7 +108,7 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 - Playback times are derived, not simulated traffic: SYN-TRK-07 arrives at the time the outcome model computes for the chosen option and road state; other trucks arrive at their scenario ETA, drive at up to 1.5× the network travel time, and otherwise wait at the destination. Load, unload, and transfer times (15, 20, and 10 min) are assumptions. Only SYN-TRK-07 and SYN-TRK-12 change with the dispatch option and road state.
 - Terminal turn time, traffic speed, and emissions are not live measurements.
 - The web check reads real public feeds (CHP incident log, Caltrans District 7 message signs, NWS alerts) about roads as they are now, while the incident is fictional. Its reliability table (`decision_model.web_triage`) is assumed, and the demo feed (`config/web_triage_fixtures.json`) is synthetic. See docs/METHODS.md section 9.
-- The 90% accuracy for dispatcher-reviewed drone footage is assumed. The CV suggestion shown with each clip comes from hand-set speed thresholds and is not validated. Automated CV alone is measured on 27 annotated aerial frames and shown separately; it is not yet worth an inspection (cv/RUN_RESULTS.md).
+- The accuracy for dispatcher-reviewed drone footage is assumed: 90% by default, 95% for heavy traffic and 85% for road damage. The CV suggestion shown with each clip comes from hand-set speed thresholds and is not validated. Automated CV alone is measured on 27 annotated aerial frames and shown separately; it is not yet worth an inspection (cv/RUN_RESULTS.md).
 - Driver hours are synthetic summaries and do not implement hours-of-service compliance.
 - Community exposure is described qualitatively; the demo does not yet calculate population-weighted pollution or noise exposure.
 - Action outcomes are point estimates from route data and assumed rates (see [docs/METHODS.md](docs/METHODS.md)) rather than Monte Carlo distributions.
@@ -116,4 +116,4 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 
 ## Recommended next data step
 
-After the hackathon, add an offline generator that snapshots permitted public aggregates, records retrieval dates and checksums, fits empirical distributions, and produces seeded scenario files. Keep the two curated scenarios for the presentation and use generated cases for sensitivity testing.
+After the hackathon, add an offline generator that snapshots permitted public aggregates, records retrieval dates and checksums, fits empirical distributions, and produces seeded scenario files. Keep the curated scenarios for the presentation and use generated cases for sensitivity testing.

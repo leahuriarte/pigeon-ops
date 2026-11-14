@@ -6,6 +6,7 @@ PIGEONOPS_LLM_VISION. Without an API key the client is disabled. Every failure r
 LLMUnavailable, and after one the client short-circuits for COOLDOWN_S seconds so a blocked
 network does not stall every panel. Output from the model is advisory and never measured.
 """
+import http.client
 import json
 import os
 import socket
@@ -141,7 +142,7 @@ def chat(messages, tools=None, tool_choice=None, max_tokens=1500):
         raise _trip(f"unreachable: {getattr(error, 'reason', error)}") from None
     except (ValueError, UnicodeDecodeError):
         raise _trip("malformed response body") from None
-    except OSError as error:
+    except (OSError, http.client.HTTPException) as error:
         raise _trip(f"network error: {error}") from None
 
     try:

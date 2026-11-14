@@ -73,9 +73,10 @@ def update_file(path, first_call):
               f"{len(route['geometry']['coordinates'])} vertices")
     newline = "\r\n" if "\r\n" in text else "\n"
     block = format_routes(routes, len(match.group(1))).replace("\n", newline)
-    path.write_text(text[:match.end()] + block + text[end:], encoding="utf-8", newline="")
+    with path.open("w", encoding="utf-8", newline="") as handle:  # write_text(newline=) needs Python 3.10
+        handle.write(text[:match.end()] + block + text[end:])
     json.loads(path.read_text(encoding="utf-8"))
-    print(f"wrote {path.relative_to(ROOT)}")
+    print(f"wrote {path}")
     return first_call
 
 

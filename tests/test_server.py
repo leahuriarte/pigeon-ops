@@ -1,6 +1,7 @@
 import json
 import threading
 import unittest
+from unittest.mock import patch
 from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.request import urlopen
@@ -55,6 +56,10 @@ class ServerTests(unittest.TestCase):
     def test_bad_input_is_rejected(self):
         self.assertEqual(404, self.status_of("/api/analysis?scenario=nope"))
         self.assertEqual(400, self.status_of("/api/analysis?observation=maybe"))
+
+    def test_unexpected_error_is_a_json_500(self):
+        with patch("backend.server.analyze", side_effect=RuntimeError("boom")), patch("traceback.print_exc"):
+            self.assertEqual(500, self.status_of("/api/analysis"))
 
 
 if __name__ == "__main__":

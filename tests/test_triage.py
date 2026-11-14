@@ -214,6 +214,17 @@ class AgentTests(TriageTestCase):
         result, _ = self.run_agent([tool_reply("report_triage", cases["uncited"])])
         self.assertIn("without searching", result["agent_note"])
 
+    def test_malformed_tool_calls_and_nan_radius_do_not_crash(self):
+        report = tool_reply("report_triage", {"finding": "corroborates", "confidence": "high",
+                                              "cited_ids": ["SYN-CHP-0914A"], "summary": "CHP logged a big rig."})
+        odd_shapes = {"role": "assistant", "content": None, "tool_calls": [
+            {"id": "c1", "function": "search_chp_incidents"}, {"id": "c2", "function": {"name": ["x"]}}]}
+        result, _ = self.run_agent([odd_shapes, tool_reply("search_chp_incidents", {"radius_km": float("nan")}), report])
+        self.assertIn(result["agent"], ("llm", "rules"))
+        self.assertNotIn("NaN", json.dumps(result))
+        with self.assertRaises(ValueError):
+            triage._radius({"radius_km": float("inf")})
+
     def test_loop_is_bounded(self):
         result, calls = self.run_agent([tool_reply("weather_alerts", {})])
         self.assertEqual(triage.MAX_ROUNDS + 1, len(calls))

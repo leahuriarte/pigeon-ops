@@ -11,6 +11,7 @@ reason the feed could not be read; a feed never raises. Items share one shape:
 Responses are cached per URL for CACHE_S seconds so repeated agent searches do not refetch.
 """
 import hashlib
+import http.client
 import json
 import math
 import re
@@ -61,7 +62,7 @@ def fetch(url, accept="*/*"):
             body = response.read(MAX_BYTES + 1)
     except HTTPError as error:
         raise FeedError(f"HTTP {error.code}") from None
-    except (URLError, socket.timeout, TimeoutError, ConnectionError, OSError) as error:
+    except (URLError, socket.timeout, TimeoutError, ConnectionError, OSError, http.client.HTTPException) as error:
         raise FeedError(f"unreachable: {getattr(error, 'reason', error)}") from None
     if len(body) > MAX_BYTES:
         raise FeedError("response too large")

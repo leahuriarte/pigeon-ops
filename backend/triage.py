@@ -13,6 +13,7 @@ feed is unreachable it falls back to `demo`. `demo` uses the synthetic records i
 `config/web_triage_fixtures.json`.
 """
 import json
+import math
 import time
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -20,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from backend import llm, web_feeds
-from backend.copilot import (CONFIDENCE, _arguments, _force, _model, _structured, _text, _tool,
+from backend.copilot import (CONFIDENCE, _arguments, _call_name, _force, _model, _structured, _text, _tool,
                              ungrounded_numbers)
 from backend.decision_engine import information_value, posterior_blocked
 
@@ -228,8 +229,8 @@ def _report_tool():
 
 def _radius(arguments):
     value = arguments.get("radius_km", DEFAULT_RADIUS_KM)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError("radius_km must be a number")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError("radius_km must be a finite number")
     return min(max(float(value), MIN_RADIUS_KM), web_feeds.MAX_RADIUS_KM)
 
 
@@ -281,7 +282,7 @@ def llm_triage(incident, sources, chat_fn=None):
         message = chat_fn(messages, tools=[report] if last else [*SEARCH_TOOLS, report],
                           tool_choice=_force("report_triage") if last else None)
         calls = [call for call in message.get("tool_calls") or [] if isinstance(call, dict)]
-        names = [(call.get("function") or {}).get("name") for call in calls]
+        names = [_call_name(call) for call in calls]
         if "report_triage" in names or not calls:
             if not searches:
                 raise ValueError("reported without searching any feed")
@@ -332,7 +333,7 @@ def triage(scenario, variant, mode="live", chat_fn=None, live_fn=None):
         report = llm_triage(incident, sources, chat_fn)
     except llm.LLMUnavailable as error:
         agent, agent_note, report = "rules", f"LLM unavailable: {error.reason}", rule_finding(sources, check)
-    except ValueError as error:
+    except (ValueError, TypeError, KeyError, AttributeError) as error:  # Any malformed reply falls back to rules.
         agent, agent_note, report = "rules", f"LLM reply rejected: {error}", rule_finding(sources, check)
 
     cited = set(report["cited_ids"])

@@ -2,6 +2,7 @@
 import json
 import mimetypes
 import os
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -17,6 +18,24 @@ FRONTEND = ROOT / "frontend"
 
 
 class DemoHandler(BaseHTTPRequestHandler):
+    timeout = 30  # A client that sends less body than its Content-Length cannot hold a thread forever.
+
+    def do_GET(self):
+        self._guarded(self._get)
+
+    def do_POST(self):
+        self._guarded(self._post)
+
+    def _guarded(self, handler):
+        """Answer an unexpected error with a JSON 500 instead of dropping the connection."""
+        try:
+            handler()
+        except (ConnectionError, TimeoutError):
+            raise
+        except Exception:  # noqa: BLE001 - last resort for a demo server
+            traceback.print_exc()
+            self._json({"error": "internal server error"}, 500)
+
     def _json(self, payload, status=200):
         body = json.dumps(payload).encode()
         self.send_response(status)
@@ -25,7 +44,7 @@ class DemoHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self):
+    def _get(self):
         parsed = urlparse(self.path)
         if parsed.path == "/api/health":
             return self._json({"status": "ok"})
@@ -47,7 +66,8 @@ class DemoHandler(BaseHTTPRequestHandler):
                 check = load_scenario(variant=params["scenario"])["disruption"].get("check")
             except (KeyError, ValueError):
                 check = None
-            return self._json(copilot.footage_opinion(case, check=check))
+            cached = copilot.cached_footage_opinion(case["id"], (check or {}).get("type"))
+            return self._json(cached or copilot.footage_opinion(case, check=check))
         if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback", "/api/llm/brief", "/api/triage"):
             return self._static(parsed.path)
 
@@ -84,7 +104,7 @@ class DemoHandler(BaseHTTPRequestHandler):
         except ValueError as error:
             return self._json({"error": str(error)}, 400)
 
-    def do_POST(self):
+    def _post(self):
         path = urlparse(self.path).path
         if path not in ("/api/inspection-review", "/api/llm/ask"):
             return self._json({"error": "not found"}, 404)

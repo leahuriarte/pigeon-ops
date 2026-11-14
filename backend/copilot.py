@@ -204,8 +204,19 @@ def _json_from_text(text):
     return value if isinstance(value, dict) else None
 
 
+def _function(call):
+    """The `function` part of a tool call, or {} when the model sent something other than an object."""
+    function = call.get("function")
+    return function if isinstance(function, dict) else {}
+
+
+def _call_name(call):
+    name = _function(call).get("name")
+    return name if isinstance(name, str) else ""
+
+
 def _arguments(call):
-    raw = (call.get("function") or {}).get("arguments")
+    raw = _function(call).get("arguments")
     if isinstance(raw, dict):
         return raw
     if raw in (None, ""):
@@ -222,7 +233,7 @@ def _arguments(call):
 def _structured(message, name):
     """The arguments of the `name` tool call, or a JSON object in the reply text."""
     for call in message.get("tool_calls") or []:
-        if isinstance(call, dict) and (call.get("function") or {}).get("name") == name:
+        if isinstance(call, dict) and _call_name(call) == name:
             try:
                 return _arguments(call)
             except ValueError:
@@ -488,12 +499,12 @@ def ask(scenario, analysis, question, chat_fn=None):
                 break
             messages.append({"role": "assistant", "content": message.get("content") or "", "tool_calls": calls})
             for index, call in enumerate(calls):
-                name = (call.get("function") or {}).get("name", "")
+                name = _call_name(call)
                 try:
                     arguments = _arguments(call)
                     result = run_engine_tool(name, arguments, scenario, analysis)
-                except ValueError as error:
-                    arguments, result = (call.get("function") or {}).get("arguments"), {"error": str(error)}
+                except (ValueError, TypeError, KeyError) as error:
+                    arguments, result = _function(call).get("arguments"), {"error": str(error)}
                 engine_calls.append({"name": name, "arguments": arguments})
                 results.append(result)
                 messages.append({"role": "tool", "tool_call_id": call.get("id") or f"call_{index}",

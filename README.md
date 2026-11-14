@@ -78,12 +78,13 @@ backend/scenario.py           Scenario loading and variant overlays
 backend/playback.py           Minute-by-minute truck schedules for the map timeline
 config/road_geometry.json     Saved road paths for every playback leg (from OSRM)
 scripts/build_road_geometry.py  Refreshes road_geometry.json after scenario edits
+scripts/build_network.py      Refreshes each scenario route's geometry, distance_m and duration_s
 backend/server.py             Tiny JSON API and static-file server
 frontend/index.html           Dashboard structure
 frontend/styles.css           Responsive visual design
 frontend/arcgis.css           ArcGIS map styles
 frontend/app.js               Map rendering and interaction
-frontend/inspection.js        Image review dialog (library served by backend/inspection.py)
+frontend/inspection.js        Drone clip review dialog (library served by backend/inspection.py)
 cv/                           Offline CV pipeline with its own environment; see cv/README.md
 tests/                        Decision-model, contract, and server tests
 run.py                        One-command entry point
