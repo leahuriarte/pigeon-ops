@@ -12,24 +12,58 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><strong>PigeonOps</strong><span>Simulated dispatch data for the ports of Los Angeles and Long Beach</span></div>
+    <div class="brand"><strong>PigeonOps</strong><span>Harbor dispatch · Ports of Los Angeles and Long Beach</span></div>
     <div class="topbar-controls">
-      <fieldset class="segmented" style="--n:2">
-        <legend class="visually-hidden">Scenario</legend>
-        <input type="radio" name="scenario" id="scenario-normal" value="normal"><label for="scenario-normal">Normal flow</label>
-        <input type="radio" name="scenario" id="scenario-disruption" value="disruption" checked><label for="scenario-disruption">Changed condition</label>
-        <span class="glider" aria-hidden="true"></span>
-      </fieldset>
-      <span class="scenario-clock">Scenario time <b id="scenario-time">—</b></span>
+      <span id="ops-status" class="ops-status ok" role="status">Loading…</span>
+      <b id="ops-clock" class="ops-clock">—</b>
+      <button id="alert-bell" class="alert-bell" type="button" aria-label="Alerts">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4 4 0 0 0-4 4v2.6L2.8 10.5v1h10.4v-1L12 8.1V5.5a4 4 0 0 0-4-4zM6.3 12.5a1.8 1.8 0 0 0 3.4 0z"/></svg>
+        <span id="alert-count" class="alert-count" hidden>1</span>
+      </button>
+      <span class="data-pill" title="Shipments, trucks, appointments and incidents are fictional. Rates are assumed and outcomes are estimated.">Simulated data</span>
     </div>
   </header>
 
   <main>
+    <!-- Shift report: shown when the morning has played out after an incident. -->
+    <section id="report" class="report" aria-labelledby="report-title" hidden>
+      <div class="report-head">
+        <div>
+          <p class="eyebrow">Shift report</p>
+          <h1 id="report-title">—</h1>
+          <p id="report-summary"></p>
+        </div>
+        <button id="report-close" class="button secondary" type="button">Back to the map</button>
+      </div>
+      <div class="report-grid">
+        <section aria-labelledby="report-indicators-title">
+          <h2 id="report-indicators-title">Usual morning against today</h2>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Indicator</th><th class="num">Usual morning</th><th class="num">Today</th><th>Change</th></tr></thead>
+              <tbody id="report-indicators"></tbody>
+            </table>
+          </div>
+          <p class="note">Expected values for every shipment in the plan, under the top-ranked response before any inspection. All are estimated.</p>
+        </section>
+        <section aria-labelledby="report-tally-title">
+          <h2 id="report-tally-title">How the response played out</h2>
+          <p id="report-tally-scope" class="subhead"></p>
+          <dl id="report-tally" class="ledger"></dl>
+        </section>
+        <section aria-labelledby="report-log-title">
+          <h2 id="report-log-title">Decision log</h2>
+          <ol id="report-log" class="report-log"></ol>
+          <p class="note">PigeonOps did not contact any driver or warehouse. The dispatcher made every call.</p>
+        </section>
+      </div>
+    </section>
+
     <!-- Level 1: what changed, and what the model suggests doing about it. -->
     <section class="situation" aria-labelledby="disruption-title">
       <div class="situation-main">
         <p class="eyebrow"><span id="situation-eyebrow">Loading</span><span id="reported-at"></span></p>
-        <h1 id="disruption-title">Loading scenario…</h1>
+        <h1 id="disruption-title">Loading…</h1>
         <p id="disruption-description"></p>
         <ul id="constraints" class="constraints" aria-label="Constraints"></ul>
       </div>
@@ -38,8 +72,8 @@
         <p id="recommendation-short" class="next-step-value">—</p>
         <dl class="next-facts">
           <div><dt>Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
-          <div><dt>Decide by</dt><dd id="deadline">—</dd></div>
-          <div><dt>Shipment</dt><dd id="affected">—</dd></div>
+          <div class="only-disruption"><dt>Decide by</dt><dd id="deadline">—</dd></div>
+          <div><dt id="affected-label">Shipment</dt><dd id="affected">—</dd></div>
         </dl>
         <p class="advisory">The recommendation is advice. This page does not contact trucks or drivers.</p>
       </div>
@@ -80,7 +114,7 @@
               <text x="20" y="372" class="water-label">San Pedro Bay</text>
               <g id="routes"></g><g id="markers"></g><g id="truck-marks"></g>
             </svg>
-            <div class="map-clock" aria-hidden="true"><b id="map-clock">—</b><span>Simulated time</span></div>
+            <div class="map-clock" aria-hidden="true"><b id="map-clock">—</b></div>
             <div id="truck-card" class="truck-card" hidden aria-live="polite"></div>
           </div>
           <div class="playback" aria-label="Playback">
@@ -90,7 +124,7 @@
                 <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>
               </button>
               <div class="timeline">
-                <input id="timeline" type="range" min="0" max="1" step="0.25" value="0" aria-label="Simulated time">
+                <input id="timeline" type="range" min="0" max="1" step="0.25" value="0" aria-label="Time of day">
                 <div id="timeline-ticks" class="ticks" aria-hidden="true"></div>
                 <div class="timeline-ends" aria-hidden="true"><span id="timeline-start">—</span><span id="timeline-end">—</span></div>
               </div>
@@ -103,13 +137,13 @@
               </label>
             </div>
             <div class="plan only-disruption">
-              <label class="plan-action">Play out
+              <label class="plan-action">Preview response
                 <select id="playback-action"></select>
               </label>
               <fieldset class="segmented" style="--n:2">
                 <legend class="visually-hidden">CA-47 road state</legend>
-                <input type="radio" name="road" id="road-open" value="open"><label for="road-open">CA-47 open</label>
-                <input type="radio" name="road" id="road-blocked" value="blocked"><label for="road-blocked">CA-47 blocked</label>
+                <input type="radio" name="road" id="road-open" value="open"><label for="road-open">If CA-47 is open</label>
+                <input type="radio" name="road" id="road-blocked" value="blocked"><label for="road-blocked">If CA-47 is blocked</label>
                 <span class="glider" aria-hidden="true"></span>
               </fieldset>
               <span id="plan-note" class="plan-note"></span>
@@ -121,7 +155,7 @@
                 <span class="basis estimated">Estimated</span>
               </div>
               <ul id="tally" class="tally-tiles"></ul>
-              <div class="tally-race">
+              <div class="tally-race only-disruption">
                 <p class="tally-race-title">Cost so far for each response <span id="tally-race-road"></span></p>
                 <ol id="tally-race" class="tally-race-list"></ol>
               </div>
@@ -175,10 +209,10 @@
             <div class="total"><dt>Net value of inspecting</dt><dd id="net-value">—</dd></div>
           </dl>
           <p id="cv-only" class="note"></p>
-          <figure id="selected-evidence" class="selected-evidence" hidden><img id="selected-evidence-image" alt="Reviewed drone frame"><figcaption id="selected-evidence-title"></figcaption><small>Reviewed stock drone footage applied to this fictional scenario.</small></figure>
+          <figure id="selected-evidence" class="selected-evidence" hidden><img id="selected-evidence-image" alt="Reviewed drone frame"><figcaption id="selected-evidence-title"></figcaption><small>Stock drone footage, not filmed at CA-47.</small></figure>
           <button id="inspect-button" class="button" type="button">Review drone footage</button>
           <div id="observation-buttons" class="choices" hidden>
-            <p>Choose what the simulated feed reports:</p>
+            <p>What did the inspection show?</p>
             <div>
               <button class="choice" type="button" data-observation="blocked">Road blocked</button>
               <button class="choice" type="button" data-observation="clear">Road clear</button>
@@ -186,8 +220,7 @@
             </div>
           </div>
           <p id="posterior" class="posterior" hidden></p>
-          <p class="note" id="drone-note"></p>
-          <details><summary>Assumptions</summary><dl id="assumptions" class="ledger"></dl></details>
+          <details><summary>Assumptions</summary><dl id="assumptions" class="ledger"></dl><p class="note" id="drone-note"></p></details>
         </section>
 
         <section class="block" aria-labelledby="options-title">
@@ -200,8 +233,8 @@
     </div>
 
     <!-- Level 5: reference material for anyone checking the numbers. -->
-    <div class="reference">
-      <h2 class="reference-title">How the numbers work</h2>
+    <details class="reference">
+      <summary class="reference-title">How the numbers work</summary>
       <div class="row row-ref">
         <section aria-labelledby="sources-title">
           <h3 id="sources-title">Data sources</h3>
@@ -218,7 +251,7 @@
           <dl id="definitions" class="definitions"></dl>
         </section>
       </div>
-    </div>
+    </details>
   </main>
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">
     <div class="inspection-header"><div><p class="eyebrow">DRONE INSPECTION · DISPATCHER REVIEW</p><h2 id="inspection-dialog-heading">Review drone footage</h2></div><button id="inspection-close" class="inspection-close">Close</button></div>
@@ -243,6 +276,14 @@
     </div>
     <div class="inspection-footer"><p>The clip, CV suggestion, your observation and the time are saved locally. A dispatcher approves any logistics action.</p><button id="inspection-apply" class="button" disabled>Apply to scenario</button></div>
   </dialog>
+  <!-- Presenter controls: hidden from the product view. Press P, or open the page with ?presenter. -->
+  <aside id="presenter" class="presenter" hidden aria-labelledby="presenter-title">
+    <div class="presenter-head"><b id="presenter-title">Presenter</b><span>Press P to hide</span></div>
+    <button type="button" data-presenter="restart">Restart the morning</button>
+    <div id="presenter-incidents" class="presenter-group"></div>
+    <button type="button" data-presenter="report">Show the shift report</button>
+    <p id="presenter-note" class="presenter-note"></p>
+  </aside>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

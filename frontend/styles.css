@@ -44,8 +44,16 @@ button { font: inherit; color: inherit; }
 .brand strong { font-size: 16px; margin-right: 10px; }
 .brand span { color: var(--muted); font-size: 13px; }
 .topbar-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.scenario-clock { font-size: 13px; color: var(--muted); }
-.scenario-clock b { color: var(--ink); }
+.ops-status { padding: 3px 10px; border-radius: 999px; background: #e6f1ea; color: var(--ok); font-size: 13px; font-weight: 600; }
+.ops-status.watch { background: #fbf1df; color: var(--watch); }
+.ops-status.risk { background: #fbe9e7; color: var(--risk); }
+.ops-status.neutral { background: var(--bg); color: var(--muted); }
+.ops-clock { font-size: 15px; font-weight: 650; }
+.alert-bell { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); cursor: pointer; }
+.alert-bell svg { width: 15px; height: 15px; fill: var(--muted); }
+.alert-bell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.alert-count { position: absolute; top: -5px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--risk); color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
+.data-pill { padding: 2px 8px; border: 1px dashed var(--line-strong); border-radius: 2px; color: var(--muted); font-size: 12px; cursor: help; }
 
 /* Segmented control adapted from Uiverse.io (MIT): Pradeepsaranbishnoi/heavy-dragonfly-92.
    Changes from the original: the radios stay keyboard-focusable, the glider position comes
@@ -137,6 +145,25 @@ h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
   border-radius: var(--radius);
 }
 body[data-scenario="disruption"] .situation { --tone: var(--risk); }
+.situation.arrived { animation: arrived 1.8s ease-out; }
+@keyframes arrived { 0%, 35% { background: #fbe9e7; } 100% { background: var(--surface); } }
+@media (prefers-reduced-motion: reduce) { .situation.arrived { animation: none; } }
+body[data-mode="report"] .situation, body[data-mode="report"] .indicators { display: none; }
+
+/* Shift report, in place of the situation banner */
+.report { --tone: var(--muted); padding: 16px 16px 16px 20px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); }
+.report-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.report h1 { margin-top: 4px; font-size: 22px; font-weight: 650; line-height: 1.25; }
+.report-head p:not(.eyebrow) { margin-top: 6px; color: var(--muted); }
+.report-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 16px; }
+.report h2 { margin-bottom: 10px; font-size: 15px; }
+.report .ledger dd small { margin-left: 6px; font-weight: 400; }
+.report-log { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.report-log li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; padding: 2px 0 2px 8px; border-left: 3px solid var(--line); }
+.report-log li:last-child { border-left-color: var(--accent); }
+.report-log time { color: var(--muted); }
+.button.secondary { width: auto; margin: 0; flex: none; background: var(--surface); color: var(--accent); }
+.button.secondary:hover:not(:disabled) { background: var(--accent-soft); }
 .eyebrow { color: var(--tone); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 .eyebrow span + span { color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none; }
 .situation h1 { margin-top: 4px; font-size: 22px; font-weight: 650; line-height: 1.25; }
@@ -220,7 +247,10 @@ body[data-scenario="disruption"] #risk-value { color: var(--risk); }
 
 /* Level 5: reference, in lower contrast than the levels above */
 .reference { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--line-strong); }
-.reference-title { margin-bottom: 12px; color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.reference { font-size: 14px; }
+.reference > summary { cursor: pointer; }
+.reference[open] > summary { margin-bottom: 12px; }
+.reference-title { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* Tables */
 .table-wrap { overflow-x: auto; }
@@ -341,4 +371,20 @@ body:not([data-scenario="disruption"]) .only-disruption { display: none !importa
   .choices div { grid-template-columns: 1fr; }
   .situation h1 { font-size: 19px; }
   .kpi-value { font-size: 20px; }
+}
+
+/* Presenter controls: not part of the product view */
+.presenter { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: grid; gap: 6px; width: 280px; padding: 12px; border-radius: 6px; background: var(--ink); color: #fff; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); font-size: 13px; }
+.presenter-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.presenter-head span, .presenter-note { color: #aab1b7; font-size: 12px; }
+.presenter-group { display: grid; gap: 6px; }
+.presenter button { padding: 6px 10px; border: 1px solid #4a5157; border-radius: 4px; background: #2a3036; color: #fff; text-align: left; cursor: pointer; }
+.presenter button:hover:not(:disabled) { background: #353c43; }
+.presenter button:disabled { opacity: 0.45; cursor: default; }
+.presenter button[aria-pressed="true"] { border-color: #8fb0e0; }
+.presenter button:focus-visible { outline: 2px solid #8fb0e0; outline-offset: 1px; }
+
+@media (max-width: 1000px) {
+  .report-grid { grid-template-columns: 1fr; }
+  .report-head { flex-direction: column; }
 }
