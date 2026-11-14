@@ -290,6 +290,14 @@ At the `disruption` variant's 40%, a corroborating finding gives 0.4 × 0.60 / (
 
 Live feeds describe real roads now, while the incidents are fictional, so a live check usually finds nothing that matches. `config/web_triage_fixtures.json` holds synthetic records written for each incident (`SYN-` ids), used when the dispatcher picks "Demo feed" or when every live feed fails.
 
+## 10. Offline route candidates and synthetic traffic
+
+`scripts/build_route_candidates.py` requests up to three OSRM driving routes for each synthetic shipment and commits their geometry, distance and duration in `config/route_candidates.json`. For a truck's first en-route load, routing starts at its synthetic current position; later loads start at their synthetic origins. A saved scenario corridor is included when it connects the shipment's actual start and destination. OSRM sometimes returns only one route. These routes are **estimated driving candidates, not validated truck routes**.
+
+`config/synthetic_traffic.json` supplies synthetic time-of-day duration multipliers, maximum extra-delay ranges and a few route-specific multipliers. `backend/route_optimizer.py` searches every combination of saved candidates for each truck's ordered loads. It propagates positive delay from an earlier load to a later load on the same truck. A candidate's estimated arrival is its synthetic planned ETA plus the difference between its traffic-adjusted duration and the baseline candidate's saved duration, plus any carried delay. The illustrative chance of arriving after the appointment starts assumes additional delay is uniformly distributed from zero to the period's `extra_delay_max_min`. Estimated loss uses **expected** lateness and missed-appointment probability under that uniform delay, plus the same driving and emissions weights as the decision engine. This is an assumed distribution, not a calibrated forecast. An optional time is a **hypothetical shift start** from the saved synthetic truck positions: all planned ETAs move with it; it is not a live GPS update.
+
+Run `python3 scripts/preview_route_plan.py normal` to inspect the advisory search. It does not change dispatch, replace the incident/drone response model, account for incident probability, or validate restrictions such as truck access, bridge clearance or hazardous cargo. No route is applied without the dispatcher.
+
 ## Known limitations
 
 - The web check's reliability table is assumed. A missing CHP log is weak evidence, and the table does not depend on how long ago the incident was reported.

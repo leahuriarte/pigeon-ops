@@ -1,0 +1,15 @@
+{
+  "basis": "synthetic",
+  "description": "Illustrative time-of-day traffic multipliers and extra-delay ranges. Not a measured feed or forecast.",
+  "periods": [
+    {"id": "SYN-TRAFFIC-1", "start": "09:00", "end": "10:00", "duration_multiplier": 1.18, "extra_delay_max_min": 18, "basis": "synthetic"},
+    {"id": "SYN-TRAFFIC-2", "start": "10:00", "end": "11:00", "duration_multiplier": 1.26, "extra_delay_max_min": 24, "basis": "synthetic"},
+    {"id": "SYN-TRAFFIC-3", "start": "11:00", "end": "13:00", "duration_multiplier": 1.12, "extra_delay_max_min": 16, "basis": "synthetic"},
+    {"id": "SYN-TRAFFIC-4", "start": "13:00", "end": "16:00", "duration_multiplier": 1.07, "extra_delay_max_min": 12, "basis": "synthetic"}
+  ],
+  "route_adjustments": [
+    {"route": "SYN-ROUTE-SYN-SHP-1055-westbound", "duration_multiplier": 1.08, "basis": "synthetic"},
+    {"route": "SYN-ROUTE-SYN-SHP-1074-westbound", "duration_multiplier": 1.08, "basis": "synthetic"},
+    {"route": "SYN-ROUTE-SYN-SHP-1051-osrm-2", "duration_multiplier": 0.95, "basis": "synthetic"}
+  ]
+}
