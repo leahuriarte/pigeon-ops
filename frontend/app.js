@@ -53,6 +53,7 @@ const observationLabels = {
 const tag = ([label, tone]) => `<span class="status ${tone}">${label}</span>`;
 
 let scenario;
+let baseline = null; // Indicators for the normal scenario, the comparison point.
 let activeScenario = "disruption";
 let shipmentFilter = "attention";
 let selectedTruck = null;
@@ -264,7 +265,7 @@ function updateEventFeed() {
     <button class="link quiet" type="button" data-truck="${esc(event.truck)}">${esc(shortTruck(event.truck))}</button>
     <span>${upcoming ? "Next: " : ""}${esc(event.text)}</span></li>`;
   const rows = [...past.map((event) => row(event, false)), next ? row(next, true) : ""];
-  $("#event-feed").innerHTML = rows.join("") || '<li class="upcoming"><span>Press play to watch the morning unfold.</span></li>';
+  $("#event-feed").innerHTML = rows.join("") || '<li class="upcoming"><span>Press play to start the simulation.</span></li>';
 }
 
 function selectTruck(id) {
@@ -571,12 +572,53 @@ function renderDecision() {
   const d = scenario.disruption;
   const affected = affectedShipment();
   $("#scenario-time").textContent = scenario.generated_at.slice(11, 16);
+  $("#situation-eyebrow").textContent = scenario.scenario_type === "disruption" ? "Changed condition" : "Normal operations";
+  const when = scenario.scenario_type === "disruption" ? "reported" : "as of";
+  $("#reported-at").textContent = d.reported_at ? ` · ${when} ${d.reported_at}` : "";
   $("#disruption-title").textContent = d.title;
   $("#disruption-description").textContent = d.description;
   $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
   $("#risk-value").textContent = pct(d.prior_blocked_probability);
-  $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min of slack</small>`;
-  $("#deadline").innerHTML = `${esc(d.decision_deadline)}<small>Reported at ${esc(d.reported_at)}</small>`;
+  $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
+  $("#deadline").textContent = d.decision_deadline;
+}
+
+// Indicator tiles. Normal flow is the baseline the changed condition is compared with.
+const higherIsBetter = new Set(["appointments_feasible"]);
+const basisLabel = { stub: "Not yet calculated", estimated: "Estimated", simulated: "Simulated", measured: "Measured" };
+function indicatorNumber(item, value) {
+  if (item.unit === "mi") return value.toFixed(1);
+  return whole(value);
+}
+function renderIndicators(indicators) {
+  const compare = scenario.scenario_type !== "normal" && baseline;
+  const scope = "Each number covers every shipment in the plan, assuming you take the top-ranked response without inspecting first.";
+  $("#indicators-note").textContent = compare
+    ? `${scope} The arrows compare each one with normal flow.`
+    : `${scope} The changed condition is compared with these values.`;
+  $("#indicators").innerHTML = indicators.map((item) => {
+    const label = esc(item.label.replace(/^Estimated /, "").replace("CO2", "CO₂"));
+    const basis = `<span class="basis ${esc(item.basis)}">${esc(basisLabel[item.basis] ?? item.basis)}</span>`;
+    if (item.value === null || item.value === undefined) {
+      return `<li class="kpi pending"><span class="kpi-label">${label}</span><span class="kpi-value">—</span><span class="kpi-foot">${basis}</span></li>`;
+    }
+    const of = item.of !== undefined ? ` of ${whole(item.of)}` : "";
+    // Count units repeat the label, so only physical units are printed.
+    const unit = ["min", "mi", "kg"].includes(item.unit) ? ` <small>${esc(item.unit)}</small>` : "";
+    let delta = '<span class="kpi-delta">Baseline</span>';
+    const base = compare && baseline.find((b) => b.id === item.id);
+    if (base && base.value !== null) {
+      const diff = item.value - base.value;
+      const shown = indicatorNumber(item, Math.abs(diff));
+      if (Number(shown) === 0) {
+        delta = '<span class="kpi-delta">Same as normal flow</span>';
+      } else {
+        const worse = (diff > 0) !== higherIsBetter.has(item.id);
+        delta = `<span class="kpi-delta ${worse ? "worse" : "better"}"><span aria-hidden="true">${diff > 0 ? "▲" : "▼"}</span> ${diff > 0 ? "+" : "−"}${shown} vs normal flow</span>`;
+      }
+    }
+    return `<li class="kpi"><span class="kpi-label">${label}</span><span class="kpi-value">${indicatorNumber(item, item.value)}${of}${unit}</span><span class="kpi-foot">${delta}${basis}</span></li>`;
+  }).join("");
 }
 
 function renderRankings(items, observation = null) {
@@ -585,15 +627,21 @@ function renderRankings(items, observation = null) {
     : "Ranked by expected loss before inspection";
   $("#rankings").innerHTML = items.map((item) => {
     const e = item.expected;
-    return `<tr class="${item.rank === 1 ? "top" : ""}">
-      <td class="num">${item.rank}</td>
-      <td><b>${esc(item.label)}</b><span class="detail">${esc(item.summary)}</span><span class="detail">${esc(item.stakeholder_effect)}</span></td>
-      <td class="num">${whole(e.lateness_min)}</td>
-      <td class="num">${money(e.incremental_cost)}</td>
-      <td class="num">${whole(e.emissions_kg)}</td>
-      <td class="num">${e.constraint_breaches.toFixed(1)}</td>
-      <td class="num"><b>${money(item.expected_loss)}</b></td>
-    </tr>`;
+    return `<li class="option${item.rank === 1 ? " top" : ""}">
+      <div class="option-head">
+        <span class="rank">${item.rank}</span>
+        <b class="option-name">${esc(item.label)}</b>
+        <span class="option-loss"><b>${money(item.expected_loss)}</b><small>expected loss</small></span>
+      </div>
+      <p>${esc(item.summary)}</p>
+      <p class="muted">${esc(item.stakeholder_effect)}</p>
+      <dl class="option-metrics">
+        <div><dt>Delay</dt><dd>${whole(e.lateness_min)} min</dd></div>
+        <div><dt>Direct cost</dt><dd>${money(e.incremental_cost)}</dd></div>
+        <div><dt>CO₂</dt><dd>${whole(e.emissions_kg)} kg</dd></div>
+        <div><dt>Breaches</dt><dd>${e.constraint_breaches.toFixed(1)}</dd></div>
+      </dl>
+    </li>`;
   }).join("");
 }
 
@@ -731,6 +779,10 @@ async function loadScenario(id) {
   const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(id)}`);
   if (!response.ok) throw new Error("The scenario failed to load");
   scenario = await response.json();
+  if (!baseline) {
+    const base = await fetch("/api/analysis?scenario=normal&observation=inconclusive");
+    baseline = base.ok ? (await base.json()).indicators : null;
+  }
   $(`#scenario-${id}`).checked = true;
   document.body.dataset.scenario = scenario.scenario_type;
   $("#drone-note").textContent = scenario.decision_model.drone.note;
@@ -741,6 +793,7 @@ async function loadScenario(id) {
   };
   resetObservation();
   renderDecision();
+  renderIndicators(scenario.analysis.indicators);
   renderRankings(scenario.analysis.before);
   renderEvoi(scenario.analysis);
   renderShipments();
@@ -793,7 +846,7 @@ function bindEvents() {
   }));
   document.addEventListener("keydown", (event) => {
     if (event.key !== " " || event.target.closest("input:not([type=range]), select, button, textarea")) return;
-    if (!event.target.closest(".row-map")) return;
+    if (!event.target.closest(".map-block")) return;
     event.preventDefault();
     setPlaying(!playing);
   });

@@ -1,6 +1,6 @@
 .map-shell {
   position: relative;
-  height: 540px;
+  height: clamp(420px, calc(100vh - 360px), 620px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
