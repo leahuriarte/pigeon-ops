@@ -1,5 +1,9 @@
 # PigeonOps data methodology
 
+Optional external imagery and California highway camera/closure snapshots are
+documented separately in [cv/SOURCES.md](cv/SOURCES.md). They are not evidence of
+the fictional demo incident and do not replace the synthetic operational records.
+
 PigeonOps uses **publicly calibrated synthetic data**. Public sources shape plausible geography, traffic, cargo, truck, cost, and emissions patterns, while every operational record shown in the demo is fictional. The prototype does not contain carrier, terminal, driver, appointment, container, or drone-operation records.
 
 ## What the demo contains

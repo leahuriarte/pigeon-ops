@@ -56,7 +56,20 @@
     "lateness_cost_per_minute": 85,
     "emissions_cost_per_kg": 0.25,
     "hard_constraint_penalty": 2500,
-    "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "launch_and_review_minutes": 6, "direct_cost": 90, "delay_cost": 75, "note": "Synthetic evidence only. The 90% accuracy is an assumption shown for sensitivity testing; no command is sent to real hardware."},
+    "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "accuracy_basis": "Dispatcher reviews drone imagery with CV assistance (assumed 90%, not yet validated)", "launch_and_review_minutes": 6, "direct_cost": 90, "delay_cost": 75, "note": "Synthetic evidence only. The 90% accuracy is an assumption shown for sensitivity testing; no command is sent to real hardware.",
+      "cv_only_model": {
+        "source": "Automated CV alone: aerial-ensemble detector error measured on 27 UAV-OBB frames (only 4 dense); traffic link assumed",
+        "signal_given_visual_state": {
+          "dense_traffic": {"blocked": 0.2857, "clear": 0.1429, "inconclusive": 0.5714},
+          "light_traffic": {"blocked": 0.0476, "clear": 0.6667, "inconclusive": 0.2857},
+          "unclear": {"blocked": 0.125, "clear": 0.375, "inconclusive": 0.5}
+        },
+        "visual_state_given_road": {
+          "blocked": {"dense_traffic": 0.75, "unclear": 0.20, "light_traffic": 0.05},
+          "open": {"dense_traffic": 0.15, "unclear": 0.25, "light_traffic": 0.60}
+        }
+      }
+    },
     "actions": [
       {"id": "hold-course", "label": "Keep current route", "summary": "Preserve the appointment if the report is false.", "stakeholder_effect": "No reassignment; highest disruption exposure.", "outcomes": {"open": {"lateness_min": 0, "incremental_cost": 0, "emissions_kg": 8, "constraint_breaches": 0}, "blocked": {"lateness_min": 42, "incremental_cost": 320, "emissions_kg": 25, "constraint_breaches": 1}}},
       {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Take the known detour now; reliable but longer.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "outcomes": {"open": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0}, "blocked": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0}}},

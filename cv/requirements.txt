@@ -1,0 +1,2 @@
+ultralytics==8.4.213
+imageio-ffmpeg==0.6.0

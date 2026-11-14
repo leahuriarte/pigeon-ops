@@ -6,6 +6,9 @@ The network view uses ArcGIS Maps SDK for JavaScript 5.2 with an OpenStreetMap b
 
 Repository slug: `pigeon-ops`
 
+Optional computer-vision setup, California highway snapshots, and annotated image
+inspection are documented in [cv/README.md](cv/README.md).
+
 ## Run it
 
 Requires Python 3.9+ and no package installation.

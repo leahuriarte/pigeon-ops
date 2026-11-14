@@ -171,7 +171,13 @@ function renderEvoi(analysis) {
   $("#evidence-loss").textContent = money(e.expected_loss_after_inspection);
   $("#inspection-cost").textContent = money(e.inspection_cost);
   $("#net-value").textContent = money(e.net_value_of_information);
-  $("#assumptions").innerHTML = `${e.formula}<br>Observation accuracy: ${pct(e.assumptions.inspection_accuracy)} (assumed)<br>Launch and review: ${e.assumptions.launch_and_review_minutes} min<br>Probability signal says blocked: ${pct(e.assumptions.signal_blocked_probability)}`;
+  const cv = e.cv_only;
+  const breakEven = e.break_even_accuracy === null ? "even perfect evidence would not pay for a flight" : `a flight pays off at ≥${pct(e.break_even_accuracy)} accuracy`;
+  $("#cv-only").innerHTML = cv
+    ? `<b>Automated CV alone (measured):</b> ${money(cv.net_value_of_information)} net — ${cv.recommend_inspection ? "worth a flight" : "not worth a flight yet"}. Misses ${pct(cv.missed_blockage_probability)} of blockages; ${breakEven}.`
+    : `Break-even: ${breakEven}.`;
+  const a = e.assumptions;
+  $("#assumptions").innerHTML = `${e.formula}<br>Evidence model: ${a.observation_source}<br>Flags a real blockage: ${pct(a.detects_blockage_probability)} · misses it (says clear): ${pct(a.missed_blockage_probability)} · false alarm on an open road: ${pct(a.false_alarm_probability)}<br>Chance the inspection comes back inconclusive: ${pct(a.signal_probability.inconclusive)}<br>Launch and review: ${a.launch_and_review_minutes} min`;
 }
 
 function resetObservation() {
