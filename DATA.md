@@ -1,7 +1,7 @@
 # PigeonOps data methodology
 
-The stock drone clips used in the inspection step, and the California highway
-camera/closure snapshots used for detector checks, are documented separately in [cv/SOURCES.md](cv/SOURCES.md). They are not evidence of
+The stock drone clips used in the inspection step and the labeled datasets used
+for detector checks are documented separately in [cv/SOURCES.md](cv/SOURCES.md). They are not evidence of
 the fictional demo incident and do not replace the synthetic operational records.
 
 PigeonOps uses **publicly calibrated synthetic data**. Public sources shape plausible geography, traffic, cargo, truck, cost, and emissions patterns, while every operational record shown in the demo is fictional. The prototype does not contain carrier, terminal, driver, appointment, container, or drone-operation records.

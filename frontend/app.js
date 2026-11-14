@@ -840,7 +840,7 @@ function renderEvoi(analysis) {
     : `An inspection pays off once its evidence is at least ${pct(e.break_even_accuracy)} accurate.`;
   const cv = e.cv_only;
   $("#cv-only").textContent = cv
-    ? `CV-only scenario estimate: ${money(cv.net_value_of_information)} net, using measured detection errors and an assumed link between traffic and blockage. ${breakEven}`
+    ? `Still-image CV alone (vehicle spacing, measured on 27 aerial frames): ${money(cv.net_value_of_information)} net. The clip suggestion uses vehicle motion and has not been measured yet. ${breakEven}`
     : breakEven;
   const a = e.assumptions;
   $("#assumptions").innerHTML = [

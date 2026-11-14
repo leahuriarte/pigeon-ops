@@ -9,10 +9,12 @@ dashboard in two ways:
    a marked road region, annotated playback and a suggested observation. The
    dialog preselects the suggestion; the dispatcher confirms or overrides it, and
    the engine then uses its assumed 90% accuracy for reviewed footage.
-2. **Measured CV-only evidence (shown for comparison).** An automatic road-state
-   rule is scored against annotated aerial images. Its error table becomes
-   `decision_model.drone.cv_only` in the scenario config, and the dashboard shows
-   what automated CV alone would be worth.
+2. **Measured CV-only evidence (shown for comparison).** The still-image
+   vehicle-spacing rule (`assess_road`) is scored against 27 annotated aerial
+   frames. Its error table becomes `decision_model.drone.cv_only` in the scenario
+   config, and the dashboard shows what that CV alone would be worth. The motion
+   rule (`assess_motion`) that suggests observations on the clips has no measured
+   accuracy yet; five self-labelled clips are too few to estimate one.
 
 [SOURCES.md](SOURCES.md) lists data and model provenance and terms.
 [RUN_RESULTS.md](RUN_RESULTS.md) records the measured results.
@@ -34,7 +36,7 @@ Run every script as a module from the repository root (`python -m cv.<name>`).
 
 | View | Model | Why |
 | --- | --- | --- |
-| Side-on or oblique cameras (Caltrans, TRANSSET) | `yolo11s.pt` at 1280 | Highway F1 0.844; the ensemble adds nothing here and is 3× slower |
+| Side-on or oblique cameras (TRANSSET highway images) | `yolo11s.pt` at 1280 | Highway F1 0.844; the ensemble adds nothing here and is 3× slower |
 | Top-down drone (UAV-OBB) | `aerial-ensemble` | COCO `yolo11s` plus DOTA-trained `yolo11m-obb`; aerial F1 0.755 against 0.499 for `yolo11s` alone |
 | Low-altitude drone clips (review library) | `drone-ensemble` | `aerial-ensemble` plus a 640 px OBB pass; finds trucks several hundred pixels long that the 1024 px pass misses. Not benchmarked |
 
@@ -45,7 +47,6 @@ choices above, so leave it off.
 
 | Task | Command |
 | --- | --- |
-| Download Caltrans snapshots (new dated folder each run) | `python -m cv.download_california` |
 | Download labeled datasets | `python -m cv.download_data` and `python -m cv.download_data --dataset transset` |
 | Score a detector | `python -m cv.benchmark --model aerial-ensemble` (add `--dataset transset --limit 200` for highway images) |
 | Annotate any images | `python -m cv.inspect_images --source <image-or-folder> --name <run>` |

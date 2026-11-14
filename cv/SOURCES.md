@@ -4,33 +4,6 @@ The logistics records in `config/port_scenario.json` remain fictional. External
 images are separate visual evidence examples. Do not imply they document the
 fictional incident, and do not turn detection confidence into inspection accuracy.
 
-## California highway context
-
-- **Publisher:** California Department of Transportation (Caltrans).
-- **Camera feed:** <https://cwwp2.dot.ca.gov/data/d7/cctv/cctvStatusD07.json>.
-- **Documentation:** <https://cwwp2.dot.ca.gov/documentation/cctv/cctv.htm>.
-- **Lane closures:** <https://cwwp2.dot.ca.gov/lane-closure.html>.
-- **Terms:** <https://dot.ca.gov/conditions-of-use>.
-- **Selection:** District 7, SR-47, I-710, I-110, I-405 and SR-91;
-  latitude 33.65–34.05 and longitude −118.55–−117.95. Download up to five
-  in-service cameras per route, nearest the port-area reference point.
-- **Files:** dated directories under `cv/data/california/`, containing original
-  camera metadata, a filtered camera GeoJSON, individual JPEGs, checksums,
-  retrieval times and lane-closure records.
-
-These are roadside cameras, not drone images, so the dashboard library no longer uses them; they remain for the detector checks in RUN_RESULTS.md. Some cameras marked in service
-return a “Temporarily Unavailable” card. Camera-record timestamps describe metadata
-updates, not image capture time. Keep the original image overlay visible. Camera
-images are not annotated evaluation data. Lane-closure feeds also contain planned,
-ended and cancelled records; check their dates and status flags before use.
-
-Additional California references: [QuickMap](https://quickmap.dot.ca.gov/),
-[reported highway conditions](https://roads.dot.ca.gov/),
-[truck access](https://dot.ca.gov/programs/traffic-operations/legal-truck-access/truck-network-map),
-and [traffic volumes](https://dot.ca.gov/programs/traffic-operations/census).
-The CWWP travel-time page does not list District 7; do not assume a D7 travel-time
-feed exists or infer measured speed from one image.
-
 ## TRANSSET highway images
 
 - **Creators:** Tewodros Syum Gebre, Quincy Blackston and Leila Hashemi Beni.
@@ -98,7 +71,7 @@ accuracy is reported from five hand-picked clips.
 ## Pretrained models
 
 - `yolo11n.pt`, `yolo11s.pt`: Ultralytics YOLO11 trained on COCO (car, bus, truck).
-  Best on side-on and oblique views such as Caltrans cameras and TRANSSET.
+  Best on side-on and oblique views such as TRANSSET highway images.
 - `yolo11s-obb.pt`, `yolo11m-obb.pt`: Ultralytics YOLO11-OBB trained on DOTA v1
   aerial imagery (small vehicle, large vehicle). Used in `aerial-ensemble` for
   top-down drone views.

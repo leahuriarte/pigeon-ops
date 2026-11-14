@@ -37,12 +37,9 @@ def main():
     output = ROOT / "outputs" / args.name
     output.mkdir(parents=True, exist_ok=True)
     manifest = {}
-    camera_context = {}
     for parent in [source.parent, *source.parents]:
         if (parent / "source.json").is_file():
             manifest = json.loads((parent / "source.json").read_text(encoding="utf-8"))
-            if (parent / "snapshots.json").is_file():
-                camera_context = {item["image"]: item for item in json.loads((parent / "snapshots.json").read_text(encoding="utf-8"))["images"]}
             break
     model = load_model(args.model)
     observations = []
@@ -52,14 +49,8 @@ def main():
         frame = cv2.imread(str(path))
         if frame is None:
             raise ValueError(f"Cannot decode image: {path}")
-        # Some in-service Caltrans cameras return a white 'Temporarily Unavailable' card.
-        # This is a diagnostic flag for review, not a road-state classifier.
-        content = frame[:max(1, int(frame.shape[0] * 0.85))]
-        white_fraction = float((content.min(axis=2) > 240).mean())
-        possible_placeholder = bool(camera_context and white_fraction > 0.75)
-        predictions = [] if possible_placeholder else predict_frame(model, frame, args.imgsz, args.confidence, args.tile_size)
-        caption = "Possible unavailable-camera card | image review required" if possible_placeholder else f"{len(predictions)} vehicle detections | review required"
-        rendered = annotate(frame, predictions, caption)
+        predictions = predict_frame(model, frame, args.imgsz, args.confidence, args.tile_size)
+        rendered = annotate(frame, predictions, f"{len(predictions)} vehicle detections | review required")
         filename = f"image-{index + 1:03d}.jpg"
         cv2.imwrite(str(output / filename), rendered)
         thumbnail = Image.fromarray(cv2.cvtColor(rendered, cv2.COLOR_BGR2RGB))
@@ -69,10 +60,7 @@ def main():
         draw.text((x, y + 240), f"{index + 1:02d}: {len(predictions)} detections | needs review", fill="white")
         observations.append({"source_file": str(path), "annotated_image": filename,
                              "label": "inconclusive", "review_status": "needs_human_review",
-                             "vehicle_count": len(predictions), "detections": predictions,
-                             "inference_skipped": possible_placeholder,
-                             "quality_warning": "Possible provider-unavailable card; verify image" if possible_placeholder else None,
-                             "camera_context": camera_context.get(path.name)})
+                             "vehicle_count": len(predictions), "detections": predictions})
         print(f"{index + 1}/{len(images)}: {path.name}: {len(predictions)} vehicles", flush=True)
     sheet.save(output / "contact-sheet.jpg")
     evidence = {
@@ -83,16 +71,14 @@ def main():
         "creators": manifest.get("creators", []), "geography": manifest.get("geography"),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "model": args.model, "image_size": args.imgsz, "tile_size": args.tile_size,
-        "confidence_threshold": args.confidence, "images_examined": len(images),
-        "images_analyzed": sum(not item["inference_skipped"] for item in observations),
-        "images_flagged_for_source_review": sum(item["inference_skipped"] for item in observations),
+        "confidence_threshold": args.confidence, "images_analyzed": len(images),
         "summary": "Vehicle detections support visual review; a single image does not establish vehicle motion, congestion, blockage, or road safety.",
         "observations": observations,
     }
     (output / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
-    cards = "".join(f'<figure><img src="{item["annotated_image"]}"><figcaption>{html.escape(Path(item["source_file"]).name)} — {item["vehicle_count"]} detections; {html.escape(item["quality_warning"] or "human review required")}.</figcaption><pre>{html.escape(json.dumps(item["camera_context"], indent=2)) if item["camera_context"] else ""}</pre></figure>' for item in observations)
+    cards = "".join(f'<figure><img src="{item["annotated_image"]}"><figcaption>{html.escape(Path(item["source_file"]).name)} — {item["vehicle_count"]} detections; human review required.</figcaption></figure>' for item in observations)
     summary = {key: value for key, value in evidence.items() if key != "observations"}
-    write_report(output, "Road image inspection", f'''<p>Model detections are visual evidence for review. Road state remains <strong>inconclusive</strong> until reviewed. These images are separate from the fictional demo incident. Camera metadata and retrieval times appear below when available.</p>
+    write_report(output, "Road image inspection", f'''<p>Model detections are visual evidence for review. Road state remains <strong>inconclusive</strong> until reviewed. These images are separate from the fictional demo incident.</p>
 <p>Attribution and source: {html.escape(str(evidence['creators']))}, <a href="{html.escape(evidence['dataset_url'] or '#', quote=True)}">{html.escape(evidence['dataset'])}</a>, {html.escape(evidence['license'] or 'license unspecified')}.</p>
 <img src="contact-sheet.jpg" alt="Overview of annotated road images">''', summary, cards)
     print(f"Report ready: {output / 'report.html'}", flush=True)

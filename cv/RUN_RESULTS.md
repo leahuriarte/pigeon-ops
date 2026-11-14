@@ -9,14 +9,12 @@ was performed in these baseline runs.
 
 - UAV-OBB v4: 1,617 labeled aerial images and two supplementary videos.
 - TRANSSET v5: 4,704 labeled North Carolina highway images.
-- Caltrans: 25 California snapshots from SR-47, I-710, I-110, I-405 and SR-91;
-  153 camera locations and 648 corridor closure-feed records.
 - Both labeled dataset archives passed publisher checksum verification.
 
-The California snapshot used for the report was retrieved November 14 at
-11:17 AM Pacific. That is retrieval time, not a guaranteed image capture time.
-Raw metadata and images are in `data/california/20261114T191704Z/`.
-Closure records include planned and ended entries; 648 is not an active-closure count.
+An earlier trial used 25 side-on Caltrans camera snapshots as the review library.
+Their findings (a false detection on a camera logo, parked vehicles counted as
+traffic) led to the road-area masks used now. That library and its downloader were
+retired when the review step switched to top-down drone clips.
 
 ## Detector comparison
 
@@ -43,7 +41,7 @@ Defaults depend on the camera view:
   about 1.5 seconds per image on CPU.
 - **Side-on and oblique cameras: YOLO11s at 1280.** On highway images the ensemble
   adds nothing (F1 0.840 against 0.844) and is three times slower (1.6 against
-  0.55 seconds per image). The Caltrans review library uses this model.
+  0.55 seconds per image).
 
 Overlapping crops help YOLO11s recall but lose to the ensemble on both accuracy
 and speed. Timings are approximate and machine-specific.
@@ -51,21 +49,17 @@ and speed. Timings are approximate and machine-specific.
 The aerial results remain weak: many vehicles are missed. The highway results
 are more useful, but extra detections remain. A manual check of a false-positive
 heavy highway image showed that the reference boxes covered road traffic while
-parked background vehicles were unannotated. California examples also show a
-false detection on a Caltrans logo. These findings motivate a road-area mask
+parked background vehicles were unannotated. These findings motivate a road-area mask
 and manual annotation review before using counts as decision evidence.
 
 These are not official OBB mAP scores or blockage accuracy. UAV-OBB rotated boxes
 were converted to enclosing rectangles. Highway frames can be correlated across
-the deterministic image partitions. California snapshots have no reference labels.
+the deterministic image partitions.
 
 ## Outputs and interpretation
 
-Open `outputs/index.html` for the combined report. The California report examined
-25 images, analyzed 19 road scenes and flagged six provider-unavailable cards.
-It found 71 vehicle detections across the 19 scenes; this is neither an accurate
-fleet count nor a count of unique vehicles. Twelve highway examples and a
-3.5-second annotated aerial video are also included.
+Open `outputs/index.html` for the combined report (`python -m cv.build_report`).
+Twelve highway examples and a 3.5-second annotated aerial video are also included.
 
 Unreviewed observations remain `inconclusive`. These initial detector runs are
 separate from the subsequent dashboard integration described below.
@@ -86,15 +80,19 @@ that row is mostly additive smoothing.
 Combined with an assumed traffic link (a blocked road looks dense 75% of the time,
 an open one 15%), automated CV alone flags 24% of blockages, says "clear" for 22%
 of them, and raises a false alarm on 10% of open roads. In the disruption scenario
-that evidence never changes the best action, so its information value is zero and
-an inspection based on it alone is not worth its $165 cost. The dashboard shows
-this next to the assumed 90% reviewed-imagery figure and the accuracy at which an
-inspection pays off (80% in the disruption scenario).
+that evidence never changes the best action, so waiting for it only adds cost: the
+held truck's delay ($444 of expected loss) plus the $90 inspection fee gives a net
+value of −$534. The dashboard shows this next to the assumed 90% reviewed-imagery
+figure and the accuracy at which an inspection pays off (86% in the disruption
+scenario). These figures use the inspection delay modelled as a held truck.
+
+This measures the still-image vehicle-spacing rule. The motion rule that suggests
+observations on the drone clips has not been measured.
 
 ## Drone inspection library (dashboard)
 
-The dashboard library now uses five top-down Pexels drone clips instead of
-side-on Caltrans cameras, because the demo's inspection is a drone flight.
+The dashboard library uses five top-down Pexels drone clips, because the demo's
+inspection is a drone flight.
 `python -m cv.prepare_review` samples 4 seconds of each clip at 8 frames per
 second with `drone-ensemble`, removes camera motion, measures vehicle speeds
 and applies the motion rule to the marked road (`cv/README.md`).

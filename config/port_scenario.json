@@ -103,7 +103,7 @@
     "hard_constraint_penalty": 2500,
     "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "launch_and_review_minutes": 6, "direct_cost": 90, "note": "The inspection plays pre-recorded stock drone clips, not a live feed, and PigeonOps does not control a drone. The 90% accuracy is an assumption, used to test how much the recommendation depends on it.",
       "accuracy_basis": "assumed for a dispatcher who reviews drone footage with a CV suggestion; not yet validated",
-      "cv_only": {"basis": "Automated CV alone: detector error measured on 27 UAV-OBB frames (only 4 with dense traffic) combined with an assumed traffic link; regenerate with python -m cv.evaluate_road_state",
+      "cv_only": {"basis": "Still-image CV alone (vehicle-spacing rule, not the motion rule used on the drone clips): detector error measured on 27 UAV-OBB frames (only 4 with dense traffic) combined with an assumed traffic link; regenerate with python -m cv.evaluate_road_state",
         "likelihoods": {"blocked": {"blocked": 0.2417, "clear": 0.2155, "inconclusive": 0.5428}, "open": {"blocked": 0.1027, "clear": 0.5152, "inconclusive": 0.3821}}}},
     "rates": {"cost_per_mile": 1.30, "driver_hourly_rate": 35, "co2_kg_per_mile": 1.6, "basis": "assumed", "note": "Non-driver truck operating cost per mile, loaded driver wage per hour and diesel tailpipe CO2 per mile. Round planning values, not measured for this fleet; see docs/METHODS.md."},
     "blockage": {"route": "primary", "location": "incident", "fallback_route": "detour", "turnaround_min": 10, "basis": "assumed", "note": "If the road is blocked, a truck on the blocked route drives to the obstruction, loses turnaround_min in the queue, drives back to the route start and takes the fallback route."},
