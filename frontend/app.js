@@ -1077,7 +1077,8 @@ function updateFleetWatch(states) {
     const canDetour = routeId === scenario.decision_model.blockage?.route && routes[fallback];
     checkin.innerHTML = `${clockLabel(event.t)}<span class="detail">${esc(shipment.id)} · ${Math.max(0, Math.round(remaining))} min away</span>`;
     riskCell.innerHTML = `<span class="status ${chance >= 50 ? "risk" : chance >= 20 ? "watch" : "ok"}">${chance}% assumed</span><span class="detail">${buffer >= 0 ? `${Math.round(buffer)} min before` : `${Math.round(-buffer)} min after`} appointment start</span>`;
-    routeCell.innerHTML = `${esc(route?.name ?? routeId)}<span class="detail">${activeDetour ? "Detour in simulated plan" : canDetour ? `${esc(routes[fallback].name)} · contingency only` : "No modeled fallback for this trip"}</span>`;
+    const routeNote = activeDetour ? "Detour in simulated plan" : canDetour ? `${esc(routes[fallback].name)} · contingency only` : "";
+    routeCell.innerHTML = `${esc(route?.name ?? routeId)}${routeNote ? `<span class="detail">${routeNote}</span>` : ""}`;
     if (chance >= 20) watched.push({ truck: state.id, shipment: shipment.id, chance, buffer });
   }
   if (step === "monitor") {
