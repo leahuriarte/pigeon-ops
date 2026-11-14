@@ -12,6 +12,7 @@ from pathlib import Path
 from backend.copilot import cached_footage_opinion
 from backend.decision_engine import analyze
 from backend.scenario import load_scenario
+from backend.triage import apply_web_evidence, validate_finding
 
 
 CV = Path(__file__).resolve().parents[1] / "cv"
@@ -44,12 +45,13 @@ def review_inspection(payload, library_path=LIBRARY, audit_path=AUDIT):
     variant = payload.get("scenario", "disruption")
     if not isinstance(variant, str):
         raise ValueError("Scenario must be a name")
-    scenario = load_scenario(variant=variant)
+    web = validate_finding(payload.get("web"))
+    scenario = apply_web_evidence(load_scenario(variant=variant), web)
     analysis = analyze(scenario, observation)
     suggestion = case.get("cv_assessment", {}).get("suggested_observation")
     llm_suggestion = (cached_footage_opinion(case["id"], (scenario["disruption"].get("check") or {}).get("type")) or {}).get("observation")
     review = {
-        "case_id": case["id"], "scenario": variant, "observation": observation,
+        "case_id": case["id"], "scenario": variant, "observation": observation, "web_finding": web,
         "note": note.strip(), "reviewed_at": datetime.now(timezone.utc).isoformat(),
         "cv_suggestion": suggestion, "agrees_with_cv": None if suggestion is None else suggestion == observation,
         "llm_suggestion": llm_suggestion,

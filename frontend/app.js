@@ -1,5 +1,6 @@
 import { openInspection, resetInspection } from "./inspection.js";
 import { clearBrief, initAsk, renderBrief, resetAsk } from "./copilot.js";
+import { clearTriage, renderTriage, setAppliedWeb, withWeb } from "./triage.js";
 import { inspectionSentence, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -850,7 +851,9 @@ function renderDecision() {
   $("#disruption-title").textContent = scenarioCopy[activeScenario]?.title ?? d.title;
   $("#disruption-description").textContent = scenarioCopy[activeScenario]?.description ?? d.description;
   $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
-  $("#risk-value").innerHTML = `${pct(d.prior_blocked_probability)}<small>assumed</small>`;
+  $("#risk-value").innerHTML = d.web_evidence
+    ? `${pct(d.prior_blocked_probability)}<small>was ${pct(d.web_evidence.prior_before)} before the web check</small>`
+    : `${pct(d.prior_blocked_probability)}<small>assumed</small>`;
   $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
   $("#deadline").textContent = d.decision_deadline;
 }
@@ -1066,7 +1069,7 @@ async function startInspection() {
 }
 
 async function observe(observation) {
-  const response = await fetch(`/api/analysis?scenario=${encodeURIComponent(activeScenario)}&observation=${encodeURIComponent(observation)}`);
+  const response = await fetch(`/api/analysis?${withWeb(new URLSearchParams({ scenario: activeScenario, observation }))}`);
   if (!response.ok) throw new Error("The analysis request failed");
   await showObservation(await response.json());
 }
@@ -1104,7 +1107,7 @@ async function loadScenario(id, { keepTime = false } = {}) {
   activeScenario = id;
   selectedTruck = null;
   setPlaying(false);
-  const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(id)}`);
+  const response = await fetch(`/api/scenario?${withWeb(new URLSearchParams({ scenario: id }))}`);
   if (!response.ok) throw new Error("The scenario failed to load");
   scenario = await response.json();
   if (scenario.scenario_type === "normal") usualAction = scenario.analysis.before[0].id;
@@ -1282,10 +1285,22 @@ async function triggerIncident(variant = story) {
   story = variant;
   routine = false;
   mode = "incident";
+  setAppliedWeb(null);
   await loadScenario(variant, { keepTime: true });
   const d = scenario.disruption;
   logDecision(`${scenarioCopy[variant]?.title ?? d.title}. Reported ${d.reported_at}.`);
   setStep("incident");
+  renderTriage($("#web-triage"), variant, { onApply: applyWebFinding });
+}
+
+// The dispatcher used (or stopped using) the web check's finding: reload the incident from the new chance.
+async function applyWebFinding(finding, result) {
+  setAppliedWeb(finding);
+  await loadScenario(activeScenario, { keepTime: true });
+  const cited = result.cited_ids.length ? ` (${result.cited_ids.join(", ")})` : "";
+  logDecision(finding
+    ? `Web check used: ${result.finding.replace("_", " ")}${cited}. Chance CA-47 is ${check().bad} now ${pct(scenario.disruption.prior_blocked_probability)}.`
+    : `Web check no longer used. Chance CA-47 is ${check().bad} back to ${pct(scenario.disruption.prior_blocked_probability)}.`);
 }
 
 // Start a fresh run at the moment the incident report arrives.
@@ -1319,6 +1334,8 @@ async function restartMorning() {
   routine = false;
   decisionLog = [];
   setSpeed(5);
+  setAppliedWeb(null);
+  clearTriage($("#web-triage"));
   await loadScenario("normal");
   setStep("start");
   setView("map");

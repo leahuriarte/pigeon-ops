@@ -27,7 +27,7 @@ def posterior_blocked(prior, observation, likelihoods):
     """Bayes update; `likelihoods` is an accuracy or a P(signal | road state) table."""
     if isinstance(likelihoods, (int, float)):
         likelihoods = likelihoods_from_accuracy(likelihoods)
-    if observation not in SIGNALS:
+    if observation not in likelihoods["blocked"]:
         return prior
     blocked = likelihoods["blocked"][observation] * prior
     open_ = likelihoods["open"][observation] * (1 - prior)
@@ -169,6 +169,7 @@ def analyze(scenario, observation=None):
         "prior_blocked_probability": round(prior, 4),
         "posterior_blocked_probability": round(posterior, 4) if observation else None,
         "observation": observation,
+        "web_evidence": scenario["disruption"].get("web_evidence"),
         "before": before,
         "after": after,
         "evoi": evoi,

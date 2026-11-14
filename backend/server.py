@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from backend import copilot, llm
+from backend import copilot, llm, triage
 from backend.decision_engine import analyze
 from backend.inspection import ASSETS, list_inspections, review_inspection
 from backend.playback import build_playback
@@ -48,13 +48,26 @@ class DemoHandler(BaseHTTPRequestHandler):
             except (KeyError, ValueError):
                 check = None
             return self._json(copilot.footage_opinion(case, check=check))
-        if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback", "/api/llm/brief"):
+        if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback", "/api/llm/brief", "/api/triage"):
             return self._static(parsed.path)
 
+        variant = params.get("scenario", "disruption")
         try:
-            scenario = load_scenario(variant=params.get("scenario", "disruption"))
+            triage.validate_finding(params.get("web"))
+            if params.get("mode", "live") not in triage.MODES:
+                raise ValueError("mode must be live or demo")
+        except ValueError as error:
+            return self._json({"error": str(error)}, 400)
+        try:
+            scenario = load_scenario(variant=variant)
         except ValueError as error:
             return self._json({"error": str(error)}, 404)
+        if parsed.path == "/api/triage":
+            return self._json(triage.triage(scenario, variant, params.get("mode", "live")))
+        try:  # The dispatcher applied the web triage finding: start from the updated blockage chance.
+            scenario = triage.apply_web_evidence(scenario, params.get("web"))
+        except ValueError as error:
+            return self._json({"error": str(error)}, 400)
         if parsed.path == "/api/scenario":
             return self._json({**scenario, "analysis": analyze(scenario)})
         if parsed.path in ("/api/analysis", "/api/llm/brief"):
@@ -97,7 +110,8 @@ class DemoHandler(BaseHTTPRequestHandler):
         if observation not in (None, "blocked", "clear", "inconclusive"):
             raise ValueError("observation must be blocked, clear, or inconclusive")
         question = copilot.validate_question(payload.get("question"))
-        scenario = load_scenario(variant=variant)  # ValueError for an unknown variant
+        web = triage.validate_finding(payload.get("web"))
+        scenario = triage.apply_web_evidence(load_scenario(variant=variant), web)  # ValueError for an unknown variant
         return copilot.ask(scenario, analyze(scenario, observation), question)
 
     def _static(self, request_path):

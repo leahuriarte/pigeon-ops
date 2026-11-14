@@ -14,7 +14,8 @@ then point PigeonOps at it, for example in `.env`:
 Canned behaviour, by the tools a request offers:
 - report_road_state: echoes the CV suggestion found in the evidence JSON;
 - write_brief: picks the rank-1 option and the inspection advice from the facts JSON;
-- the Q&A tools: first calls get_decision_summary, then answers with a fixed sentence.
+- the Q&A tools: first calls get_decision_summary, then answers with a fixed sentence;
+- report_triage: searches CHP and signs, then corroborates citing the first record (or nothing_found).
 No canned text contains digits, so the number-grounding guards pass.
 """
 import json
@@ -71,6 +72,18 @@ def reply_to(body):
             "why": "Stub reply: it has the lowest expected loss in the engine's ranking.",
             "what_would_change_it": "A different chance of a blockage could change the ranking.",
             "who_is_affected": "The affected shipment and its warehouse appointment.",
+        })]}
+    if "report_triage" in tools:
+        results = [_json_in(m.get("content") or "") for m in messages if m.get("role") == "tool"]
+        if not results and "search_chp_incidents" in tools:
+            return {"role": "assistant", "content": None, "tool_calls": [
+                _call("search_chp_incidents", {"radius_km": 2}, 0), _call("read_message_signs", {"radius_km": 2}, 1)]}
+        records = [record for result in results for record in result.get("records") or []]
+        return {"role": "assistant", "content": None, "tool_calls": [_call("report_triage", {
+            "finding": "corroborates" if records else "nothing_found", "confidence": "medium",
+            "summary": ("Stub reply: the nearest record mentions the reported hazard." if records
+                        else "Stub reply: no nearby record mentions the reported hazard."),
+            "cited_ids": [records[0]["id"]] if records else [],
         })]}
     if "get_decision_summary" in tools and not any(m.get("role") == "tool" for m in messages):
         return {"role": "assistant", "content": None, "tool_calls": [_call("get_decision_summary", {})]}

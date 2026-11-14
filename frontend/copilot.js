@@ -2,6 +2,7 @@
 // The engine's numbers and ranking stay the source of truth; these panels only explain them.
 // Every call is asynchronous with a timeout, and any failure hides the panel quietly, so the page
 // works exactly as before without the LLM. LLM text is always set with textContent, never innerHTML.
+import { withWeb } from "./triage.js";
 
 const signalWords = { blocked: "road blocked", clear: "road clear", inconclusive: "inconclusive" };
 let statusPromise = null;
@@ -98,7 +99,7 @@ export async function renderBrief(container, scenarioId, observation = null) {
   const label = "AI explanation · unvalidated";
   container.replaceChildren(llmTag(label), el("p", "note", "Loading…"));
   container.hidden = false;
-  const query = new URLSearchParams({ scenario: scenarioId });
+  const query = withWeb(new URLSearchParams({ scenario: scenarioId }));
   if (observation) query.set("observation", observation);
   const brief = await getJSON(`/api/llm/brief?${query}`, 45000);
   if (stale()) return; // The scenario or the observation changed meanwhile.
@@ -151,7 +152,7 @@ export async function initAsk(getContext) {
     answer.hidden = false;
     const result = await getJSON("/api/llm/ask", 120000, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scenario, observation: observation || null, question }),
+      body: JSON.stringify(withWeb({ scenario, observation: observation || null, question })),
     });
     if (token !== askToken) return; // Scenario reset or a newer question.
     button.disabled = false;

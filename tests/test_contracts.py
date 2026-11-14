@@ -61,6 +61,26 @@ class ScenarioContractTests(unittest.TestCase):
                             self.assertRegex(row["arrival"], r"^\d\d:\d\d$")
 
 
+class WebTriageContractTests(unittest.TestCase):
+    def test_likelihoods_and_fixtures_match_contract(self):
+        model = load_scenario(variant="disruption")["decision_model"]["web_triage"]
+        self.assertEqual("assumed", model["basis"])
+        for state in ("blocked", "open"):
+            row = model["likelihoods"][state]
+            self.assertEqual({"corroborates", "contradicts", "nothing_found"}, set(row))
+            self.assertAlmostEqual(1.0, sum(row.values()))
+        fixtures = json.loads((ROOT / "config" / "web_triage_fixtures.json").read_text(encoding="utf-8"))
+        self.assertEqual("synthetic", fixtures["basis"])
+        incidents = {item["id"] for item in available_scenarios()} - {"normal"}
+        self.assertLessEqual(incidents, set(fixtures["variants"]))
+        for records in fixtures["variants"].values():
+            for record in records:
+                self.assertTrue(record["id"].startswith("SYN-"))
+                self.assertIn(record["feed"], {"chp", "signs", "weather"})
+                self.assertLessEqual({"source", "source_url", "title", "detail", "time", "lat", "lon"}, set(record))
+        self.assertIn("web_evidence", analyze(load_scenario(variant="disruption")))
+
+
 class InspectionLibraryContractTests(unittest.TestCase):
     CASE = {"id", "title", "visual_label", "review_note", "image_quality", "annotated_image", "source_image",
             "annotated_video", "vehicle_detections", "excluded_detections", "allowed_observations", "cv_assessment",

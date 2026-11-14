@@ -152,6 +152,7 @@ def decision_facts(scenario, analysis):
         },
         "blockage_chance": {"before_pct": before_pct, "now_pct": now_pct, "change_points": now_pct - before_pct},
         "observation": observation,
+        "web_triage_applied": analysis.get("web_evidence"),
         "inspection": {
             "recommended": evoi["recommend_inspection"],
             "gross_saving_usd": _usd(evoi["gross_value_of_information"]),
@@ -359,7 +360,7 @@ BRIEF_FIELDS = ("headline", "why", "what_would_change_it", "who_is_affected")
 
 def decision_brief(scenario, analysis, chat_fn=None):
     chat_fn = chat_fn or llm.chat
-    key = (scenario.get("id"), analysis.get("observation"))
+    key = (scenario.get("id"), analysis.get("observation"), (analysis.get("web_evidence") or {}).get("finding"))
     if key in _brief_cache:
         return _brief_cache[key]
     facts = decision_facts(scenario, analysis)

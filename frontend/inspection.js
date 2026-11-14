@@ -1,4 +1,5 @@
 import { clearFootageOpinion, renderFootageOpinion } from "./copilot.js";
+import { withWeb } from "./triage.js";
 
 const dialog = document.querySelector("#inspection-dialog");
 const clips = document.querySelector("#inspection-clips");
@@ -135,8 +136,8 @@ document.querySelector("#inspection-apply").addEventListener("click", async () =
   try {
     const response = await fetch("/api/inspection-review", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ case_id: caseItem.id, scenario: reviewedScenario, observation,
-        note: document.querySelector("#inspection-review-note").value, simulated_application: true }),
+      body: JSON.stringify(withWeb({ case_id: caseItem.id, scenario: reviewedScenario, observation,
+        note: document.querySelector("#inspection-review-note").value, simulated_application: true })),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Review could not be applied");

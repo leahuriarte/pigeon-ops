@@ -271,7 +271,26 @@ Without an API key the features are off. On a timeout, a network or HTTP error, 
 
 The guards catch a wrong pick and invented figures. They do not catch a wrong explanation built from real figures, so the text remains unvalidated advice.
 
+## 9. Web check before the drone
+
+When an incident report arrives, `backend/triage.py` searches public feeds near the reported spot before the dispatcher decides on a drone check. `backend/web_feeds.py` reads three sources with no key: the CHP incident log (every open California Highway Patrol incident, filtered to 10 km and to logs within 3 hours of the newest one), Caltrans District 7 message signs that show a message, and National Weather Service alerts for the point.
+
+An LLM agent calls search tools over those feeds (CHP, signs, weather, each with a radius it chooses from 0.5 to 10 km) and ends with one finding: `corroborates` (a record shows the bad road state the check names), `contradicts` (a record shows the good state, such as traffic getting through) or `nothing_found`. Its report is rejected if it cites a record its searches did not return, if a corroborating or contradicting finding cites nothing, if it reported without searching, or if its summary has a number not in the records (the grounding check of section 8). The loop stops after five rounds. Without a usable LLM reply a keyword rule decides: a CHP log or sign within 2 km that mentions the hazard corroborates, unless it also says traffic is getting through, which contradicts. Weather alerts are shown but never decide the rule.
+
+Nothing changes until the dispatcher clicks "Use this finding". The finding is then a Bayes update of the blockage chance with the assumed table `decision_model.web_triage.likelihoods`:
+
+| Road state | corroborates | contradicts | nothing_found |
+| --- | --- | --- | --- |
+| blocked | 0.60 | 0.05 | 0.35 |
+| open | 0.08 | 0.20 | 0.72 |
+
+At the `disruption` variant's 40%, a corroborating finding gives 0.4 × 0.60 / (0.4 × 0.60 + 0.6 × 0.08) = 83%, and the drone check's net value drops from +$116 to −$604, so it is no longer recommended. A contradicting finding gives 14% and nothing found gives 24%. The updated chance becomes the prior for everything after it, including the drone's value and the drone update; the two are treated as independent given the road state.
+
+Live feeds describe real roads now, while the incidents are fictional, so a live check usually finds nothing that matches. `config/web_triage_fixtures.json` holds synthetic records written for each incident (`SYN-` ids), used when the dispatcher picks "Demo feed" or when every live feed fails.
+
 ## Known limitations
+
+- The web check's reliability table is assumed. A missing CHP log is weak evidence, and the table does not depend on how long ago the incident was reported.
 
 - Rerouting is modeled as driving back to the start of the current route. A real dispatcher would use the nearest junction, so detour costs are overstated.
 - Waiting in the queue counts toward driver time and cost but not toward emissions. Idling emissions are left out.

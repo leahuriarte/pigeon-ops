@@ -1,0 +1,113 @@
+{
+  "basis": "synthetic",
+  "note": "Synthetic demo feed. Records written in the style of the CHP incident log, Caltrans message signs and NWS alerts to match each fictional incident. None of them is a real report. Used when 'Demo feed' is chosen or when every live feed is unreachable.",
+  "variants": {
+    "disruption": [
+      {
+        "feed": "chp",
+        "id": "SYN-CHP-0914A",
+        "source": "CHP incident log (synthetic)",
+        "source_url": "https://cad.chp.ca.gov/",
+        "title": "1183-Trfc Collision-Unkn Inj at SR47 N / Ocean Blvd Con",
+        "detail": "NB CONNECTOR; BIG RIG ON ITS SIDE BLKG #1 AND #2 LNS; 1 UNIT ON SCENE",
+        "time": "09:08",
+        "lat": 33.7736,
+        "lon": -118.2364
+      },
+      {
+        "feed": "signs",
+        "id": "SYN-CMS-4701",
+        "source": "Caltrans message sign (synthetic)",
+        "source_url": "https://quickmap.dot.ca.gov/",
+        "title": "Sign on SR-47 North, S/O Ocean Blvd",
+        "detail": "INCIDENT AHEAD / EXPECT DELAYS",
+        "time": "09:11",
+        "lat": 33.7655,
+        "lon": -118.2401
+      }
+    ],
+    "disruption_b": [
+      {
+        "feed": "chp",
+        "id": "SYN-CHP-0914B",
+        "source": "CHP incident log (synthetic)",
+        "source_url": "https://cad.chp.ca.gov/",
+        "title": "1183-Trfc Collision-Unkn Inj at SR47 N / Ocean Blvd Con",
+        "detail": "NB CONNECTOR; OVERTURNED BIG RIG; ALL LNS BLOCKED; SIGALERT ISSUED; 3 UNITS ON SCENE",
+        "time": "09:06",
+        "lat": 33.7736,
+        "lon": -118.2364
+      },
+      {
+        "feed": "chp",
+        "id": "SYN-CHP-0914C",
+        "source": "CHP incident log (synthetic)",
+        "source_url": "https://cad.chp.ca.gov/",
+        "title": "1125-Traffic Hazard at SR47 N / Henry Ford Ave",
+        "detail": "TRAFFIC BACKED UP BEHIND COLLISION ON CONNECTOR",
+        "time": "09:10",
+        "lat": 33.7781,
+        "lon": -118.2289
+      },
+      {
+        "feed": "signs",
+        "id": "SYN-CMS-4702",
+        "source": "Caltrans message sign (synthetic)",
+        "source_url": "https://quickmap.dot.ca.gov/",
+        "title": "Sign on SR-47 North, S/O Ocean Blvd",
+        "detail": "COLLISION AHEAD / ALL LANES BLOCKED / USE ALT ROUTES",
+        "time": "09:12",
+        "lat": 33.7655,
+        "lon": -118.2401
+      }
+    ],
+    "congestion": [
+      {
+        "feed": "signs",
+        "id": "SYN-CMS-4703",
+        "source": "Caltrans message sign (synthetic)",
+        "source_url": "https://quickmap.dot.ca.gov/",
+        "title": "Sign on SR-47 North, S/O Ocean Blvd",
+        "detail": "TRUCK QUEUE AHEAD / TERMINAL GATE DELAYS",
+        "time": "09:05",
+        "lat": 33.7655,
+        "lon": -118.2401
+      },
+      {
+        "feed": "chp",
+        "id": "SYN-CHP-0914D",
+        "source": "CHP incident log (synthetic)",
+        "source_url": "https://cad.chp.ca.gov/",
+        "title": "1125-Traffic Hazard at SR47 N / Ocean Blvd Con",
+        "detail": "TRUCKS BACKED UP ON CONNECTOR FROM TERMINAL GATE; STOPPED IN #1 LN",
+        "time": "09:09",
+        "lat": 33.7741,
+        "lon": -118.2358
+      }
+    ],
+    "flood": [
+      {
+        "feed": "chp",
+        "id": "SYN-CHP-0914E",
+        "source": "CHP incident log (synthetic)",
+        "source_url": "https://cad.chp.ca.gov/",
+        "title": "1125-Traffic Hazard at SR47 N / Ocean Blvd Con",
+        "detail": "WATER ACROSS LNS FROM BROKEN MAIN; SHALLOW; VEHS PASSING SLOWLY IN #2 LN; LADWP ENRT",
+        "time": "09:10",
+        "lat": 33.7733,
+        "lon": -118.2369
+      },
+      {
+        "feed": "weather",
+        "id": "SYN-NWS-0001",
+        "source": "NWS alert (synthetic)",
+        "source_url": "https://www.weather.gov/lox/",
+        "title": "No rain expected; dry conditions across the Los Angeles coast",
+        "detail": "Special weather statement, severity minor. Dry weather through the afternoon; any standing water is not from rainfall.",
+        "time": "06:00",
+        "lat": null,
+        "lon": null
+      }
+    ]
+  }
+}
