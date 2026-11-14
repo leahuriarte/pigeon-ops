@@ -55,6 +55,13 @@ let scenario;
 const check = () => ({ type: "crash", label: "Drone check", bad: "blocked", good: "open", ...scenario?.disruption?.check });
 const roadWord = (state) => (state === "blocked" ? check().bad : check().good);
 const findingText = (observation) => ({ blocked: `road ${check().bad}`, clear: "road clear", inconclusive: "inconclusive" })[observation];
+const scenarioCopy = {
+  normal: { title: "Regular morning", description: "No incidents reported." },
+  disruption: { title: "Possible crash on CA-47", description: "Two drivers report a blockage. Neither report is confirmed." },
+  disruption_b: { title: "Crash reported on CA-47", description: "Four drivers and a simulated traffic alert report a full blockage." },
+  congestion: { title: "Heavy traffic on CA-47", description: "A driver reports a queue after a terminal slowdown. Its length and speed are unknown." },
+  flood: { title: "Possible flooding on CA-47", description: "A water main has burst beside the road. A driver reports water across the lanes. It's unclear whether trucks can pass." },
+};
 let baseline = null; // Indicators for the normal scenario, the comparison point.
 let activeScenario = "normal";
 let modelPick = null; // Top-ranked response, updated after an inspection.
@@ -304,7 +311,7 @@ function frame(now) {
   const before = currentTime;
   currentTime = Math.min(span.end, currentTime + elapsed * speed);
   const reportAt = incidentAt();
-  if (mode === "monitoring" && before < reportAt && currentTime >= reportAt) {
+  if (mode === "monitoring" && story !== "normal" && before < reportAt && currentTime >= reportAt) {
     currentTime = reportAt;
     updateFrame();
     setPlaying(false);
@@ -317,7 +324,7 @@ function frame(now) {
     return;
   }
   setPlaying(false);
-  if ((mode === "incident" || mode === "routine") && step === "outcome") showReport();
+  if ((mode === "incident" && step === "outcome") || step === "monitor") showReport();
 }
 
 function setPlaying(value) {
@@ -475,7 +482,7 @@ function renderTallyFrame() {
     <span class="tally-foot"></span></li>`).join("");
   const best = modelPick?.id;
   $("#tally-race").innerHTML = actions.filter((a) => tallies[a.id]).map((a) => {
-    const notes = [a.id === plan.action && "your choice", a.id === best && "model’s pick"].filter(Boolean).join(", ");
+    const notes = [a.id === plan.action && "selected", a.id === best && "recommended"].filter(Boolean).join(", ");
     return `<li class="race-row${a.id === plan.action ? " current" : ""}" data-action="${esc(a.id)}">
       <span class="race-name">${esc(a.label)}${notes ? ` <small>${notes}</small>` : ""}</span>
       <span class="race-bar" aria-hidden="true"><i class="ghost"></i><i class="fill"></i></span>
@@ -484,7 +491,7 @@ function renderTallyFrame() {
   }).join("");
   const r = scenario.decision_model;
   const shipments = [...new Set(current.map((row) => row.shipment))].join(" and ");
-  $("#tally-note").textContent = `Covers ${shipments}, the shipments the responses change, from ${clockLabel(span.start)} until each is delivered. Cost adds truck running cost ($${r.rates.cost_per_mile.toFixed(2)}/mi), driver time ($${r.rates.driver_hourly_rate}/h), delay (${money(r.lateness_cost_per_minute)}/min), CO₂ ($${r.emissions_cost_per_kg.toFixed(2)}/kg) and ${money(r.hard_constraint_penalty)} per missed appointment. All rates are assumed.`;
+  $("#tally-note").textContent = `${shipments}, from ${clockLabel(span.start)} to delivery. Assumed rates: driving $${r.rates.cost_per_mile.toFixed(2)}/mi; driver time $${r.rates.driver_hourly_rate}/h; delay ${money(r.lateness_cost_per_minute)}/min; CO₂ $${r.emissions_cost_per_kg.toFixed(2)}/kg; missed appointment ${money(r.hard_constraint_penalty)}.`;
   tallyKeys.clear();
 }
 
@@ -808,11 +815,11 @@ async function drawMap() {
       renderer = await createArcGISRenderer();
       $("#map-fallback").classList.add("hidden");
       $("#arcgis-map").classList.remove("hidden");
-      $("#map-provider").textContent = "Basemap and road paths from OpenStreetMap (roads routed with OSRM). Trucks and schedules are simulated.";
+      $("#map-provider").textContent = "OpenStreetMap · OSRM routes · Simulated trucks";
     } catch (error) {
       console.warn("Using the schematic map because ArcGIS failed to load:", error);
       renderer = createSchematicRenderer();
-      showSchematic("The street map did not load, so this is a schematic.");
+      showSchematic("Map unavailable. Showing a schematic.");
     }
   }
   renderer.setScenario();
@@ -824,7 +831,7 @@ function showSchematic(message) {
   $(".map-shell").classList.add("schematic");
   $("#arcgis-map").classList.add("hidden");
   $("#map-fallback").classList.remove("hidden");
-  $("#map-provider").textContent = `${message} Trucks and schedules are simulated.`;
+  $("#map-provider").textContent = `${message} Simulated trucks.`;
 }
 
 function affectedShipment() {
@@ -838,12 +845,12 @@ function renderDecision() {
   $("#risk-label").textContent = `Chance CA-47 is ${check().bad}`;
   $$("[data-observation]").forEach((button) => { button.textContent = { blocked: `Road ${check().bad}`, clear: "Road clear", inconclusive: "Inconclusive" }[button.dataset.observation]; });
   $("#affected-label").textContent = scenario.scenario_type === "disruption" ? "Shipment at risk" : "Tightest delivery";
-  const when = scenario.scenario_type === "disruption" ? "reported" : "as of";
+  const when = scenario.scenario_type === "disruption" ? "Reported" : "As of";
   $("#reported-at").textContent = d.reported_at ? ` · ${when} ${d.reported_at}` : "";
-  $("#disruption-title").textContent = d.title;
-  $("#disruption-description").textContent = d.description;
+  $("#disruption-title").textContent = scenarioCopy[activeScenario]?.title ?? d.title;
+  $("#disruption-description").textContent = scenarioCopy[activeScenario]?.description ?? d.description;
   $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
-  $("#risk-value").innerHTML = `${pct(d.prior_blocked_probability)}<small>assumed from the reports</small>`;
+  $("#risk-value").innerHTML = `${pct(d.prior_blocked_probability)}<small>assumed</small>`;
   $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
   $("#deadline").textContent = d.decision_deadline;
 }
@@ -871,12 +878,12 @@ function indicatorChange(item, base) {
   const worse = (diff > 0) !== higherIsBetter.has(item.id);
   return { amount: `${diff > 0 ? "+" : "−"}${shown}`, tone: worse ? "worse" : "better", arrow: diff > 0 ? "▲" : "▼" };
 }
-const shortLabels = { community_exposure: "Schools near routes" };
+const shortLabels = { appointments_feasible: "Appointments within reach", community_exposure: "Schools near routes" };
 function renderIndicators(indicators) {
   const compare = scenario.scenario_type !== "normal" && baseline;
   const missing = indicators.filter((item) => item.value === null || item.value === undefined);
   const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
-  $("#indicators-note").textContent = `Estimates for the whole plan, assuming the top-ranked response and no inspection.${compare ? " Arrows compare with the usual morning." : ""}${pending}`;
+  $("#indicators-note").textContent = `Estimates for the recommended plan, before inspection.${pending}`;
   $("#indicators").innerHTML = indicators.filter((item) => !missing.includes(item)).map((item) => {
     const label = shortLabels[item.id] ?? indicatorLabel(item);
     const basis = basisLabel[item.basis] ?? item.basis;
@@ -899,9 +906,7 @@ function renderIndicators(indicators) {
 }
 
 function renderRankings(items, observation = null, blocked = scenario.disruption.prior_blocked_probability) {
-  $("#ranking-state").textContent = observation
-    ? `Ranked by expected loss after ${observation === "inconclusive" ? "an inconclusive inspection" : `the inspection showed the ${findingText(observation)}`}`
-    : "Ranked by expected loss before inspection";
+  $("#ranking-state").textContent = `Lowest expected loss first · ${observation ? "After inspection" : "Before inspection"} · Estimated`;
   $("#rankings").innerHTML = items.map((item) => {
     const e = item.expected;
     const id = `response-${esc(item.id)}`;
@@ -914,7 +919,7 @@ function renderRankings(items, observation = null, blocked = scenario.disruption
           ${item.rank === 1 ? '<span class="tag pick">Recommended</span>' : ""}
           <span class="option-loss"><b>${money(item.expected_loss)}</b><small>expected loss</small></span>
         </span>
-        <span class="option-summary">${esc(item.summary)}</span>
+        ${item.id === "swap-truck" ? `<span class="option-summary">${esc(item.summary)}</span>` : ""}
         ${outcomeCases(item, blocked, scenario.disruption.affected_shipment, check())}
         <span class="option-more">${esc(item.stakeholder_effect)}${schoolsNote(item)}</span>
         <span class="option-metrics"><span><small>Delay</small>${whole(e.lateness_min)} min</span><span><small>Direct cost</small>${money(e.incremental_cost)}</span><span><small>CO₂</small>${whole(e.emissions_kg)} kg</span><span><small>Missed appts</small>${e.constraint_breaches.toFixed(1)}</span></span>
@@ -928,7 +933,7 @@ function renderRankings(items, observation = null, blocked = scenario.disruption
 function schoolsNote(item) {
   const n = item.schools_within_300m;
   if (n === null || n === undefined) return "";
-  return ` Its route passes within 300 m of ${n} ${n === 1 ? "school" : "schools"} (OpenStreetMap, estimated).`;
+  return ` ${n} ${n === 1 ? "school" : "schools"} within 300 m (OSM estimate).`;
 }
 
 function actionLabel(id) {
@@ -939,7 +944,7 @@ function actionLabel(id) {
 function renderConfirm() {
   const override = Boolean(modelPick) && plan.action !== modelPick.id;
   $("#override-reason-wrap").hidden = !override;
-  $("#confirm-button").textContent = `${override ? "Override and confirm" : "Confirm"}: ${actionLabel(plan.action)}`;
+  $("#confirm-button").textContent = override ? "Confirm other response" : "Confirm response";
   $("#confirm-button").disabled = override && !$("#override-reason").value.trim();
 }
 
@@ -948,22 +953,22 @@ function renderEvoi(analysis) {
   const best = analysis.before[0];
   $("#recommendation").textContent = inspectionSentence(e);
   $("#recommendation-short").innerHTML = e.recommend_inspection
-    ? `Yes, check first<small>If you decide now instead, the best response is ${esc(best.label)}.</small>`
-    : `No, decide now<small>The best response is ${esc(best.label)}.</small>`;
+    ? "Check first"
+    : `Skip the check<small>Recommended: ${esc(best.label)}</small>`;
   $("#act-loss").textContent = money(e.best_act_now_loss);
   $("#evidence-loss").textContent = money(e.expected_loss_after_inspection);
   $("#inspection-cost").textContent = money(e.inspection_cost);
   $("#net-value").textContent = money(e.net_value_of_information);
   $("#inspect-button").classList.toggle("primary", e.recommend_inspection);
   $("#skip-inspection").classList.toggle("primary", !e.recommend_inspection);
-  $("#inspect-button").textContent = e.recommend_inspection ? "Review drone footage" : "Review drone footage anyway";
+  $("#inspect-button").textContent = "Review footage";
   $("#cv-only").textContent = accuracyNote(e);
   renderSensitivity($("#sensitivity"), analysis, check());
   const a = e.assumptions;
   $("#assumptions").innerHTML = [
-    ["Inspection accuracy", `${pct(a.inspection_accuracy)} (${esc(a.accuracy_basis)})`],
-    ["Time to launch and review", `${a.launch_and_review_minutes} min`],
-    [`Chance the inspection shows “${check().bad}”`, pct(a.signal_blocked_probability)],
+    ["Assumed accuracy", `${pct(a.inspection_accuracy)} (${esc(a.accuracy_basis)})`],
+    ["Assumed check time", `${a.launch_and_review_minutes} min`],
+    [`Estimated chance of a “${check().bad}” result`, pct(a.signal_blocked_probability)],
   ].map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("");
   // LLM-written brief from the engine's numbers; the normal morning has no incident step.
   if (activeScenario === "normal") clearBrief($("#brief-incident"));
@@ -1005,7 +1010,7 @@ function renderFleet() {
 
 function renderConditions() {
   const o = scenario.operations;
-  $("#conditions").textContent = `Trucks are averaging ${o.network_speed_mph} mph across the network, and terminal turn time is ${o.terminal_turn_time_min} min. Weather: ${o.weather.replaceAll(" · ", ", ")}.`;
+  $("#conditions").textContent = `Simulated conditions: ${o.network_speed_mph} mph average; ${o.terminal_turn_time_min} min terminal turn time. ${o.weather.replaceAll(" · ", ", ")}.`;
 }
 
 function renderProvenance() {
@@ -1021,12 +1026,12 @@ function renderProvenance() {
 function renderDefinitions() {
   const m = scenario.decision_model;
   const definitions = [
-    ["Needs attention", "A shipment with status at risk, watch, or unassigned."],
-    ["Slack", "Minutes between a shipment’s ETA and the start of its appointment window."],
-    ["Blockage probability", "The chance that the reported problem really stops or holds up trucks on CA-47: a blocked road for a crash, a standing queue for heavy traffic, an impassable road for road damage. It starts at the value set for the incident report and is recalculated with Bayes’ rule after an inspection result."],
-    ["Missed appointment (breach)", "An outcome that breaks a hard rule, such as a truck arriving after its appointment window closes."],
-    ["Expected loss", `Delay × ${money(m.lateness_cost_per_minute)} per minute, plus direct cost, plus CO₂ × $${m.emissions_cost_per_kg.toFixed(2)} per kg, plus missed appointments × ${money(m.hard_constraint_penalty)}. The blocked and open outcomes are averaged using the blockage probability.`],
-    ["Net value of inspecting", "Expected loss if you act now, minus expected loss if you inspect first, minus the cost of inspecting. The page recommends inspecting when the net value is above zero."],
+    ["Needs attention", "A shipment at risk, under watch, or without a truck."],
+    ["Slack", "Time between arrival and the start of the appointment window."],
+    ["Road risk", "Assumed chance that a blockage, queue, or road damage delays trucks on CA-47. Updated with Bayes’ rule after inspection."],
+    ["Missed appointment", "Arrival after the appointment window closes. A constraint breach can also mean another hard rule was broken."],
+    ["Expected loss", `Average cost across the possible road conditions. Assumed rates: delay ${money(m.lateness_cost_per_minute)}/min, CO₂ $${m.emissions_cost_per_kg.toFixed(2)}/kg, missed appointment ${money(m.hard_constraint_penalty)}, plus driving costs.`],
+    ["Inspection value", "Expected loss without inspection minus expected loss with inspection, including its cost and wait. A positive value favors inspection."],
   ];
   $("#definitions").innerHTML = definitions.map(([term, text]) => `<dt>${term}</dt><dd>${esc(text)}</dd>`).join("");
 }
@@ -1044,11 +1049,11 @@ function resetObservation() {
   $("#observation-buttons").hidden = true;
   $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", "false"));
   $("#inspect-button").disabled = false;
-  $("#reinspect-button").textContent = "Review drone footage";
+  $("#reinspect-button").textContent = "Review footage";
   $("#override-reason").value = "";
   clearBrief($("#brief-respond"));
   resetAsk();
-  $("#posterior").textContent = `No drone check. The chance CA-47 is ${check().bad} stays at ${pct(scenario.disruption.prior_blocked_probability)}.`;
+  $("#posterior").textContent = `No inspection · Assumed chance CA-47 is ${check().bad}: ${pct(scenario.disruption.prior_blocked_probability)}.`;
 }
 
 // Opens the footage dialog, or falls back to simulated results when there is no library.
@@ -1056,7 +1061,7 @@ async function startInspection() {
   if (await openInspection(activeScenario, check())) return;
   setStep("incident");
   $("#observation-buttons").hidden = false;
-  $("#inspect-button").textContent = "Waiting for a result";
+  $("#inspect-button").textContent = "Choose a result";
   $("#inspect-button").disabled = true;
 }
 
@@ -1080,12 +1085,12 @@ async function showObservation(analysis, summary = null) {
   currentTime = Math.max(currentTime, span.start + scenario.decision_model.drone.launch_and_review_minutes);
   logDecision(`${check().label}: ${finding}. Chance CA-47 is ${bad} ${prior} → ${posterior}. Best response: ${best}.`);
   $("#posterior").textContent = summary ?? {
-    blocked: `The inspection showed the road ${bad}, so the chance CA-47 is ${bad} rises from ${prior} to ${posterior}. “${best}” has the lowest expected loss.`,
-    clear: `The inspection showed the road clear, so the chance CA-47 is ${bad} drops from ${prior} to ${posterior}. “${best}” has the lowest expected loss.`,
-    inconclusive: `The inspection was inconclusive, so the chance CA-47 is ${bad} stays at ${prior} and the ranking is the same as before.`,
+    blocked: `Road ${bad}. Estimated chance CA-47 is ${bad}: ${posterior} (was ${prior}).`,
+    clear: `Road clear. Estimated chance CA-47 is ${bad}: ${posterior} (was ${prior}).`,
+    inconclusive: `Inconclusive. Assumed chance CA-47 is ${bad}: ${prior}, unchanged.`,
   }[observation];
-  $("#risk-value").innerHTML = `${posterior}<small>${posterior === prior ? "unchanged by the drone check" : `was ${prior} before the drone check`}</small>`;
-  $("#recommendation-short").innerHTML = `Checked: ${finding}<small>The best response is now ${esc(best)}.</small>`;
+  $("#risk-value").innerHTML = `${posterior}<small>estimated · ${posterior === prior ? "unchanged" : `was ${prior}`}</small>`;
+  $("#recommendation-short").innerHTML = `${finding}<small>Recommended: ${esc(best)}</small>`;
   renderSensitivity($("#sensitivity"), analysis, check());
   renderBrief($("#brief-respond"), activeScenario, observation);
   // Play the map out with the new best option and the now more likely road state.
@@ -1108,7 +1113,7 @@ async function loadScenario(id, { keepTime = false } = {}) {
     baseline = base.ok ? (await base.json()).indicators : null;
   }
   document.body.dataset.scenario = scenario.scenario_type;
-  $("#drone-note").textContent = scenario.decision_model.drone.note;
+  $("#drone-note").textContent = "Stock footage. Inspection accuracy and review time are assumed.";
   plan = {
     action: scenario.analysis.before[0].id,
     road: scenario.disruption.prior_blocked_probability >= 0.5 ? "blocked" : "open",
@@ -1131,22 +1136,25 @@ async function loadScenario(id, { keepTime = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Flow. The morning opens in monitoring on the usual plan (step start). While
+// Flow. The start step lets the dispatcher choose the morning (story): a
+// regular morning with no incident, or one of the incident reports. The
+// morning opens in monitoring on the usual plan. On a regular morning the
+// guide shows the monitor step until the shift report. Otherwise, while
 // it plays, the incident report arrives INCIDENT_DELAY_MIN after the start and
 // the page switches to the incident data at the same clock time (step
 // incident). The dispatcher decides on a drone check, chooses a response
 // (step respond) and watches it play out (step outcome). When the morning has
 // played out, the shift report compares today with the usual morning.
-// A normal morning (mode routine) skips the incident: the usual plan plays out
+// A normal morning skips the incident: the usual plan plays out
 // to the end and the shift report shows the indicators for an ordinary day.
 // ---------------------------------------------------------------------------
 const INCIDENT_DELAY_MIN = 2;
-const steps = ["start", "incident", "respond", "outcome"];
+const steps = ["start", "incident", "respond", "outcome"]; // "monitor" is outside the stepper.
 let mode = "monitoring";
 let step = "start";
 let furthest = 0; // Index in steps of the furthest step reached in this run.
-let incidentVariant = "disruption";
-let incidents = []; // { id, title, prior } for each incident variant.
+let story = "disruption"; // The chosen morning: "normal" or an incident variant id.
+let stories = []; // { id, normal, tag, title, prior, check, worth } for the regular morning and each incident.
 let decisionLog = [];
 let routine = false; // True for a normal morning with no incident report.
 
@@ -1185,6 +1193,7 @@ function setStep(name) {
   $$(".step[data-step]").forEach((section) => { section.hidden = section.dataset.step !== name; });
   $(".panel-body").scrollTop = 0;
   if (name === "start") renderStart();
+  if (name === "monitor") renderMonitor();
   if (name === "respond") renderConfirm();
   if (name === "incident" || name === "respond") showGuide();
   renderMode();
@@ -1220,47 +1229,89 @@ function renderStepper() {
   });
 }
 
-const jumpButton = (item) => `<button class="btn jump-btn" type="button" data-incident="${esc(item.id)}"><b>${esc(item.title)}</b><small>${esc(item.check.label)} · ${pct(item.prior)} chance the road is ${esc(item.check.bad)}</small></button>`;
+const storyDetail = (item) => item.normal
+  ? "Follow the planned routes"
+  : `${pct(item.prior)} assumed chance the road is ${item.check.bad}`;
+const jumpButton = (item) => `<button class="btn jump-btn" type="button" data-jump="${esc(item.id)}"><b>${esc(item.tag)}: ${esc(item.title)}</b><small>${esc(storyDetail(item))}</small></button>`;
 
 function renderStart() {
-  const usual = scenario.scenario_type === "normal" ? scenario.analysis : null;
-  const verdict = usual && !usual.evoi.recommend_inspection
-    ? ` With no report, the chance CA-47 is blocked is ${pct(usual.prior_blocked_probability)} and a drone check would lose ${money(-usual.evoi.net_value_of_information)}, so PigeonOps does not suggest one.`
-    : "";
-  $("#start-note").textContent = `The morning starts at ${clockLabel(span.start)} on the usual plan.${verdict} Start the morning and an incident report arrives at ${clockLabel(incidentAt())}. A normal morning plays the usual plan to the end with no report.`;
-  $("#incident-jumps").innerHTML = incidents.map(jumpButton).join("");
+  $("#story-options").innerHTML = stories.map((item) => `<li class="option">
+    <input type="radio" name="story" id="story-${esc(item.id)}" value="${esc(item.id)}"${item.id === story ? " checked" : ""}>
+    <label for="story-${esc(item.id)}">
+      <span class="tag ${item.normal ? "ok" : "risk"}">${esc(item.tag)}</span>
+      <span class="option-name story-title">${esc(item.title)}</span>
+      <span class="option-summary story-detail">${esc(storyDetail(item))}</span>
+    </label>
+  </li>`).join("");
+  const chosen = stories.find((item) => item.id === story);
+  $("#jump-button").hidden = !chosen || chosen.normal;
+  if (chosen?.normal) {
+    $("#start-note").textContent = `${clockLabel(span.start)} to ${clockLabel(span.end)} · No incidents`;
+  } else {
+    $("#start-note").textContent = `Starts ${clockLabel(span.start)} · Incident at ${clockLabel(span.start + INCIDENT_DELAY_MIN)}`;
+  }
+}
+
+// The regular morning: nothing to decide, so the guide shows what PigeonOps is watching.
+function renderMonitor() {
+  const a = scenario.analysis;
+  const feasible = a.indicators.find((item) => item.id === "appointments_feasible");
+  $("#monitor-risk").innerHTML = `${pct(a.prior_blocked_probability)}<small>assumed</small>`;
+  $("#monitor-check").innerHTML = a.evoi.recommend_inspection
+    ? `Recommended<small>${money(a.evoi.net_value_of_information)} estimated saving</small>`
+    : `Skip<small>${money(-a.evoi.net_value_of_information)} estimated added loss</small>`;
+  $("#monitor-feasible").innerHTML = feasible ? `${whole(feasible.value)} of ${whole(feasible.of)}<small>estimated</small>` : "—";
+  const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
+  $("#monitor-note").textContent = unassigned ? `${unassigned} load${unassigned === 1 ? " needs" : "s need"} a truck.` : "";
 }
 
 function renderOutcome() {
   const report = mode === "report";
   $("#report").hidden = !report;
-  $("#outcome-title").textContent = report ? "Shift report" : routine ? "Normal morning" : `Playing out: ${actionLabel(plan.action)}`;
-  if (!report) $("#outcome-sub").textContent = routine ? "No incident report. Every truck runs the usual plan." : "";
+  $("#outcome-title").textContent = report ? "Shift report" : actionLabel(plan.action);
+  if (!report) $("#outcome-sub").textContent = "";
   $("#skip-end").hidden = report;
   $("#change-response").hidden = report || routine;
   $("#report-restart").hidden = !report;
-  const others = incidents.filter((item) => item.id !== activeScenario);
+  const others = stories.filter((item) => item.id !== story);
   $("#next-incidents").innerHTML = others.map(jumpButton).join("");
   $("#next-incidents-wrap").hidden = !report || !others.length;
 }
 
-async function triggerIncident(variant = incidentVariant) {
-  incidentVariant = variant;
+async function triggerIncident(variant = story) {
+  story = variant;
   routine = false;
   mode = "incident";
   await loadScenario(variant, { keepTime: true });
   const d = scenario.disruption;
-  logDecision(`Alert: ${d.title} (reported ${d.reported_at}).`);
+  logDecision(`${scenarioCopy[variant]?.title ?? d.title}. Reported ${d.reported_at}.`);
   setStep("incident");
 }
 
 // Start a fresh run at the moment the incident report arrives.
 async function jumpToIncident(variant) {
   setPlaying(false);
+  story = variant;
+  document.body.dataset.story = variant;
   mode = "monitoring";
   decisionLog = [];
   currentTime = span.start + INCIDENT_DELAY_MIN;
   await triggerIncident(variant);
+}
+
+// Play the chosen morning from its start.
+async function startMorning(id = story) {
+  story = id;
+  if (step !== "start") await restartMorning();
+  routine = id === "normal";
+  document.body.dataset.story = id;
+  if (id === "normal") {
+    logDecision("Started on the planned routes. No incidents reported.");
+    setStep("monitor");
+  }
+  setView("map");
+  showMap();
+  setPlaying(true);
 }
 
 async function restartMorning() {
@@ -1273,27 +1324,11 @@ async function restartMorning() {
   setView("map");
 }
 
-// The normal scenario: the usual plan plays out with no incident, ending in a shift report.
-async function startRoutine() {
-  setPlaying(false);
-  routine = true;
-  mode = "routine";
-  decisionLog = [];
-  if (activeScenario !== "normal") await loadScenario("normal");
-  currentTime = span.start;
-  logDecision("Normal morning started on the usual plan. No incident report.");
-  setStep("outcome");
-  setView("map");
-  showMap();
-  setSpeed(15);
-  setPlaying(true);
-}
-
 function confirmResponse() {
   const label = actionLabel(plan.action);
   logDecision(plan.action === modelPick?.id
-    ? `Dispatcher chose ${label}, the model’s pick.`
-    : `Dispatcher overrode the model: chose ${label} over ${modelPick.label}. Reason given: “${$("#override-reason").value.trim()}”`);
+    ? `Confirmed: ${label} (recommended).`
+    : `Chose ${label} over ${modelPick.label}. Reason: ${$("#override-reason").value.trim()}`);
   mode = "incident";
   setStep("outcome");
   setView("map");
@@ -1303,19 +1338,20 @@ function confirmResponse() {
 }
 
 function showReport() {
-  if (mode === "monitoring") return;
+  if (mode === "monitoring" && step !== "monitor") return;
   setPlaying(false);
   mode = "report";
   renderReport();
-  renderMode();
+  if (step === "outcome") renderMode();
+  else setStep("outcome");
 }
 
 function renderReport() {
   const d = scenario.disruption;
   const day = new Date(scenario.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  const incidentLine = routine ? "No incident report; every truck ran the usual plan." : `One incident: ${d.title}.`;
-  $("#outcome-sub").textContent = `${day}, ${clockLabel(span.start)} to ${clockLabel(currentTime)}. ${incidentLine} Every figure is estimated from simulated data.`;
-  $("#report-indicators-title").textContent = routine ? "Indicators for a normal morning" : "Usual morning against today";
+  const incident = scenario.scenario_type === "normal" ? "No incidents" : scenarioCopy[activeScenario]?.title ?? d.title;
+  $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${incident}. Simulated results.`;
+  $("#report-indicators-title").textContent = routine ? "Regular morning" : "Plan comparison";
 
   $("#report-indicators").innerHTML = scenario.analysis.indicators.map((item) => {
     const base = baseline?.find((b) => b.id === item.id);
@@ -1328,26 +1364,37 @@ function renderReport() {
   }).join("");
 
   const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
-  const closing = routine ? "Shift ended with every truck on the usual plan."
+  const closing = scenario.scenario_type === "normal"
+    ? "Completed the planned routes without inspection."
     : plan.action === modelPick?.id
-    ? `At the end of the shift the map showed ${action.label}, the model’s pick.`
-    : `At the end of the shift the map showed ${action.label}. The model ranked ${modelPick.label} first.`;
+    ? `Completed: ${action.label} (recommended).`
+    : `Completed: ${action.label}. Recommended: ${modelPick.label}.`;
   $("#report-log").innerHTML = [...decisionLog, { t: currentTime, text: closing }]
     .map((entry) => `<li><time>${clockLabel(entry.t)}</time><span>${esc(entry.text)}</span></li>`).join("");
 }
 
+function skipToReport() {
+  setPlaying(false);
+  currentTime = span.end;
+  updateFrame();
+  showReport();
+}
+
 function bindEvents() {
   const fail = (error) => console.error(error);
-  $("#routine-button").addEventListener("click", () => startRoutine().catch(fail));
-  $("#start-button").addEventListener("click", () => {
-    setView("map");
-    showMap();
-    setPlaying(true);
+  $("#start-button").addEventListener("click", () => startMorning().catch(fail));
+  $("#jump-button").addEventListener("click", () => jumpToIncident(story).catch(fail));
+  $("#story-options").addEventListener("change", (event) => {
+    if (event.target.name !== "story") return;
+    story = event.target.value;
+    renderStart();
+    $(`#story-${story}`).focus();
   });
+  $("#monitor-skip").addEventListener("click", skipToReport);
   $("#inspect-button").addEventListener("click", () => startInspection().catch(fail));
   $("#reinspect-button").addEventListener("click", () => startInspection().catch(fail));
   $("#skip-inspection").addEventListener("click", () => {
-    logDecision("Dispatcher decided without a drone check.");
+    logDecision("Skipped inspection.");
     setStep("respond");
   });
   $$("[data-observation]").forEach((button) => button.addEventListener("click", () => observe(button.dataset.observation).catch((error) => {
@@ -1363,12 +1410,7 @@ function bindEvents() {
   });
   $("#confirm-button").addEventListener("click", confirmResponse);
   $("#override-reason").addEventListener("input", renderConfirm);
-  $("#skip-end").addEventListener("click", () => {
-    setPlaying(false);
-    currentTime = span.end;
-    updateFrame();
-    showReport();
-  });
+  $("#skip-end").addEventListener("click", skipToReport);
   $("#change-response").addEventListener("click", () => {
     setPlaying(false);
     setStep("respond");
@@ -1399,8 +1441,10 @@ function bindEvents() {
   document.addEventListener("click", (event) => {
     const truck = event.target.closest("[data-truck]");
     if (truck) selectTruck(selectedTruck === truck.dataset.truck ? null : truck.dataset.truck);
-    const jump = event.target.closest("[data-incident]");
-    if (jump) jumpToIncident(jump.dataset.incident).catch(fail);
+    const jump = event.target.closest("[data-jump]");
+    if (!jump) return;
+    const id = jump.dataset.jump;
+    (id === "normal" ? startMorning(id) : jumpToIncident(id)).catch(fail);
   });
 
   $("#play").addEventListener("click", () => setPlaying(!playing));
@@ -1429,11 +1473,11 @@ window.addEventListener("inspection-reviewed", ({ detail }) => {
   if (detail.review.scenario !== activeScenario) return;
   const cv = detail.review.cv_suggestion;
   const choice = detail.review.observation;
-  const agreement = !cv ? "" : cv === choice ? ` (matches the CV suggestion)` : ` (CV suggested ${findingText(cv)}; you overrode it)`;
+  const agreement = !cv ? "" : cv === choice ? " Matches video analysis." : ` Video analysis suggested ${findingText(cv)}.`;
   const before = pct(detail.analysis.prior_blocked_probability);
   const after = pct(detail.analysis.posterior_blocked_probability);
-  const chance = before === after ? `stays at ${before}` : `changes from ${before} to ${after}`;
-  const summary = `Drone footage reviewed: ${findingText(choice)}${agreement}. The chance CA-47 is ${check().bad} ${chance}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
+  const change = before === after ? "unchanged" : `was ${before}`;
+  const summary = `Reviewed: ${findingText(choice)}. Estimated chance CA-47 is ${check().bad}: ${after} (${change}).${agreement}`;
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;
@@ -1443,21 +1487,37 @@ window.addEventListener("inspection-reviewed", ({ detail }) => {
   });
 });
 
-// Title and prior for each incident variant, for the jump buttons.
-async function loadIncidents() {
+// The mornings to choose from: the regular morning, then the incident reports
+// numbered by kind of check (the two crash reports share incident 1).
+const checkNames = { crash: "Crash", congestion: "Heavy traffic", environment: "Road damage" };
+async function loadStories() {
   const list = await fetch("/api/scenarios").then((response) => (response.ok ? response.json() : { scenarios: [] })).catch(() => ({ scenarios: [] }));
-  const found = await Promise.all(list.scenarios.filter((item) => item.id !== "normal").map(async (item) => {
+  const found = await Promise.all(list.scenarios.map(async (item) => {
     const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(item.id)}`).catch(() => null);
     if (!response?.ok) return null;
-    const d = (await response.json()).disruption;
-    return { id: item.id, title: d.title, prior: d.prior_blocked_probability, check: { label: "Drone check", bad: "blocked", ...d.check } };
+    const data = await response.json();
+    const d = data.disruption;
+    const normal = data.scenario_type === "normal";
+    return {
+      id: item.id,
+      normal,
+      title: scenarioCopy[item.id]?.title ?? d.title,
+      prior: d.prior_blocked_probability,
+      check: { type: "crash", label: "Drone check", bad: "blocked", ...d.check },
+      worth: data.analysis.evoi.recommend_inspection,
+    };
   }));
-  incidents = found.filter(Boolean);
+  const types = [];
+  stories = found.filter(Boolean).map((item) => {
+    if (item.normal) return { ...item, tag: "No incident" };
+    if (!types.includes(item.check.type)) types.push(item.check.type);
+    return { ...item, tag: `Incident ${types.indexOf(item.check.type) + 1} · ${checkNames[item.check.type] ?? item.check.label}` };
+  }).sort((a, b) => b.normal - a.normal);
 }
 
 bindEvents();
 setView("map");
-loadIncidents()
+loadStories()
   .then(() => loadScenario("normal"))
   .then(() => setStep("start"))
   .catch((error) => {

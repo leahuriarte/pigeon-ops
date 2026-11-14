@@ -17,12 +17,12 @@
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
       <strong>PigeonOps</strong>
-      <span class="brand-sub">Harbor dispatch · Ports of Los Angeles and Long Beach</span>
+      <span class="brand-sub">Los Angeles &amp; Long Beach dispatch</span>
     </div>
     <div class="topbar-right">
       <span id="ops-status" class="ops-status ok" role="status">Loading…</span>
-      <span class="sim-tag" title="Shipments, trucks, appointments and incidents are fictional. Rates are assumed and outcomes are estimated.">Simulated data</span>
-      <button id="restart" class="btn small" type="button">Restart</button>
+      <span class="sim-tag" title="Fictional shipments and incidents. Assumed rates. Estimated results.">Simulation</span>
+      <button id="restart" class="btn small" type="button">Choose scenario</button>
     </div>
   </header>
 
@@ -106,7 +106,7 @@
       <div id="view-trucks" class="view" role="tabpanel" aria-label="Trucks" hidden>
         <div class="view-head">
           <p id="fleet-summary"></p>
-          <p class="hint">Select a truck to follow it on the map.</p>
+          <p class="hint">Select a truck to see it on the map.</p>
         </div>
         <div class="table-wrap">
           <table class="data trucks">
@@ -118,7 +118,7 @@
 
       <div id="view-method" class="view view-method" role="tabpanel" aria-label="Data and method" hidden>
         <section aria-labelledby="definitions-title">
-          <h2 id="definitions-title">How the recommendation is calculated</h2>
+          <h2 id="definitions-title">How it works</h2>
           <dl id="definitions" class="definitions"></dl>
         </section>
         <section aria-labelledby="sources-title">
@@ -129,7 +129,7 @@
               <tbody id="provenance"></tbody>
             </table>
           </div>
-          <p class="note">Shipments, trucks, appointments and the incident are fictional. Inspection clips are credited stock drone footage and were not filmed at that incident. DATA.md lists sources and assumptions.</p>
+          <p class="note">Fictional dispatch data. Stock drone footage from other locations. Sources and assumptions: DATA.md.</p>
           <p id="conditions" class="note"></p>
         </section>
       </div>
@@ -146,24 +146,33 @@
 
       <div class="panel-body">
         <section class="step step-start" data-step="start" aria-labelledby="start-title">
-          <h1 id="start-title">Is a drone check worth the wait?</h1>
-          <p class="lede">PigeonOps is a decision aid for a port dispatcher. When a road report comes in, it works out whether checking the road with a drone is worth the cost and the delay, then ranks the possible responses. The dispatcher makes every call.</p>
-          <ol class="howto">
-            <li><b>An incident report arrives.</b> It says a road on a critical delivery’s route may be blocked.</li>
-            <li><b>You decide whether to check by drone.</b> You see what the check costs and what it is expected to save.</li>
-            <li><b>You choose a response.</b> Keep the route, reroute, or swap trucks.</li>
-            <li><b>You watch it play out.</b> Cost, delay and CO₂ add up while the trucks drive, and a shift report closes the morning.</li>
-          </ol>
+          <h1 id="start-title">Plan the morning</h1>
+          <p class="lede">Check a road report, compare the options, and choose a response.</p>
+          <fieldset class="story-picker">
+            <legend>Scenario</legend>
+            <ul id="story-options" class="options"></ul>
+          </fieldset>
           <div class="actions">
-            <button id="start-button" class="btn primary big" type="button">Start the morning</button>
-            <button id="routine-button" class="btn" type="button">Play a normal morning, no incident</button>
+            <button id="start-button" class="btn primary big" type="button">Start</button>
+            <button id="jump-button" class="btn" type="button">Skip to incident</button>
           </div>
           <p id="start-note" class="note"></p>
-          <div class="jump">
-            <p>Or jump straight to an incident report:</p>
-            <div id="incident-jumps" class="jump-list"></div>
+          <p class="fine-print">Simulation only. You approve each response. No drones or drivers are dispatched.</p>
+        </section>
+
+        <section class="step step-monitor" data-step="monitor" aria-labelledby="monitor-title" hidden>
+          <p class="tag-line"><span class="tag ok">No incident</span><span>Regular morning</span></p>
+          <h1 id="monitor-title">Running to plan</h1>
+          <p class="lede">No incidents reported. Trucks are following the planned routes.</p>
+          <dl class="facts">
+            <div><dt>Chance CA-47 is blocked</dt><dd id="monitor-risk">—</dd></div>
+            <div><dt>Drone check</dt><dd id="monitor-check">—</dd></div>
+            <div><dt>Appointments within reach</dt><dd id="monitor-feasible">—</dd></div>
+          </dl>
+          <p id="monitor-note" class="note"></p>
+          <div class="actions">
+            <button id="monitor-skip" class="btn" type="button">View shift report</button>
           </div>
-          <p class="fine-print">Every shipment, truck and incident is fictional. No drone is flown and no driver is contacted.</p>
         </section>
 
         <section class="step step-incident" data-step="incident" aria-labelledby="disruption-title" hidden>
@@ -178,66 +187,65 @@
           <details class="more"><summary>Constraints</summary><ul id="constraints" class="constraints"></ul></details>
 
           <div class="verdict">
-            <h2 id="inspection-title">Check the road with a drone first?</h2>
+            <h2 id="inspection-title">Check by drone?</h2>
             <p id="recommendation-short" class="verdict-answer">—</p>
             <p id="recommendation" class="verdict-why">Calculating…</p>
-            <div id="brief-incident" class="copilot-brief" aria-live="polite" hidden></div>
-            <details class="more"><summary>Show the numbers</summary>
+            <details class="more"><summary>Calculation</summary>
               <dl class="ledger">
-                <div><dt>Expected loss if you act now</dt><dd id="act-loss">—</dd></div>
-                <div><dt>Expected loss if you inspect first</dt><dd id="evidence-loss">—</dd></div>
-                <div><dt>Cost of inspecting</dt><dd id="inspection-cost">—</dd></div>
-                <div class="total"><dt>Net value of inspecting</dt><dd id="net-value">—</dd></div>
+                <div><dt>Expected loss: act now</dt><dd id="act-loss">—</dd></div>
+                <div><dt>Expected loss: check first</dt><dd id="evidence-loss">—</dd></div>
+                <div><dt>Inspection cost</dt><dd id="inspection-cost">—</dd></div>
+                <div class="total"><dt>Net saving from inspection</dt><dd id="net-value">—</dd></div>
               </dl>
               <dl id="assumptions" class="ledger"></dl>
               <figure id="sensitivity" class="sensitivity" hidden></figure>
               <p id="cv-only" class="note"></p>
               <p id="drone-note" class="note"></p>
+              <div id="brief-incident" class="copilot-brief" aria-live="polite" hidden></div>
             </details>
           </div>
 
           <div class="actions">
-            <button id="inspect-button" class="btn primary" type="button">Review drone footage</button>
-            <button id="skip-inspection" class="btn" type="button">Decide without a drone check</button>
+            <button id="inspect-button" class="btn primary" type="button">Review footage</button>
+            <button id="skip-inspection" class="btn" type="button">Skip inspection</button>
           </div>
           <div id="observation-buttons" class="choices" hidden>
-            <p>The footage library has no clip of this kind of hazard, so pick a simulated result:</p>
+            <p>No matching footage. Choose a simulated result:</p>
             <div>
               <button class="choice" type="button" data-observation="blocked">Road blocked</button>
               <button class="choice" type="button" data-observation="clear">Road clear</button>
               <button class="choice" type="button" data-observation="inconclusive">Inconclusive</button>
             </div>
           </div>
-          <p class="fine-print">Advice only. This page does not contact trucks or drivers.</p>
         </section>
 
         <section class="step step-respond" data-step="respond" aria-labelledby="options-title" hidden>
           <div class="evidence">
             <figure id="selected-evidence" class="selected-evidence" hidden>
               <img id="selected-evidence-image" alt="Reviewed drone frame">
-              <figcaption><span id="selected-evidence-title"></span> Stock drone footage, not filmed at CA-47.</figcaption>
+              <figcaption><span id="selected-evidence-title"></span> Stock footage from another location.</figcaption>
             </figure>
             <p id="posterior" class="posterior"></p>
-            <div id="brief-respond" class="copilot-brief" aria-live="polite" hidden></div>
-            <button id="reinspect-button" class="link" type="button">Review drone footage</button>
+            <details class="more ai-explanation"><summary>AI explanation</summary><div id="brief-respond" class="copilot-brief" aria-live="polite" hidden></div></details>
+            <button id="reinspect-button" class="link" type="button">Review footage</button>
           </div>
           <h1 id="options-title">Choose a response</h1>
-          <p id="ranking-state" class="subhead">Ranked by expected loss before inspection</p>
+          <p id="ranking-state" class="subhead">Lowest expected loss first. Estimates.</p>
           <ol id="rankings" class="options"></ol>
-          <label id="override-reason-wrap" class="override-reason" hidden>Why are you overriding the recommendation? Your reason goes in the decision log.
+          <label id="override-reason-wrap" class="override-reason" hidden>Reason for choosing another response
             <textarea id="override-reason" rows="2" maxlength="200"></textarea>
           </label>
           <div class="actions">
             <button id="confirm-button" class="btn primary" type="button">Confirm</button>
           </div>
-          <p class="fine-print">Expected loss is what a response costs on average, in dollars: delay, extra driving, CO₂ and missed appointments. It weights the open and blocked outcomes by the chance CA-47 is blocked. Confirming plays the plan out on the map. No driver is contacted.</p>
+          <details class="more"><summary>What is expected loss?</summary><p>Average cost of driving, delay, CO₂, and missed appointments, weighted by the chance of each road condition. Rates are assumed. Confirming runs the simulation.</p></details>
         </section>
 
         <section class="step step-outcome" data-step="outcome" aria-labelledby="outcome-title" hidden>
-          <h1 id="outcome-title">Playing out</h1>
+          <h1 id="outcome-title">Simulation</h1>
           <p id="outcome-sub" class="subhead"></p>
           <div class="road-case only-disruption">
-            <span>Play it out as if CA-47 is</span>
+            <span>Simulate CA-47 as</span>
             <fieldset class="segmented" style="--n:2">
               <legend class="visually-hidden">CA-47 road state</legend>
               <input type="radio" name="road" id="road-open" value="open"><label for="road-open">open</label>
@@ -249,7 +257,7 @@
 
           <section id="tally-block" class="tally" aria-labelledby="tally-title" hidden>
             <div class="tally-head">
-              <h2 id="tally-title">Running tally</h2>
+              <h2 id="tally-title">Trip totals</h2>
               <span class="basis estimated">Estimated</span>
             </div>
             <p id="tally-scope" class="subhead"></p>
@@ -260,26 +268,25 @@
           </section>
 
           <div id="report" class="report" hidden>
-            <h2 id="report-indicators-title">Usual morning against today</h2>
+            <h2 id="report-indicators-title">Plan comparison</h2>
             <div class="table-wrap">
               <table class="data">
                 <thead><tr><th>Indicator</th><th class="num">Usual</th><th class="num">Today</th><th>Change</th></tr></thead>
                 <tbody id="report-indicators"></tbody>
               </table>
             </div>
-            <p class="note">Expected values for every shipment in the plan, under the top-ranked response before any inspection. All are estimated.</p>
+            <p class="note">Whole-plan estimates for the top-ranked response before inspection.</p>
             <h2 id="report-log-title">Decision log</h2>
             <ol id="report-log" class="report-log"></ol>
-            <p class="fine-print">PigeonOps did not contact any driver or warehouse. The dispatcher made every call.</p>
           </div>
 
           <div class="actions">
-            <button id="skip-end" class="btn" type="button">Skip to the shift report</button>
-            <button id="change-response" class="btn" type="button">Change the response</button>
-            <button id="report-restart" class="btn primary" type="button" hidden>Restart the morning</button>
+            <button id="skip-end" class="btn" type="button">View shift report</button>
+            <button id="change-response" class="btn" type="button">Change response</button>
+            <button id="report-restart" class="btn primary" type="button" hidden>Choose scenario</button>
           </div>
           <div id="next-incidents-wrap" class="jump" hidden>
-            <p>Or try an incident report:</p>
+            <p>Other scenarios</p>
             <div id="next-incidents" class="jump-list"></div>
           </div>
         </section>
@@ -288,16 +295,16 @@
           <summary>Ask about this decision</summary>
           <form id="copilot-ask-form" class="copilot-ask-form">
             <label class="visually-hidden" for="copilot-question">Your question</label>
-            <input id="copilot-question" type="text" maxlength="300" autocomplete="off" placeholder="Ask a what-if question">
+            <input id="copilot-question" type="text" maxlength="300" autocomplete="off" placeholder="Ask about the options">
             <button id="copilot-ask-button" class="btn small" type="submit">Ask</button>
           </form>
           <div class="copilot-chips">
-            <button class="btn small" type="button" data-question="What if the chance of a blockage were 60%?">What if the chance of a blockage were 60%?</button>
-            <button class="btn small" type="button" data-question="Why not reroute right away?">Why not reroute right away?</button>
-            <button class="btn small" type="button" data-question="Which shipments are late if the road is blocked?">Which shipments are late if the road is blocked?</button>
+            <button class="btn small" type="button" data-question="What if the chance of a blockage were 60%?">What if blockage risk is 60%?</button>
+            <button class="btn small" type="button" data-question="Why not reroute right away?">Why not reroute now?</button>
+            <button class="btn small" type="button" data-question="Which shipments are late if the road is blocked?">Which loads would be late?</button>
           </div>
           <div id="copilot-answer" class="copilot-answer" aria-live="polite" hidden></div>
-          <p class="fine-print">Your question is sent to the hackathon LLM service. It answers by calling the PigeonOps engine; the answer is LLM-written, advisory and not validated.</p>
+          <p class="fine-print">Questions go to an external AI service. Check its answers against the calculation.</p>
         </details>
       </div>
     </aside>
@@ -306,8 +313,8 @@
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">
     <header class="inspection-header">
       <div>
-        <h2 id="inspection-dialog-heading">Drone check: what does the footage show?</h2>
-        <p class="inspection-scope">Pre-recorded drone clips stand in for the inspection flight. None was filmed at CA-47. Applying an observation updates the fictional scenario; it does not report current conditions or fly a drone.</p>
+        <h2 id="inspection-dialog-heading">Review footage</h2>
+        <p class="inspection-scope">Stock footage from another location, used for this simulation.</p>
       </div>
       <button id="inspection-close" class="btn small" type="button">Close</button>
     </header>
@@ -316,34 +323,35 @@
         <div id="inspection-clips" class="clip-tabs" role="tablist" aria-label="Inspection clip"></div>
         <video id="inspection-video" class="inspection-photo" autoplay loop muted playsinline aria-label="Annotated drone clip"></video>
         <img id="inspection-photo" class="inspection-photo" alt="Unannotated source frame" hidden>
-        <div class="inspection-photo-caption"><span id="inspection-count"></span><button id="inspection-image-toggle" class="link" type="button">Show source frame</button></div>
-        <p class="inspection-legend"><span><i class="swatch road"></i>Marked road</span><span><i class="swatch stopped"></i>Standing</span><span><i class="swatch slow"></i>Slow</span><span><i class="swatch moving"></i>Moving</span><span><i class="swatch other"></i>Off road or not re-found</span></p>
+        <div class="inspection-photo-caption"><button id="inspection-image-toggle" class="link" type="button">Show source frame</button></div>
+        <p class="inspection-legend"><span><i class="swatch road"></i>Marked road</span><span><i class="swatch stopped"></i>Stopped</span><span><i class="swatch slow"></i>Slow</span><span><i class="swatch moving"></i>Moving</span><span><i class="swatch other"></i>Other detections</span></p>
       </div>
       <div class="inspection-side">
         <div id="inspection-cv" class="inspection-cv">
-          <span class="tag">CV suggestion · unvalidated</span>
+          <span class="tag">Video analysis · unvalidated</span>
           <h3 id="inspection-cv-signal"></h3>
-          <p id="inspection-cv-reason"></p>
         </div>
         <div id="inspection-llm" class="inspection-llm" aria-live="polite" hidden></div>
         <fieldset class="inspection-choices">
-          <legend>What do you see? The CV suggestion is preselected.</legend>
+          <legend>Your observation</legend>
           <label><input type="radio" name="inspection-observation" value="blocked"><span>Road blocked</span></label>
-          <label><input type="radio" name="inspection-observation" value="clear"><span>Road clear: traffic gets through</span></label>
+          <label><input type="radio" name="inspection-observation" value="clear"><span>Road clear</span></label>
           <label><input type="radio" name="inspection-observation" value="inconclusive"><span>Inconclusive</span></label>
         </fieldset>
         <p id="inspection-restriction" class="note"></p>
         <details class="more inspection-about"><summary>About this clip</summary>
           <strong id="inspection-case-title"></strong>
+          <span id="inspection-count" hidden></span>
+          <p id="inspection-cv-reason"></p>
           <p id="inspection-finding" class="inspection-finding"></p>
           <p id="inspection-note" class="inspection-note"></p>
           <p id="inspection-cv-basis" class="fine-print"></p>
-          <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Road outlines and visual notes are drawn by hand and still provisional. Speeds are approximate.</span></div>
-          <label class="inspection-review-note">Review note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
+          <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Provisional road markings. Estimated speeds.</span></div>
+          <label class="inspection-review-note">Note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
+          <p class="fine-print">Reviews are saved locally.</p>
         </details>
         <p id="inspection-error" class="inspection-error" role="alert"></p>
         <button id="inspection-apply" class="btn primary" type="button" disabled>Apply to scenario</button>
-        <p class="fine-print">The clip, CV suggestion, your observation and the time are saved locally. A dispatcher approves any logistics action.</p>
       </div>
     </div>
   </dialog>

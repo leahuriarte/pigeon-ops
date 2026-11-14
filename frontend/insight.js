@@ -13,10 +13,10 @@ export function inspectionSentence(evoi) {
   const gross = evoi.gross_value_of_information;
   const cost = evoi.inspection_cost;
   if (evoi.recommend_inspection) {
-    return `Checking first is expected to save ${money(gross)}, with the ${wait}-minute wait already counted. The check costs ${money(cost)}, so you come out ${money(evoi.net_value_of_information)} ahead.`;
+    return `Estimated net saving: ${money(evoi.net_value_of_information)}, including the ${money(cost)} check and ${wait}-minute wait.`;
   }
-  if (gross > 0) return `Checking first would save about ${money(gross)}, which is less than the ${money(cost)} the check costs.`;
-  return `Waiting ${wait} minutes for the check would raise the expected loss by ${money(-gross)}, and the check itself costs ${money(cost)}.`;
+  if (gross > 0) return `Estimated saving: ${money(gross)}. Inspection cost: ${money(cost)}.`;
+  return `Checking first adds an estimated ${money(-evoi.net_value_of_information)} in cost and delay.`;
 }
 
 // How accurate the inspection has to be, what the page assumes, and how automated CV alone compares.
@@ -24,17 +24,17 @@ export function accuracyNote(evoi) {
   const a = evoi.assumptions;
   const breakEven = evoi.break_even_accuracy;
   const need = breakEven === null || breakEven === undefined
-    ? "Even a perfect check would not pay for itself here."
+    ? "Even 100% accuracy would not cover the inspection cost."
     : breakEven >= 0.995
-      ? "Only a near-perfect check, right more than 99% of the time, would pay for itself here."
-      : `The check has to be right at least ${pct(breakEven)} of the time to pay for itself.`;
-  const assumed = `The page assumes a dispatcher who reviews the footage alongside the CV suggestion is right ${pct(a.inspection_accuracy)} of the time. Nobody has measured that figure.`;
+      ? "Break-even accuracy: over 99%."
+      : `Break-even accuracy: ${pct(breakEven)}.`;
+  const assumed = `Assumed accuracy after human review: ${pct(a.inspection_accuracy)}. Unmeasured.`;
   const cv = evoi.cv_only;
   if (!cv) return `${need} ${assumed}`;
   const alone = cv.recommend_inspection
-    ? `would be worth ${money(cv.net_value_of_information)}`
-    : `would lose ${money(-cv.net_value_of_information)}`;
-  return `${need} ${assumed} Automated CV on its own, measured on still aerial frames, ${alone} here. That is why a dispatcher confirms every suggestion.`;
+    ? `${money(cv.net_value_of_information)} estimated saving`
+    : `${money(-cv.net_value_of_information)} estimated added loss`;
+  return `${need} ${assumed} Automated image analysis alone: ${alone}, using accuracy measured on aerial stills.`;
 }
 
 // Ranges of blockage chance where the net value of inspecting is above zero, as [low, high] pairs.
@@ -74,7 +74,6 @@ export function renderSensitivity(container, analysis, words = { bad: "blocked" 
   const after = analysis.posterior_blocked_probability;
   const inspected = after !== null && after !== undefined && Boolean(analysis.observation);
   const now = inspected ? after : before;
-  const evoi = analysis.evoi;
   const windows = payoffWindows(points);
 
   const [W, H, left, right, top, bottom] = [340, 168, 10, 10, 24, 30];
@@ -106,19 +105,19 @@ export function renderSensitivity(container, analysis, words = { bad: "blocked" 
     ? `<text x="${x(peak.prior).toFixed(1)}" y="${(y(peak.net_value) - 7).toFixed(1)}" text-anchor="${anchor(x(peak.prior))}">${signed(peak.net_value)}</text>`
     : "";
 
-  const range = windows.map(([a, b]) => `${pct(a)} and ${pct(b)}`).join(", or between ");
+  const range = windows.map(([a, b]) => `${pct(a)} to ${pct(b)}`).join(" or ");
   const first = windows.length
-    ? `A drone check pays for itself when the chance of a blockage is between ${range}. Below that range the road is very likely open, and above it you would change plans anyway, so the check would rarely change your decision.`
-    : "Here a drone check does not pay for itself at any chance of a blockage.";
+    ? `Inspection pays at a ${range} chance the road is ${words.bad}.`
+    : "Inspection costs more than it saves across this range.";
   const inWindow = windows.some(([a, b]) => now > a && now < b);
   const second = inspected
-    ? `Before the footage the chance was ${pct(before)}. Now it is ${pct(now)}, so ${inWindow ? "a second check could still pay" : "a second check would not pay"}.`
-    : `The chance now is ${pct(now)}, so checking first ${evoi.net_value_of_information > 0 ? `is worth ${money(evoi.net_value_of_information)}` : `would lose ${money(-evoi.net_value_of_information)}`}.`;
+    ? `Risk after review: ${pct(now)} (was ${pct(before)}). ${inWindow ? "A second check could pay." : "A second check would not pay."}`
+    : `Current estimate: ${pct(now)}.`;
   const summary = `${first} ${second}`;
 
   container.hidden = false;
   container.innerHTML = `<h3>When a drone check pays off</h3>
-    <p class="sens-sub">Net value of checking first, in dollars, for each chance that the road is ${esc(words.bad)}. Estimated.</p>
+    <p class="sens-sub">Estimated net saving ($)</p>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(summary)}">
       ${bands}
       <line class="sens-zero" x1="${left}" x2="${W - right}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}"/>
@@ -131,7 +130,7 @@ export function renderSensitivity(container, analysis, words = { bad: "blocked" 
       ${ticks}
       <text x="${W / 2}" y="${H - 3}" text-anchor="middle">Chance the road is ${esc(words.bad)}</text>
     </svg>
-    <p class="sens-readout">Point at the line to read a value.</p>
+    <p class="sens-readout">${signed(valueAt(points, now))} at ${pct(now)} risk.</p>
     <figcaption>${esc(summary)}</figcaption>`;
 
   const svg = container.querySelector("svg");
@@ -146,19 +145,19 @@ export function renderSensitivity(container, analysis, words = { bad: "blocked" 
     hover.querySelector("line").setAttribute("x2", x(point.prior));
     hover.querySelector("circle").setAttribute("cx", x(point.prior));
     hover.querySelector("circle").setAttribute("cy", y(point.net_value));
-    readout.textContent = `At a ${pct(point.prior)} chance, checking first is worth ${signed(point.net_value)}.`;
+    readout.textContent = `${signed(point.net_value)} at ${pct(point.prior)} risk.`;
   });
   svg.addEventListener("pointerleave", () => {
     hover.setAttribute("hidden", "");
-    readout.textContent = "Point at the line to read a value.";
+    readout.textContent = `${signed(valueAt(points, now))} at ${pct(now)} risk.`;
   });
 }
 
 function shipmentPhrase(row) {
   const late = Math.round(row.lateness_min);
-  const head = `${esc(row.shipment)} arrives ${esc(row.arrival)}`;
-  if (row.constraint_breaches > 0) return `${head}, ${late} min late, and misses its appointment`;
-  if (late > 0) return `${head}, ${late} min late, inside its appointment window`;
+  const head = `${esc(row.shipment)}: ${esc(row.arrival)}`;
+  if (row.constraint_breaches > 0) return `${head}, ${late} min late; appointment missed`;
+  if (late > 0) return `${head}, ${late} min late; within appointment window`;
   return `${head}, on time`;
 }
 
@@ -167,7 +166,7 @@ function caseFor(outcome, affectedId) {
   const rows = outcome.detail?.shipments;
   if (!rows?.length) {
     const late = Math.round(outcome.lateness_min);
-    const text = outcome.constraint_breaches > 0 ? `${late} min late, and an appointment is missed` : late > 0 ? `${late} min late` : "On time";
+    const text = outcome.constraint_breaches > 0 ? `${late} min late; appointment missed` : late > 0 ? `${late} min late` : "On time";
     return { text, tone: outcome.constraint_breaches > 0 ? "bad" : late > 0 ? "warn" : "ok" };
   }
   const shown = rows.filter((row) => row.shipment === affectedId || row.reassigned || row.lateness_min > 0 || row.constraint_breaches > 0);
@@ -181,7 +180,7 @@ export function outcomeCases(option, blockedProbability, affectedId, words = { b
   const open = caseFor(option.outcomes?.open, affectedId);
   const blocked = caseFor(option.outcomes?.blocked, affectedId);
   if (!open || !blocked) return "";
-  const row = (label, share, item) => `<li class="${item.tone}"><span class="case">${label}${share === null ? "" : ` <small>${pct(share)} chance</small>`}</span><span>${item.text}.</span></li>`;
+  const row = (label, share, item) => `<li class="${item.tone}"><span class="case">${label}${share === null ? "" : ` <small>${pct(share)} estimated chance</small>`}</span><span>${item.text}.</span></li>`;
   if (open.text === blocked.text) return `<ul class="option-cases">${row(`Road ${words.good} or ${words.bad}`, null, open)}</ul>`;
-  return `<ul class="option-cases">${row(`If the road is ${words.good}`, 1 - blockedProbability, open)}${row(`If the road is ${words.bad}`, blockedProbability, blocked)}</ul>`;
+  return `<ul class="option-cases">${row(`Road ${words.good}`, 1 - blockedProbability, open)}${row(`Road ${words.bad}`, blockedProbability, blocked)}</ul>`;
 }

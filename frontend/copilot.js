@@ -32,7 +32,7 @@ function el(tag, className, text) {
 }
 
 const llmTag = (text) => el("span", "tag llm", text);
-const madeBy = (model) => el("p", "fine-print", `Written by ${model}, a language model. Advisory and not validated; check it against the engine’s figures.`);
+const madeBy = (model) => el("p", "fine-print", `Model: ${model}`);
 
 // ---------------------------------------------------------------------------
 // 1. Second read of the footage, under the CV suggestion in the inspection dialog.
@@ -53,7 +53,7 @@ export async function renderFootageOpinion(caseItem, labels = {}, scenarioId = n
   const card = document.querySelector("#inspection-llm");
   if (!(await llmStatus()).enabled || token !== footageToken) return;
   delete card.dataset.agrees;
-  card.replaceChildren(llmTag("LLM second read · unvalidated"), el("p", "note", "Reading the CV evidence…"));
+  card.replaceChildren(llmTag("AI review · unvalidated"), el("p", "note", "Reviewing…"));
   card.hidden = false;
   const query = new URLSearchParams({ case_id: caseItem.id });
   if (scenarioId) query.set("scenario", scenarioId);
@@ -65,14 +65,14 @@ export async function renderFootageOpinion(caseItem, labels = {}, scenarioId = n
   }
   const finding = labels[result.observation]?.toLowerCase() ?? signalWords[result.observation] ?? result.observation;
   const headline = el("h3", null, result.agrees_with_cv
-    ? `Agrees with the CV suggestion: ${finding}`
-    : `Differs from the CV suggestion: suggests ${finding}`);
+    ? `Agrees: ${finding}`
+    : `Disagrees: ${finding}`);
   headline.append(el("small", null, `${result.confidence} confidence`));
-  const parts = [llmTag("LLM second read · unvalidated"), headline, el("p", null, result.rationale)];
+  const parts = [llmTag("AI review · unvalidated"), headline, el("p", null, result.rationale)];
   if (result.checks?.length) {
     const list = el("ul", "copilot-checks");
     result.checks.forEach((item) => list.append(el("li", null, item)));
-    parts.push(el("strong", "copilot-label", "Check before you confirm"), list);
+    parts.push(el("strong", "copilot-label", "Check"), list);
   }
   parts.push(madeBy(result.model));
   card.dataset.agrees = String(Boolean(result.agrees_with_cv));
@@ -95,8 +95,8 @@ export async function renderBrief(container, scenarioId, observation = null) {
   const token = briefTokens.get(container);
   const stale = () => briefTokens.get(container) !== token;
   if (!(await llmStatus()).enabled || stale()) return;
-  const label = "Dispatcher brief · LLM-written from the engine’s numbers · advice only";
-  container.replaceChildren(llmTag(label), el("p", "note", "Writing a brief…"));
+  const label = "AI explanation · unvalidated";
+  container.replaceChildren(llmTag(label), el("p", "note", "Loading…"));
   container.hidden = false;
   const query = new URLSearchParams({ scenario: scenarioId });
   if (observation) query.set("observation", observation);
@@ -107,7 +107,7 @@ export async function renderBrief(container, scenarioId, observation = null) {
     return;
   }
   const more = el("dl", "copilot-more");
-  [["What would change it", brief.what_would_change_it], ["Who is affected", brief.who_is_affected]].forEach(([term, text]) => {
+  [["Could change if", brief.what_would_change_it], ["Affected", brief.who_is_affected]].forEach(([term, text]) => {
     const row = el("div");
     row.append(el("dt", null, term), el("dd", null, text));
     more.append(row);
@@ -147,7 +147,7 @@ export async function initAsk(getContext) {
     const token = ++askToken;
     const { scenario, observation } = getContext();
     button.disabled = true;
-    answer.replaceChildren(el("p", "note", "Asking the engine…"));
+    answer.replaceChildren(el("p", "note", "Calculating…"));
     answer.hidden = false;
     const result = await getJSON("/api/llm/ask", 120000, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -156,16 +156,18 @@ export async function initAsk(getContext) {
     if (token !== askToken) return; // Scenario reset or a newer question.
     button.disabled = false;
     if (!result.available) {
-      answer.replaceChildren(el("p", "note", "The LLM could not answer right now. The engine’s figures above still stand."));
+      answer.replaceChildren(el("p", "note", "Couldn't get an answer. Try again."));
       return;
     }
-    const parts = [llmTag("LLM-written · advisory · not validated"), el("p", "copilot-answer-text", result.answer)];
+    const parts = [llmTag("AI answer · unvalidated"), el("p", "copilot-answer-text", result.answer)];
     if (!result.grounded) {
-      parts.push(el("p", "copilot-warn", "This answer contains figures that are not in the engine’s output. Check them against the numbers above."));
+      parts.push(el("p", "copilot-warn", "Some figures aren't in the calculation. Check before using them."));
     }
-    parts.push(el("p", "fine-print", result.engine_calls?.length
+    const calculation = el("details", "more");
+    calculation.append(el("summary", null, "Calculation details"), el("p", "fine-print", result.engine_calls?.length
       ? `Engine calls: ${result.engine_calls.map(describeCall).join("; ")}.`
-      : "The model answered without calling the engine."));
+      : "The AI answered without checking the calculation."));
+    parts.push(calculation);
     parts.push(madeBy(result.model));
     answer.replaceChildren(...parts);
   }
