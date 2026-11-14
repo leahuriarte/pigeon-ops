@@ -1,6 +1,6 @@
 {
   "annotation_method": "Road regions and visual notes drawn by AI-assisted review of the keyframe; provisional, not independently validated ground truth.",
-  "scope": "Pre-recorded top-down drone clips from Pexels illustrate a synthetic logistics scenario. None was filmed at the fictional CA-47 incident or near the Port of Los Angeles or Long Beach.",
+  "scope": "Pre-recorded drone clips from Pexels illustrate a synthetic logistics scenario. All are top-down except the container-terminal queue, which is an oblique view. None shows the fictional CA-47 incident. The crash, clear-road and rest-area clips were not filmed near the Port of Los Angeles or Long Beach; the sources of the two heavy-traffic clips do not state where they were filmed.",
   "license": "Pexels License",
   "license_url": "https://www.pexels.com/license/",
   "clips": [
@@ -12,6 +12,9 @@
       "credit": "K on Pexels",
       "start_seconds": 1.0,
       "visual_label": "visible_obstruction",
+      "check_types": [
+        "crash"
+      ],
       "road": [
         [
           0.0,
@@ -40,6 +43,9 @@
       "credit": "K on Pexels",
       "start_seconds": 0.5,
       "visual_label": "visible_obstruction",
+      "check_types": [
+        "crash"
+      ],
       "road": [
         [
           0.0,
@@ -61,6 +67,69 @@
       "note": "The wrecked cab, its trailer and a fuel or fluid spill cover the marked carriageway, which is otherwise empty. Traffic on the far carriageway, outside the marked region, is moving. The detector does not recognise the jackknifed wreck as a vehicle, so the CV sees an empty road and stays inconclusive; the dispatcher can see the wreck and override it. The camera turns during the clip; the road region follows it."
     },
     {
+      "id": "terminal-truck-queue",
+      "file": "blocked_port_queue_13742716.mp4",
+      "title": "Truck queue in a container terminal",
+      "source_url": "https://www.pexels.com/video/trucks-in-port-13742716/",
+      "credit": "Kelly on Pexels",
+      "start_seconds": 1.0,
+      "visual_label": "standing_queue",
+      "check_types": [
+        "congestion"
+      ],
+      "road": [
+        [
+          0.46,
+          0.1
+        ],
+        [
+          0.58,
+          0.1
+        ],
+        [
+          0.74,
+          1.0
+        ],
+        [
+          0.32,
+          1.0
+        ]
+      ],
+      "note": "Three lanes of trucks stand nose to tail behind a stop line between container stacks. The trucks do not move during the clip; a container handler works to the right, outside the marked lanes. What holds the queue is outside the frame. This is an oblique view inside a terminal, not a top-down view of a public road, so the speed scale is rough for the distant trucks; a standing truck still reads 0 km/h."
+    },
+    {
+      "id": "highway-dense-slow",
+      "file": "ambiguous_dense_moving_38774214.mp4",
+      "title": "Four-lane highway, dense slow traffic",
+      "source_url": "https://www.pexels.com/video/aerial-view-of-vehicles-on-highway-traffic-38774214/",
+      "credit": "Kelly on Pexels",
+      "start_seconds": 6.0,
+      "visual_label": "dense_slow_traffic",
+      "check_types": [
+        "congestion"
+      ],
+      "camera": "hover",
+      "road": [
+        [
+          0.0,
+          0.1
+        ],
+        [
+          1.0,
+          0.1
+        ],
+        [
+          1.0,
+          0.9
+        ],
+        [
+          0.0,
+          0.9
+        ]
+      ],
+      "note": "Cars, a van and a tractor-trailer fill all four lanes and keep rolling in the same direction, at roughly 10 to 25 km/h if the footage plays at real speed. Nothing stands still and no obstruction is visible, but this is far below highway speed. The CV calls the road clear because every vehicle is above its 10 km/h moving threshold; whether heavy, slow traffic counts as clear is the dispatcher's call. Vehicles fill so much of this close view that the camera-motion estimate follows the traffic instead of the ground, so this clip treats the hovering camera as still."
+    },
+    {
       "id": "highway-free-flow",
       "file": "clear_topdown_13376785.mp4",
       "title": "Divided highway, light traffic",
@@ -68,6 +137,11 @@
       "credit": "tal molcho on Pexels",
       "start_seconds": 10.0,
       "visual_label": "no_visible_obstruction",
+      "check_types": [
+        "crash",
+        "congestion",
+        "environment"
+      ],
       "road": [
         [
           0.0,
@@ -96,6 +170,11 @@
       "credit": "Kenan Turguç on Pexels",
       "start_seconds": 3.0,
       "visual_label": "no_visible_obstruction",
+      "check_types": [
+        "crash",
+        "congestion",
+        "environment"
+      ],
       "road": [
         [
           0.0,
@@ -124,6 +203,11 @@
       "credit": "DeLuca G on Pexels",
       "start_seconds": 10.0,
       "visual_label": "no_visible_obstruction",
+      "check_types": [
+        "crash",
+        "congestion",
+        "environment"
+      ],
       "road": [
         [
           0.0,

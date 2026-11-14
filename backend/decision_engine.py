@@ -1,5 +1,5 @@
 """Small, auditable expected-value-of-information decision engine."""
-from backend.indicators import compute_indicators
+from backend.indicators import action_route, compute_indicators, schools_near
 from backend.outcomes import INSPECTED, METRICS
 
 SIGNALS = ("blocked", "clear", "inconclusive")
@@ -150,6 +150,10 @@ def analyze(scenario, observation=None):
     prior = scenario["disruption"]["prior_blocked_probability"]
     posterior = posterior_blocked(prior, observation, drone["accuracy"])
     before = rank_actions(model, prior)
+    after = rank_actions(model, posterior, True) if observation else []
+    for option in before + after:
+        # Fairness measure per response: schools within 300 m of the route it sends the affected load on.
+        option["schools_within_300m"] = schools_near([action_route(scenario, option["id"])])
     evoi = information_value(model, prior)
     evoi["break_even_accuracy"] = break_even_accuracy(model, prior)
     # Automated CV alone, using the measured error table, for comparison with reviewed imagery.
@@ -166,7 +170,7 @@ def analyze(scenario, observation=None):
         "posterior_blocked_probability": round(posterior, 4) if observation else None,
         "observation": observation,
         "before": before,
-        "after": rank_actions(model, posterior, True) if observation else [],
+        "after": after,
         "evoi": evoi,
         "sensitivity": sensitivity(model),
         "indicators": compute_indicators(scenario, before),

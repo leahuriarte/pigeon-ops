@@ -1,0 +1,44 @@
+/* LLM-written panels from frontend/copilot.js. Colours and fonts come from the :root tokens in styles.css.
+   A dashed border marks text that is advisory and not validated, as the dashed .basis tags do. */
+.tag.llm { border-style: dashed; background: var(--card); color: var(--ink-2); white-space: normal; }
+
+/* Second read in the inspection dialog, under the CV suggestion */
+.inspection-llm { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; border: 1.5px dashed var(--ink); background: var(--white); }
+.inspection-llm[hidden] { display: none; }
+.inspection-llm h3 { font-size: 16px; }
+.inspection-llm h3 small { display: block; margin-top: 2px; color: var(--ink-2); font-family: var(--font-body); font-size: 12px; font-weight: 400; }
+.inspection-llm p { font-size: 13px; }
+.inspection-llm[data-agrees="false"] { border-color: var(--watch); background: var(--watch-bg); }
+.inspection-llm[data-agrees="false"] h3 { color: var(--watch); }
+.copilot-label { font-size: 12.5px; }
+.copilot-checks { margin: 0; padding-left: 18px; font-size: 12.5px; }
+.inspection-llm .fine-print, .copilot-brief .fine-print, .copilot-answer .fine-print { align-self: stretch; padding-top: 6px; }
+
+/* Dispatcher brief, in the incident verdict and in the respond step */
+.copilot-brief { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; border: 1px dashed var(--ink-2); background: var(--card); }
+.copilot-brief[hidden] { display: none; }
+.copilot-brief h3 { font-family: var(--font-display); font-size: 16px; }
+.copilot-brief p { font-size: 13.5px; }
+.copilot-more { display: grid; gap: 4px; margin: 0; font-size: 13px; }
+.copilot-more dt { color: var(--ink-2); font-size: 12px; }
+.copilot-more dd { margin: 0; }
+
+/* Ask box: shown only on the incident and respond steps */
+body:not([data-step="incident"]):not([data-step="respond"]) .copilot-ask { display: none; }
+.copilot-ask { margin-top: 16px; }
+.copilot-ask-form { display: flex; gap: 8px; }
+.copilot-ask-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: var(--frame);
+  border-radius: 3px;
+  background: var(--white);
+  font-size: 13px;
+}
+.copilot-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.copilot-chips .btn { font-family: var(--font-body); font-size: 12px; font-weight: 400; text-align: left; }
+.copilot-answer { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; border: 1px dashed var(--ink-2); background: var(--white); }
+.copilot-answer[hidden] { display: none; }
+.copilot-answer-text { font-size: 13.5px; }
+.copilot-warn { padding: 6px 8px; border-left: 3px solid var(--watch); background: var(--watch-bg); color: var(--ink); font-size: 12.5px; }

@@ -44,29 +44,38 @@ on these data during setup.
 ## Drone inspection clips (dashboard library)
 
 The dashboard's inspection library (`cv/review_library/`, built by
-`python -m cv.prepare_review` from `cv/drone_review.json`) uses only top-down
-drone footage, because the demo's inspection is a drone flight over the road.
+`python -m cv.prepare_review` from `cv/drone_review.json`) uses drone footage,
+because the demo's inspection is a drone flight over the road. Six clips are
+top-down; the container-terminal queue is an oblique view.
 Raw clips go in `cv/clips/raw/` (ignored by Git); the committed library holds a
 4-second annotated excerpt, one source frame and one annotated frame per clip.
 All are 1920×1080 Pexels downloads under the [Pexels license](https://www.pexels.com/license/),
-fetched November 14, 2026. None was filmed near the Port of Los Angeles or
-Long Beach, and capture dates are not published.
+fetched November 14, 2026. The crash, clear-road and rest-area clips were not
+filmed near the Port of Los Angeles or Long Beach. The sources of the two
+heavy-traffic clips (Kelly) do not state where they were filmed. Capture dates
+are not published.
 
-| File | Library case | Creator | Source |
-| --- | --- | --- | --- |
-| `blocked_crash_topdown_12753260.mp4` | crash-lanes-blocked | K | https://www.pexels.com/video/aerial-shot-of-a-car-accident-on-a-highway-12753260/ |
-| `blocked_crash_topdown_12901485.mp4` | crash-orbit | K | https://www.pexels.com/video/accident-on-highway-12901485/ |
-| `clear_topdown_13376785.mp4` | highway-free-flow | tal molcho | https://www.pexels.com/video/traffic-on-highway-13376785/ |
-| `clear_topdown_31570754.mp4` | city-highway-flow | Kenan Turguç | https://www.pexels.com/video/aerial-view-of-city-highway-traffic-31570754/ |
-| `ambiguous_rest_area_15978611.mp4` | rest-area-parked-trucks | DeLuca G | https://www.pexels.com/video/aerial-view-of-a-highway-with-many-trucks-15978611/ |
+| File | Library case | Check types | Creator | Source |
+| --- | --- | --- | --- | --- |
+| `blocked_crash_topdown_12753260.mp4` | crash-lanes-blocked | crash | K | https://www.pexels.com/video/aerial-shot-of-a-car-accident-on-a-highway-12753260/ |
+| `blocked_crash_topdown_12901485.mp4` | crash-orbit | crash | K | https://www.pexels.com/video/accident-on-highway-12901485/ |
+| `blocked_port_queue_13742716.mp4` | terminal-truck-queue | congestion | Kelly | https://www.pexels.com/video/trucks-in-port-13742716/ |
+| `ambiguous_dense_moving_38774214.mp4` | highway-dense-slow | congestion | Kelly | https://www.pexels.com/video/aerial-view-of-vehicles-on-highway-traffic-38774214/ |
+| `clear_topdown_13376785.mp4` | highway-free-flow | crash, congestion, environment | tal molcho | https://www.pexels.com/video/traffic-on-highway-13376785/ |
+| `clear_topdown_31570754.mp4` | city-highway-flow | crash, congestion, environment | Kenan Turguç | https://www.pexels.com/video/aerial-view-of-city-highway-traffic-31570754/ |
+| `ambiguous_rest_area_15978611.mp4` | rest-area-parked-trucks | crash, congestion, environment | DeLuca G | https://www.pexels.com/video/aerial-view-of-a-highway-with-many-trucks-15978611/ |
 
 Download each clip's 1920×1080 file from its page and save it under the file
-name above. Two earlier candidates, `blocked_port_queue_13742716.mp4` and
-`blocked_highway_queue_13171071.mp4`, are oblique views and are not used. `ambiguous_dense_moving_38774214.mp4` (Kelly) is top-down but so close that cars fill the frame, which defeats the camera-motion estimate; it is left out.
+name above. A clear road is a valid answer to any check, so the three clear-road
+clips carry every check type. One earlier candidate,
+`blocked_highway_queue_13171071.mp4` (Jozef Papp,
+https://www.pexels.com/video/traffic-on-highway-13171071/), is not used: it is a
+1280×720 wide oblique view with the horizon in frame, the trucks are 10 to 40
+pixels long, and the detector finds about 8 of several dozen.
 
 Road regions and visual notes in `drone_review.json` are AI-assisted and
 provisional. No independent annotator has validated them, and no blockage
-accuracy is reported from five hand-picked clips.
+accuracy is reported from seven hand-picked clips.
 
 ## Pretrained models
 

@@ -6,7 +6,6 @@ each formula and assumption.
 """
 import math
 import re
-from copy import deepcopy
 
 METERS_PER_MILE = 1609.344
 EARTH_RADIUS_M = 6371008.8
@@ -112,6 +111,8 @@ class RouteModel:
         if self.fallback is self.blocked_route:
             raise ValueError("blockage fallback_route must differ from the blocked route")
         self.turnaround_min = blockage["turnaround_min"]
+        # A "slowdown" (heavy traffic) holds the truck for slowdown_min and lets it through; a closure turns it back.
+        self.slowdown_min = blockage["slowdown_min"] if blockage.get("effect") == "slowdown" else None
         incident = _by_id(scenario["locations"], blockage["location"])
         self.truck = truck
         self.truck_at = fraction_along(self.current["geometry"], truck["lat"], truck["lon"])
@@ -140,9 +141,14 @@ class RouteModel:
         return trip
 
     def follow(self, trip, route, position, state):
-        """Drive `route` from `position` to its end, turning back at the obstruction if it is blocked."""
+        """Drive `route` from `position` to its end. In the blocked state the truck queues through a slowdown,
+        or turns back at a closure and takes the fallback route."""
         if state == "blocked" and route is self.blocked_route and position < self.incident_at:
             trip.drive(route, position, self.incident_at, f"{route['id']} to obstruction")
+            if self.slowdown_min is not None:
+                trip.wait(self.slowdown_min, "queue through the slowdown")
+                trip.drive(route, self.incident_at, 1.0)
+                return
             trip.wait(self.turnaround_min, "turnaround at obstruction")
             trip.drive(route, self.incident_at, 0.0, f"{route['id']} back to start")
             trip.drive(self.fallback, 0.0, 1.0)
@@ -166,24 +172,6 @@ class RouteModel:
         }
 
 
-def apply_override(computed, override):
-    """Merge an action's hand-entered override over its computed outcomes; the override wins."""
-    outcomes = deepcopy(computed)
-    for state in STATES:
-        values = {k: v for k, v in (override or {}).get(state, {}).items() if k in METRICS}
-        if not values:
-            continue
-        outcome = outcomes.setdefault(state, {})
-        outcome.update(values)
-        outcome["basis"] = "override"
-        outcome["override_basis"] = override.get("basis", "assumed")
-    for state in STATES:
-        missing = [k for k in METRICS if k not in outcomes.get(state, {})]
-        if missing:
-            raise ValueError(f"{state} outcome is missing {missing}; give a plan or a complete override")
-    return outcomes
-
-
 def apply_route_outcomes(scenario):
     """Fill each action's outcomes, its outcomes after an inspection, and decision_model.assignments in place."""
     from backend.assignment import AssignmentModel  # assignment builds on RouteModel
@@ -194,9 +182,7 @@ def apply_route_outcomes(scenario):
     model["planned_trip"] = routes.planned_summary()
     delay = model.get("drone", {}).get("launch_and_review_minutes", 0)
     for action in model["actions"]:
-        plan = action.get("plan")
         for key, minutes in (("outcomes", 0), (INSPECTED, delay)):
-            computed = {state: pool.outcome(plan, state, minutes) for state in STATES} if plan else {}
-            action[key] = apply_override(computed, action.get("override"))
+            action[key] = {state: pool.outcome(action["plan"], state, minutes) for state in STATES}
     model["assignments"] = pool.enumerate(model["actions"], delay)
     return scenario

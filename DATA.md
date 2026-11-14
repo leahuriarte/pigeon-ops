@@ -14,9 +14,10 @@ The shared operating picture in `config/port_scenario.json` contains:
 - 9 synthetic trucks with assignments, powertrains, status, duty time, approximate simulated positions, and availability times for the two trucks the swap option exchanges
 - 4 illustrative corridors, including a current route, candidate detour, and two fleet context routes
 - A playback schedule for every truck, built from the shipment ETAs, appointments, and release holds, with road-following paths in `config/road_geometry.json`
-- 3 scenario variants: routine morning operations, an unverified road disruption, and a corroborated one
-- 3 dispatcher actions whose delay, cost, emissions, and constraint outcomes are computed from route data (one still uses a hand-entered override); see [docs/METHODS.md](docs/METHODS.md)
-- 1 simulated observation with an explicit accuracy assumption
+- 5 scenario variants: routine morning operations and four incident reports, each calling for a kind of drone check: an unverified crash, a corroborated crash, heavy traffic, and road damage from a burst water main
+- 3 dispatcher actions whose delay, cost, emissions, and constraint outcomes are computed from route data; see [docs/METHODS.md](docs/METHODS.md)
+- 1 simulated observation per incident, with an explicit accuracy and time assumption for each kind of check
+- Schools within 300 m of each route, from OpenStreetMap (`config/community_exposure.json`, rebuilt by `scripts/build_community_exposure.py`); the only non-synthetic values in the indicators
 
 Identifiers use the `SYN-` prefix so they cannot be mistaken for valid container, carrier, truck, or shipment identifiers.
 
@@ -74,7 +75,7 @@ The prototype currently uses a hand-curated, deterministic scenario so the hacka
 1. Select a terminal, destination, commodity class, truck, appointment, and readiness state.
 2. Assign a corridor and an ETA with appointment slack.
 3. Mark shipments as on time, watch, at risk, planned, or unassigned.
-4. In the disruption variant, introduce an uncertain road state with a 40% prior blockage probability.
+4. In each incident variant, introduce an uncertain road state with a prior probability (40% and 80% for the crash reports, 50% for heavy traffic, 25% for road damage).
 5. Compute each action's outcomes from route distance and duration, then its loss under open and blocked states.
 6. Calculate the value of an imperfect observation and update the probability with Bayes' rule after a simulated result.
 

@@ -1,3 +1,5 @@
+import { clearFootageOpinion, renderFootageOpinion } from "./copilot.js";
+
 const dialog = document.querySelector("#inspection-dialog");
 const clips = document.querySelector("#inspection-clips");
 const video = document.querySelector("#inspection-video");
@@ -19,11 +21,7 @@ const labels = {
   image_unavailable: "Footage unavailable",
 };
 const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const signalLabels = {
-  blocked: "Road blocked",
-  clear: "Road clear: traffic gets through",
-  inconclusive: "Inconclusive",
-};
+let signalLabels = {};
 
 function showMedia() {
   video.hidden = showSource;
@@ -71,9 +69,12 @@ function renderCase() {
   document.querySelector("#inspection-restriction").textContent = selected.allowed_observations.length === 1
     ? "This clip supports an inconclusive observation only."
     : "Confirm or change the suggestion. Traffic getting through this frame does not prove the road is safe beyond it.";
+  renderFootageOpinion(selected, signalLabels, scenarioId); // LLM second read; never changes the preselected radio.
 }
 
-export async function openInspection(id) {
+// Opens the dialog with the clips that fit this kind of check (`words` is the scenario's disruption.check).
+// Returns false when the library has no clip showing that kind of hazard, so the page falls back to simulated results.
+export async function openInspection(id, words) {
   if (!libraryPromise) {
     libraryPromise = fetch("/api/inspection-cases").then((response) => {
       if (!response.ok) throw new Error("Inspection library could not be loaded");
@@ -81,9 +82,12 @@ export async function openInspection(id) {
     }).catch(() => ({ cases: [] }));
   }
   const library = await libraryPromise;
-  cases = library.cases || [];
-  if (!cases.length) return false;
+  cases = (library.cases || []).filter((item) => !item.check_types || item.check_types.includes(words.type));
+  if (!cases.some((item) => item.visual_label !== "no_visible_obstruction")) return false;
   scenarioId = id;
+  signalLabels = { blocked: `Road ${words.bad}`, clear: "Road clear: traffic gets through", inconclusive: "Inconclusive" };
+  document.querySelector("#inspection-dialog-heading").textContent = `${words.label}: what does the footage show?`;
+  document.querySelectorAll("[name=inspection-observation]").forEach((radio) => { radio.nextElementSibling.textContent = signalLabels[radio.value]; });
   clips.innerHTML = cases.map((item) => `<button class="clip" type="button" role="tab" data-case="${escapeHtml(item.id)}" aria-selected="false">
     <img src="${escapeHtml(item.annotated_image)}" alt="">
     <span>${escapeHtml(item.title)}</span>
@@ -98,6 +102,7 @@ export async function openInspection(id) {
 export function resetInspection() {
   if (dialog.open) dialog.close();
   scenarioId = null;
+  clearFootageOpinion();
 }
 
 clips.addEventListener("click", (event) => {

@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LIBRARY = ROOT / "cv" / "review_library" / "library.json"
 INDICATOR_IDS = {"shipments_at_risk", "appointments_feasible", "expected_delay_min", "added_miles", "co2_kg", "community_exposure"}
 BASES = {"stub", "estimated", "simulated", "measured"}
+CHECK_TYPES = {"crash", "congestion", "environment"}
 SHIPMENT_ROW = {"shipment", "truck", "route", "reassigned", "arrival", "appointment", "slack_min", "lateness_min",
                 "constraint_breaches", "basis"}
 
@@ -28,7 +29,10 @@ class ScenarioContractTests(unittest.TestCase):
                 for key in ("id", "name", "scenario_type", "disruption", "decision_model", "routes", "shipments"):
                     self.assertIn(key, s)
                 self.assertIn("prior_blocked_probability", s["disruption"])
-                self.check_indicators(s["indicators_stub"])
+                if s["scenario_type"] != "normal":
+                    check = s["disruption"]["check"]
+                    self.assertIn(check["type"], CHECK_TYPES)
+                    self.assertLessEqual({"label", "bad", "good"}, set(check))
                 for route in s["routes"]:
                     self.assertEqual("LineString", route["geometry"]["type"])
                     self.assertGreaterEqual(len(route["geometry"]["coordinates"]), 2)
@@ -40,6 +44,9 @@ class ScenarioContractTests(unittest.TestCase):
                 result = analyze(load_scenario(variant=item["id"]), "blocked")
                 self.check_indicators(result["indicators"])
                 self.assertIn("of", next(i for i in result["indicators"] if i["id"] == "appointments_feasible"))
+                self.assertTrue(all(i["value"] is not None and i["basis"] == "estimated" for i in result["indicators"]))
+                for option in result["before"] + result["after"]:
+                    self.assertIsInstance(option["schools_within_300m"], int)
                 assignments = result["assignments"]
                 self.assertLessEqual({"shipments", "trucks", "count", "before", "after"}, set(assignments))
                 self.assertEqual(assignments["count"], len(assignments["before"]))

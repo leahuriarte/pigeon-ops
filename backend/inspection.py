@@ -9,6 +9,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from backend.copilot import cached_footage_opinion
 from backend.decision_engine import analyze
 from backend.scenario import load_scenario
 
@@ -43,12 +44,16 @@ def review_inspection(payload, library_path=LIBRARY, audit_path=AUDIT):
     variant = payload.get("scenario", "disruption")
     if not isinstance(variant, str):
         raise ValueError("Scenario must be a name")
-    analysis = analyze(load_scenario(variant=variant), observation)
+    scenario = load_scenario(variant=variant)
+    analysis = analyze(scenario, observation)
     suggestion = case.get("cv_assessment", {}).get("suggested_observation")
+    llm_suggestion = (cached_footage_opinion(case["id"], (scenario["disruption"].get("check") or {}).get("type")) or {}).get("observation")
     review = {
         "case_id": case["id"], "scenario": variant, "observation": observation,
         "note": note.strip(), "reviewed_at": datetime.now(timezone.utc).isoformat(),
         "cv_suggestion": suggestion, "agrees_with_cv": None if suggestion is None else suggestion == observation,
+        "llm_suggestion": llm_suggestion,
+        "agrees_with_llm": None if llm_suggestion is None else llm_suggestion == observation,
         "review_method": "explicit_demo_review", "simulated_application": True,
         "source_url": case["source"]["source_url"], "source_sha256": case["source"]["sha256"],
         "interpretation": "Reviewed stock drone footage applied to a fictional scenario; not a current road-status report.",

@@ -64,7 +64,7 @@ function valueAt(points, prior) {
 // Line chart of analysis.sensitivity: net value of inspecting against the chance the road is blocked.
 // The shaded range is where inspecting pays. Markers show the chance now and, after an inspection,
 // the chance before it.
-export function renderSensitivity(container, analysis) {
+export function renderSensitivity(container, analysis, words = { bad: "blocked" }) {
   const points = analysis.sensitivity;
   if (!points?.length) {
     container.hidden = true;
@@ -118,7 +118,7 @@ export function renderSensitivity(container, analysis) {
 
   container.hidden = false;
   container.innerHTML = `<h3>When a drone check pays off</h3>
-    <p class="sens-sub">Net value of checking first, in dollars, for each chance that the road is blocked. Estimated.</p>
+    <p class="sens-sub">Net value of checking first, in dollars, for each chance that the road is ${esc(words.bad)}. Estimated.</p>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(summary)}">
       ${bands}
       <line class="sens-zero" x1="${left}" x2="${W - right}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}"/>
@@ -129,7 +129,7 @@ export function renderSensitivity(container, analysis) {
       ${marker(now, "Now", true)}
       <g class="sens-hover" hidden><line y1="${top}" y2="${H - bottom}"/><circle r="4"/></g>
       ${ticks}
-      <text x="${W / 2}" y="${H - 3}" text-anchor="middle">Chance the road is blocked</text>
+      <text x="${W / 2}" y="${H - 3}" text-anchor="middle">Chance the road is ${esc(words.bad)}</text>
     </svg>
     <p class="sens-readout">Point at the line to read a value.</p>
     <figcaption>${esc(summary)}</figcaption>`;
@@ -177,11 +177,11 @@ function caseFor(outcome, affectedId) {
 
 // What a response does to the affected shipments in each road state, as list markup for an option card.
 // `option` is one entry of analysis.before, analysis.after or analysis.assignments.before.
-export function outcomeCases(option, blockedProbability, affectedId) {
+export function outcomeCases(option, blockedProbability, affectedId, words = { bad: "blocked", good: "open" }) {
   const open = caseFor(option.outcomes?.open, affectedId);
   const blocked = caseFor(option.outcomes?.blocked, affectedId);
   if (!open || !blocked) return "";
   const row = (label, share, item) => `<li class="${item.tone}"><span class="case">${label}${share === null ? "" : ` <small>${pct(share)} chance</small>`}</span><span>${item.text}.</span></li>`;
-  if (open.text === blocked.text) return `<ul class="option-cases">${row("Road open or blocked", null, open)}</ul>`;
-  return `<ul class="option-cases">${row("If the road is open", 1 - blockedProbability, open)}${row("If the road is blocked", blockedProbability, blocked)}</ul>`;
+  if (open.text === blocked.text) return `<ul class="option-cases">${row(`Road ${words.good} or ${words.bad}`, null, open)}</ul>`;
+  return `<ul class="option-cases">${row(`If the road is ${words.good}`, 1 - blockedProbability, open)}${row(`If the road is ${words.bad}`, blockedProbability, blocked)}</ul>`;
 }

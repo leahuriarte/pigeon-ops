@@ -59,7 +59,8 @@ The trip an action produces depends on its `plan.route` and the road state:
 
 1. **Planned trip.** The truck stays on its current route and drives from its share to the end.
 2. **Switch route** (for example `reroute`). The truck drives back along the current route to its start, then drives the whole new route. The new route must start where the current route starts; the backend raises an error otherwise.
-3. **Blocked road.** If the trip uses the blocked route (`blockage.route`) and the truck has not yet passed the obstruction, it drives to the obstruction, waits `blockage.turnaround_min`, drives back to the route start, then drives the whole `blockage.fallback_route`.
+3. **Slowdown** (heavy traffic, `blockage.effect: "slowdown"`). If the trip uses the affected route and the truck has not yet passed the queue, it drives to the queue, waits `blockage.slowdown_min` crawling through it, and continues on the same route. It drives no extra miles.
+4. **Blocked road** (every other incident). If the trip uses the blocked route (`blockage.route`) and the truck has not yet passed the obstruction, it drives to the obstruction, waits `blockage.turnaround_min`, drives back to the route start, then drives the whole `blockage.fallback_route`.
 
 ```text
 driver minutes = driving minutes + waiting minutes
@@ -82,12 +83,6 @@ incremental_cost    = trip cost − planned trip cost
 The shipment's ETA anchors the clock. It is a synthetic input that already includes things the route model does not see, such as gate time. Route data only supplies the change from that plan.
 
 Each computed outcome has `basis: "estimated"` and a `detail` block with the affected shipment's arrival, miles, driver minutes, trip cost and path, the added miles of the whole assignment pool, and `shipments`, one row per pool shipment (section 4).
-
-### Overrides
-
-An action may have an `override` block with `open` and/or `blocked` values for any of `lateness_min`, `incremental_cost`, `emissions_kg` and `constraint_breaches`. An override value always wins over the computed value. An outcome with any overridden value gets `basis: "override"` and `override_basis` (for example `"assumed"`).
-
-An action with no `plan` must override all four values in both states. No action does this at present.
 
 ## 4. Truck assignment
 
@@ -199,12 +194,18 @@ The sensitivity curve repeats the net value at 21 evenly spaced priors from 0 to
 | normal | 0.02 | hold-course | 120.72 | 131.90 | −101.18 | no |
 | disruption | 0.40 | reroute | 1227.11 | 1020.91 | +116.20 | yes |
 | disruption_b | 0.80 | reroute | 1227.11 | 1740.61 | −603.50 | no |
+| congestion | 0.50 | hold-course | 1204.91 | 918.60 | +196.32 | yes |
+| flood | 0.25 | reroute | 1227.11 | 917.17 | +219.94 | yes |
 
 Net value is best loss now minus loss with inspection minus the $90 direct cost.
 
 In `disruption` an inspection can change the decision. A "clear" result drops the blockage probability to 7%, and keeping the current route becomes best. Inspecting is still worth it, by $116.20 instead of the $279.30 the flat delay cost gave. The inspection pays off once its evidence is at least 86.4% accurate (`evoi.break_even_accuracy`); the assumed accuracy is 90%.
 
 In `disruption_b` the reports are corroborated, so the prior is 80%. Even after a "clear" result the probability stays at 31%, and rerouting is still best. The inspection cannot change the decision. It only makes the reroute start 6 minutes later: 6 more late minutes at $85 plus $3.50 of paid waiting, $513.50, plus the $90 direct cost.
+
+In `congestion` (heavy traffic) the queue only delays the truck, so keeping the route is best before a check. A "jammed" result raises the probability to 95% and the detour becomes best. A traffic check is assumed to be 95% accurate and to take 4 minutes, because a standing queue is easy to see from above.
+
+In `flood` (road damage from a burst water main) a truck that reaches an impassable road loses 15 minutes backing out, so the detour is best before a check. A "clear" result drops the probability to 5% and keeping the route becomes best. A road damage check is assumed to be 85% accurate and to take 8 minutes, because water depth is hard to judge from above and the CV only tracks vehicles.
 
 In `normal`, waiting costs only $3.50 of driver time because SYN-SHP-1042 has 21 minutes of slack, but there is almost nothing to learn.
 
@@ -219,11 +220,11 @@ Indicators describe the whole plan under the top-ranked option before any inspec
 | `expected_delay_min` | p × blocked lateness + (1 − p) × open lateness of the top option |
 | `added_miles` | p × blocked added miles + (1 − p) × open added miles of the top option, against the planned trip |
 | `co2_kg` | Full route miles of every assigned shipment × `co2_kg_per_mile`, plus the top option's expected emissions (which include the change to other pool shipments) minus the planned trip's emissions |
-| `community_exposure` | Not computed yet. It needs a school location dataset. Value `null`, basis `stub` |
+| `community_exposure` | Distinct schools within 300 m of any route the plan drives: every assigned shipment's route, with the affected shipment on the top option's route. Schools are OpenStreetMap `amenity=school` points, saved by `scripts/build_community_exposure.py` in `config/community_exposure.json` |
 
 P(...) here is the sum of the probabilities of the road states in which the condition holds.
 
-Indicators are `basis: "estimated"` when the top option's outcomes come from route data. If the top option uses an override, they are `basis: "stub"`, and `added_miles` is `null` because an override carries no miles.
+Every indicator is `basis: "estimated"`. Each ranked response also carries `schools_within_300m`, the same count for the one route it sends the affected load on (0 on the CA-47 route, 6 on the Anaheim St detour). It counts the route the response chooses; a truck forced onto the detour by a closure is not counted.
 
 Each shipment counts as one full trip on its route. Return trips and empty repositioning are not counted, so `co2_kg` understates fleet emissions.
 
@@ -234,7 +235,8 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 | `rates.cost_per_mile` | $1.30 | assumed | Non-driver operating cost (fuel, maintenance, tires, truck payments, insurance). Round value of the size reported in ATRI's annual *Operational Costs of Trucking*; not checked against the latest edition. |
 | `rates.driver_hourly_rate` | $35 | assumed | Loaded driver cost per hour, charged for driving and waiting. Round value; not sourced. |
 | `rates.co2_kg_per_mile` | 1.6 kg | estimated | About 10.2 kg CO2 per gallon of diesel (EPA emission factor) divided by about 6.4 miles per gallon for a heavy truck. Tailpipe only. Battery-electric trucks are treated the same; this overstates their emissions. |
-| `blockage.turnaround_min` | 10 min | assumed | Time lost reaching the queue and turning around. |
+| `blockage.turnaround_min` | 10 min, 15 min in `flood` | assumed | Time lost reaching the closure and turning around; longer when the truck has to back out of standing water. |
+| `blockage.slowdown_min` | 40 min in `congestion` | assumed | Time lost crawling through a standing queue. |
 | `blockage.route` / `fallback_route` | primary / detour | assumed | The obstruction sits on `primary`; drivers fall back to the Anaheim St detour. |
 | `indicator_rules.at_risk_probability` | 0.5 | assumed | Probability threshold for "at risk" and "infeasible". |
 | Truck `available_at` | SYN-TRK-07 09:12, SYN-TRK-12 09:25 | synthetic | SYN-TRK-07 is free now; 09:25 comes from the scenario's "is free for a handover from 09:25". |
@@ -244,9 +246,30 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 | Route distance and duration | OSRM | estimated | OSRM's car profile with free-flow speeds. Trucks are usually slower, so all times are optimistic. |
 | Constant speed along a route | n/a | assumed | Needed because OSRM gives one duration per route. |
 | Truck position and ETA | scenario | synthetic | From the seeded scenario. |
-| Prior blockage probability | 0.02 / 0.40 / 0.80 | synthetic | Chosen per variant to tell the demo story. |
-| Inspection accuracy | 0.90 | assumed | Sensitivity parameter, not validated on footage. |
+| Prior blockage probability | 0.02 / 0.40 / 0.80 / 0.50 / 0.25 | synthetic | Chosen per variant (normal, disruption, disruption_b, congestion, flood) to tell the demo story. |
+| Inspection accuracy | 0.90 crash, 0.95 traffic, 0.85 road damage | assumed | Sensitivity parameter per kind of check, not validated on footage. |
+| Inspection time | 6 min crash, 4 min traffic, 8 min road damage | assumed | `drone.launch_and_review_minutes` per kind of check. |
+| Schools near a route | 300 m | estimated | OpenStreetMap may miss schools or list closed ones; distance is to the school's mapped point or outline centre. |
 | Lateness, emissions and breach weights | $85/min, $0.25/kg, $2,500 | assumed | Unchanged; see DATA.md. |
+
+## 8. LLM explanations
+
+The code lives in `backend/llm.py` (client) and `backend/copilot.py` (roles). A language model writes text around the engine's results. It never sets a number, a ranking, the Bayes update or the preselected observation. Everything it writes carries `basis: "llm_generated"` and the model name, and the page labels it as LLM-written, advisory and not validated.
+
+There are three roles:
+
+1. **Second read of the footage.** The model gets a clip's CV assessment (motion counts, shares, rule thresholds), its detection counts, its image quality, the provisional keyframe annotation and the allowed observations. It returns an observation from that list, a confidence, a short rationale and up to three things to check in the clip. The dialog shows it under the CV suggestion. The review log records it as `llm_suggestion` and `agrees_with_llm`.
+2. **Dispatcher brief.** The model gets `decision_facts`: the incident, the blockage chance before and now in whole percents, the inspection economics, the ranges of blockage chance where inspecting pays (the zero crossings of `sensitivity`), the ranked options with each road state's outcome, and the indicators. Differences it might quote, such as each option's gap to the best expected loss, are computed in advance so it does no arithmetic.
+3. **Questions.** The model answers by calling four tools that run the engine: the decision summary, `information_value` at a given blockage chance, `rank_actions` at a given blockage chance, and one action's per-shipment rows. The loop stops after four rounds of tool calls.
+
+Two guards check the output:
+
+- **Rank-1 check.** A brief is dropped unless it recommends the engine's top-ranked option. Before an inspection it must also agree with `recommend_inspection`.
+- **Number grounding.** Every number in the text must appear in what the model was given. A number counts as given if it matches a source value rounded to 0, 1 or 2 decimals, its absolute value, its percent when the value is a probability, or a number inside a source string (so `SYN-SHP-1042` and `09:30` pass). A footage read or brief that fails is dropped. An answer to a question is shown with a warning instead.
+
+Without an API key the features are off. On a timeout, a network or HTTP error, or a reply that fails validation, the panel stays hidden and the page works as before. After a failure the client waits 30 seconds before trying again. `python -m scripts.llm_stub` serves canned replies for development and tests; it is not a model.
+
+The guards catch a wrong pick and invented figures. They do not catch a wrong explanation built from real figures, so the text remains unvalidated advice.
 
 ## Known limitations
 
@@ -254,7 +277,6 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 - Waiting in the queue counts toward driver time and cost but not toward emissions. Idling emissions are left out.
 - During an inspection a free pool truck waits where it is. A real driver might keep driving toward the obstruction, which would cost nothing if the road is clear and add backtracking if it is not.
 - The wait applies to every pool truck that is free before the inspection ends, even one that ends up keeping its own load.
-- An action outcome entered as an `override` does not move with the inspection delay.
 - Only pool shipments respond to the disruption. Shipments outside the pool run on plan.
 - The drive to the load is a straight line at a fixed speed. It ignores the blockage, so in the blocked state it understates how long SYN-TRK-12 needs to reach SYN-TRK-07 from beyond the obstruction.
 - Each reassigned shipment is computed on its own. In a swap each truck drives to the other's position instead of both meeting once, which overstates the swap's driving.

@@ -31,6 +31,8 @@ WINDOW_SECONDS = 4.0
 SAMPLE_FPS = 8
 SPEED_GAP_SECONDS = 0.25
 OUTPUT_WIDTH = 960
+# Visual labels for which a reviewer would expect a "blocked" suggestion.
+BLOCKED_LABELS = {"visible_obstruction", "standing_queue"}
 # BGR colours: standing, slow, moving, outside the road or not re-found.
 COLOURS = {"stopped": (40, 40, 230), "slow": (0, 170, 250), "moving": (90, 210, 60), "other": (190, 190, 190)}
 
@@ -45,8 +47,13 @@ def gray(frame):
     return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
 
-def analyse_clip(path, start, model, rule=DEFAULT_MOTION_RULE, road=()):
-    """Detections, road region and vehicle speeds for each sampled frame."""
+def analyse_clip(path, start, model, rule=DEFAULT_MOTION_RULE, road=(), hover=False):
+    """Detections, road region and vehicle speeds for each sampled frame.
+
+    `hover` skips the camera-motion estimate and treats the camera as still.
+    Use it only for a clip where vehicles cover so much of the frame that the
+    estimate follows the traffic instead of the ground.
+    """
     capture = cv2.VideoCapture(str(path))
     if not capture.isOpened():
         raise ValueError(f"Cannot open {path}")
@@ -64,7 +71,7 @@ def analyse_clip(path, start, model, rule=DEFAULT_MOTION_RULE, road=()):
                 break
             boxes = [item["box"] for item in predict_frame(model, frame, confidence=CONFIDENCE)]
             # Follow the keyframe's road region as the camera drifts or turns.
-            if previous is None:
+            if previous is None or hover:
                 to_here = IDENTITY.copy()
             else:
                 step = camera_motion(gray(previous["frame"]), gray(frame), previous["boxes"])
@@ -80,7 +87,8 @@ def analyse_clip(path, start, model, rule=DEFAULT_MOTION_RULE, road=()):
     # One ground scale per clip: altitude barely changes within a few seconds.
     scale = metres_per_pixel([box for sample in samples for box in sample["boxes"]])
     for sample in samples:
-        speeds = vehicle_speeds(gray(sample["frame"]), gray(sample["later"]), sample["boxes"], gap / fps, scale) if scale else []
+        speeds = vehicle_speeds(gray(sample["frame"]), gray(sample["later"]), sample["boxes"], gap / fps, scale,
+                                camera=IDENTITY if hover else None) if scale else []
         sample["vehicles"] = []
         for box, speed in zip(sample["boxes"], speeds):
             inside = on_road(box, sample["road"])
@@ -152,7 +160,8 @@ def prepare(catalog_path, clips_dir, output, model_name=MODEL):
         keyframe = read_frame(probe, round(item["start_seconds"] * probe.get(cv2.CAP_PROP_FPS)))
         probe.release()
         road = to_pixels(item["road"], keyframe.shape[1], keyframe.shape[0])
-        samples, assessment, timing = analyse_clip(path, item["start_seconds"], model, road=road)
+        hover = item.get("camera") == "hover"
+        samples, assessment, timing = analyse_clip(path, item["start_seconds"], model, road=road, hover=hover)
         # Show the sample that best matches the clip-level counts as the still.
         target = (assessment["stopped"], assessment["moving"])
         still = min(samples, key=lambda s: abs(counts(s)["stopped"] - target[0]) + abs(counts(s)["moving"] - target[1]))
@@ -168,6 +177,8 @@ def prepare(catalog_path, clips_dir, output, model_name=MODEL):
         median_on_road = on_road_counts[len(on_road_counts) // 2]
         cases.append({
             "id": item["id"], "title": item["title"], "visual_label": item["visual_label"],
+            # Which drone checks this clip can illustrate: crash, congestion, environment.
+            "check_types": item["check_types"],
             "review_note": item["note"], "annotation_method": catalog["annotation_method"],
             "image_quality": "reviewable",
             "road_region": item["road"],
@@ -181,6 +192,7 @@ def prepare(catalog_path, clips_dir, output, model_name=MODEL):
                 **assessment, "suggested_observation": assessment["signal"],
                 "model": f"{model_name}, confidence {CONFIDENCE}",
                 "window_seconds": round(samples[-1]["seconds"], 2), **timing,
+                "camera_motion": "assumed none (hovering drone, set by hand)" if hover else "estimated from the background",
                 "basis": "Unvalidated rule: hand-set speed thresholds, approximate speeds from an assumed 2 m vehicle "
                          "width, no labelled blockage footage to score it against. A dispatcher confirms or overrides it.",
             },
@@ -196,7 +208,7 @@ def prepare(catalog_path, clips_dir, output, model_name=MODEL):
             "review_status": "needs_dispatcher_review", "simulated_application": True,
         })
         print(f"{item['id']}: {assessment['signal']} ({assessment['reason']}); expected {item['visual_label']}", flush=True)
-    agreement = sum((case["visual_label"] == "visible_obstruction") == (case["cv_assessment"]["signal"] == "blocked")
+    agreement = sum((case["visual_label"] in BLOCKED_LABELS) == (case["cv_assessment"]["signal"] == "blocked")
                     for case in cases)
     summary = {
         "cases": len(cases), "model": model_name,

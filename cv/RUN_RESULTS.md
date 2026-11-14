@@ -91,8 +91,10 @@ observations on the drone clips has not been measured.
 
 ## Drone inspection library (dashboard)
 
-The dashboard library uses five top-down Pexels drone clips, because the demo's
-inspection is a drone flight.
+The dashboard library uses seven Pexels drone clips (six top-down, one oblique),
+because the demo's inspection is a drone flight. Each clip lists the check types
+it can illustrate (`crash`, `congestion`, `environment`); the three clear-road
+clips carry all three.
 `python -m cv.prepare_review` samples 4 seconds of each clip at 8 frames per
 second with `drone-ensemble`, removes camera motion, measures vehicle speeds
 and applies the motion rule to the marked road (`cv/README.md`).
@@ -101,13 +103,25 @@ and applies the motion rule to the marked road (`cv/README.md`).
 | --- | --- | --- | --- |
 | crash-lanes-blocked | wreck across lanes | blocked | crashed trailer standing at 0 km/h; one car crawling at about 7 km/h |
 | crash-orbit | wreck across lanes | inconclusive | the detector does not recognise the jackknifed wreck, so the road looks empty |
+| terminal-truck-queue | standing truck queue | blocked | 16 of 16 trucks in the marked lanes standing at 0 km/h |
+| highway-dense-slow | dense, slow traffic | clear | 10 of 10 vehicles moving at about 10–25 km/h, all above the 10 km/h moving threshold |
 | highway-free-flow | no obstruction | clear | 11 of 11 vehicles moving at 60–100 km/h |
 | city-highway-flow | no obstruction | clear | 6 of 6 vehicles moving |
 | rest-area-parked-trucks | no obstruction | clear | 12 moving on the motorway; 63 parked trucks excluded by the road region |
 
-These are five hand-picked clips, not an accuracy measurement. A dense close-up
-clip (`38774214`) was dropped: cars fill the frame and the camera-motion estimate
-fails. Speeds in the rest-area clip read about 16 km/h, which suggests slowed
+These are seven hand-picked clips, not an accuracy measurement. In the dense
+close-up clip (`38774214`, highway-dense-slow) cars fill the frame and the
+camera-motion estimate follows the traffic: the road region slid off the road,
+speeds read 0–19 km/h, and the suggestion changed with the start time (blocked
+from 0.5, 2.2 and 13 s, inconclusive from 6 and 10 s). The catalog therefore
+marks that clip `"camera": "hover"`, which treats the camera as still; the
+suggestion is then clear from both start times tried (0.5 and 6 s). The real
+drift is about 1 km/h. Its "clear" is the rule working as written, not a
+judgment that the traffic is light. The terminal clip is an oblique view, so
+its single ground scale is rough, but standing trucks read 0 km/h at any scale.
+A wide oblique highway queue clip (`13171071`) was left out: the detector finds
+about 8 of several dozen trucks.
+Speeds in the rest-area clip read about 16 km/h, which suggests slowed
 stock footage; the 10 km/h moving threshold still classifies it correctly.
 
 Browser check on November 14: confirming the crash suggestion moves the

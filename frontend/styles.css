@@ -553,6 +553,8 @@ details.more > :not(summary) { margin-top: 8px; }
 .option-summary { display: block; margin-top: 6px; }
 .option-more { display: none; margin-top: 4px; color: var(--ink-2); font-size: 12.5px; }
 .option input:checked + label .option-more { display: block; }
+.override-reason { display: grid; gap: 4px; color: var(--ink-2); font-size: 13px; }
+.override-reason textarea { width: 100%; padding: 6px 8px; border: var(--frame); border-radius: 3px; background: var(--white); font-size: 13px; resize: vertical; }
 /* Only the selected card shows its detail, so three cards and the confirm button fit one screen. */
 .option input:not(:checked) + label :is(.option-cases, .option-metrics) { display: none; }
 .option-metrics {

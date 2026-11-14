@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/arcgis.css">
   <link rel="stylesheet" href="/inspection.css">
   <link rel="stylesheet" href="/insight.css">
+  <link rel="stylesheet" href="/copilot.css">
 </head>
 <body data-mode="monitoring" data-step="start" data-view="map">
   <header class="topbar">
@@ -169,7 +170,7 @@
           <h1 id="disruption-title">Loading…</h1>
           <p id="disruption-description" class="lede"></p>
           <dl class="facts">
-            <div><dt>Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
+            <div><dt id="risk-label">Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
             <div><dt id="affected-label">Shipment at risk</dt><dd id="affected">—</dd></div>
             <div><dt>Decide by</dt><dd id="deadline">—</dd></div>
           </dl>
@@ -179,6 +180,7 @@
             <h2 id="inspection-title">Check the road with a drone first?</h2>
             <p id="recommendation-short" class="verdict-answer">—</p>
             <p id="recommendation" class="verdict-why">Calculating…</p>
+            <div id="brief-incident" class="copilot-brief" aria-live="polite" hidden></div>
             <details class="more"><summary>Show the numbers</summary>
               <dl class="ledger">
                 <div><dt>Expected loss if you act now</dt><dd id="act-loss">—</dd></div>
@@ -198,7 +200,7 @@
             <button id="skip-inspection" class="btn" type="button">Decide without a drone check</button>
           </div>
           <div id="observation-buttons" class="choices" hidden>
-            <p>No footage library is available, so pick a simulated result:</p>
+            <p>The footage library has no clip of this kind of hazard, so pick a simulated result:</p>
             <div>
               <button class="choice" type="button" data-observation="blocked">Road blocked</button>
               <button class="choice" type="button" data-observation="clear">Road clear</button>
@@ -215,11 +217,15 @@
               <figcaption><span id="selected-evidence-title"></span> Stock drone footage, not filmed at CA-47.</figcaption>
             </figure>
             <p id="posterior" class="posterior"></p>
+            <div id="brief-respond" class="copilot-brief" aria-live="polite" hidden></div>
             <button id="reinspect-button" class="link" type="button">Review drone footage</button>
           </div>
           <h1 id="options-title">Choose a response</h1>
           <p id="ranking-state" class="subhead">Ranked by expected loss before inspection</p>
           <ol id="rankings" class="options"></ol>
+          <label id="override-reason-wrap" class="override-reason" hidden>Why are you overriding the recommendation? Your reason goes in the decision log.
+            <textarea id="override-reason" rows="2" maxlength="200"></textarea>
+          </label>
           <div class="actions">
             <button id="confirm-button" class="btn primary" type="button">Confirm</button>
           </div>
@@ -276,6 +282,22 @@
             <div id="next-incidents" class="jump-list"></div>
           </div>
         </section>
+
+        <details id="copilot-ask" class="more copilot-ask" hidden>
+          <summary>Ask about this decision</summary>
+          <form id="copilot-ask-form" class="copilot-ask-form">
+            <label class="visually-hidden" for="copilot-question">Your question</label>
+            <input id="copilot-question" type="text" maxlength="300" autocomplete="off" placeholder="Ask a what-if question">
+            <button id="copilot-ask-button" class="btn small" type="submit">Ask</button>
+          </form>
+          <div class="copilot-chips">
+            <button class="btn small" type="button" data-question="What if the chance of a blockage were 60%?">What if the chance of a blockage were 60%?</button>
+            <button class="btn small" type="button" data-question="Why not reroute right away?">Why not reroute right away?</button>
+            <button class="btn small" type="button" data-question="Which shipments are late if the road is blocked?">Which shipments are late if the road is blocked?</button>
+          </div>
+          <div id="copilot-answer" class="copilot-answer" aria-live="polite" hidden></div>
+          <p class="fine-print">Your question is sent to the hackathon LLM service. It answers by calling the PigeonOps engine; the answer is LLM-written, advisory and not validated.</p>
+        </details>
       </div>
     </aside>
   </main>
@@ -302,6 +324,7 @@
           <h3 id="inspection-cv-signal"></h3>
           <p id="inspection-cv-reason"></p>
         </div>
+        <div id="inspection-llm" class="inspection-llm" aria-live="polite" hidden></div>
         <fieldset class="inspection-choices">
           <legend>What do you see? The CV suggestion is preselected.</legend>
           <label><input type="radio" name="inspection-observation" value="blocked"><span>Road blocked</span></label>

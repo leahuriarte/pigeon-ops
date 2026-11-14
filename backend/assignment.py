@@ -198,8 +198,8 @@ class AssignmentModel:
         ids = [s["id"] for s in self.shipments]
         named = {}
         for action in actions:
-            plan = action.get("plan")
-            if not plan or action.get("override") or plan.get("route", self.affected["route"]) != self.affected["route"]:
+            plan = action["plan"]
+            if plan.get("route", self.affected["route"]) != self.affected["route"]:
                 continue
             trucks = self._trucks_for(plan)
             named.setdefault(tuple(trucks[key] for key in ids), action["id"])

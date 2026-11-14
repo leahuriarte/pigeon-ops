@@ -2,7 +2,7 @@
 
 A dependency-light hackathon prototype for deciding **whether more information is worth gathering before a dispatcher acts**. The demo uses publicly calibrated synthetic Port of Los Angeles / Long Beach operations, a simulated road disruption, and a simulated observation feed. It never controls or deploys a real drone.
 
-The network view uses ArcGIS Maps SDK for JavaScript 5.2 with a muted OpenStreetMap basemap and no API key. A timeline under the map plays the morning forward: every truck moves along road-following paths, and in the disruption scenario you can play out each dispatch option with CA-47 open or blocked. If the CDN is unavailable, or the screen is narrower than 920px, an SVG schematic plays the same timeline.
+The network view uses ArcGIS Maps SDK for JavaScript 5.2 with a muted OpenStreetMap basemap and no API key. A timeline under the map plays the morning forward: every truck moves along road-following paths, and after an incident report you can play out each dispatch option with CA-47 open or blocked. If the CDN is unavailable, or the screen is narrower than 920px, an SVG schematic plays the same timeline.
 
 Repository slug: `pigeon-ops`
 
@@ -18,7 +18,7 @@ Requires Python 3.9+ and no package installation.
 python3 run.py
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flow** and **Changed condition**, inspect the shipment and truck network, then click **Review drone footage**. The ranked dispatcher options and blockage probability update immediately.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). On Windows use `python` instead of `python3`. Press **Start the morning**, or jump straight to one of the four incident reports, then follow the steps on the right: incident, drone check, response, outcome.
 
 The demo includes 12 fictional shipments, 9 fictional trucks, multiple port-to-warehouse corridors, appointment and readiness context, and visible data-provenance labels. Read [DATA.md](DATA.md) for the source inventory, modeling choices, and limitations.
 
@@ -28,15 +28,22 @@ Run the tests:
 python3 -m unittest discover -s tests -v
 ```
 
-## Demo story (about 90 seconds)
+## Demo story
 
-1. Start with **Normal flow**: the fleet is visible, four appointments are tight, and inspection is not worth its cost.
-2. Switch to **Changed condition**: `SYN-SHP-1042` may miss its appointment because CA-47 could be blocked.
-3. Compare keep course, reroute, and truck-swap options, including stakeholder and environmental effects.
-4. Show why a six-minute simulated inspection is worth gathering in this condition.
-5. Press play under the map to watch the model's pick unfold. Switch **Play out** or the CA-47 toggle to compare options, and click a truck to follow it.
-6. Click **Review drone footage**. The first clip shows a truck crash across the travel lanes: the CV marks the crashed truck as standing still on the road and suggests **Road blocked**. Confirm it; the blockage probability rises from 40% to 86% and the map switches to the reroute. Reopen it and try the rest-area clip: dozens of parked trucks are excluded because they are off the marked road, traffic on the motorway is moving, and the suggestion is **Road clear**. Without the library, simulated **Road blocked**, **Road clear** and **Inconclusive** buttons appear instead.
-7. Show the posterior blockage probability and newly ranked options. Point out the measured line: automated CV alone is not yet worth an inspection, and the page states the accuracy at which it would be. Emphasize that a dispatcher approves any action.
+1. Start screen: the usual morning. The fleet is on the map, the indicator tiles show the usual plan, and the note under the start button says a drone check is not worth it with no report (2% chance, a $101 loss).
+2. Pick an incident report. Each one calls for a different kind of drone check:
+
+   | Incident | Kind of check | Chance | Best response now | Check first? |
+   | --- | --- | --- | --- | --- |
+   | Possible overturned vehicle | Crash check | 40% blocked | Reroute | Yes, worth $116 |
+   | Corroborated overturned vehicle | Crash check | 80% blocked | Reroute | No, it cannot change the decision |
+   | Heavy truck queue | Traffic check | 50% jammed | Keep current route | Yes, worth $196 |
+   | Burst water main, possible flooding | Road damage check | 25% impassable | Reroute | Yes, worth $220 |
+
+3. Open **Show the numbers** for the calculation, the chart of when a check pays off, and the accuracy the check needs.
+4. Click **Review drone footage**. The dialog shows the clips that fit the kind of check. The CV suggestion is preselected and marked unvalidated; you confirm or change it. To show a check changing the decision, pick a clear-road clip in the crash incident: the chance drops from 40% to 7%, **Keep current route** becomes best, and the 11-mile detour past 6 schools is avoided. The library has no flooded-road clip yet, so the road damage check falls back to simulated result buttons.
+5. Choose a response. Each card shows delay, cost, CO₂ and the schools within 300 m of its route. Picking a response the model did not rank first asks for a reason, which goes in the decision log.
+6. Watch it play out, then open the shift report: the usual morning against today on six indicators, and the decision log.
 
 ## How the decision model works
 

@@ -5,8 +5,10 @@ measures whether they move, and turns that into reviewable evidence. Nothing
 here controls a drone or changes a dispatch decision on its own. It feeds the
 dashboard in two ways:
 
-1. **Drone inspection library (used live, committed).** Five top-down clips with
-   a marked road region, annotated playback and a suggested observation. The
+1. **Drone inspection library (used live, committed).** Seven drone clips (two
+   crash, two heavy traffic, three clear road) with a marked road region,
+   annotated playback, a suggested observation and the check types
+   (`crash`, `congestion`, `environment`) each clip can illustrate. The
    dialog preselects the suggestion; the dispatcher confirms or overrides it, and
    the engine then uses its assumed 90% accuracy for reviewed footage.
 2. **Measured CV-only evidence (shown for comparison).** The still-image
@@ -14,7 +16,7 @@ dashboard in two ways:
    frames. Its error table becomes `decision_model.drone.cv_only` in the scenario
    config, and the dashboard shows what that CV alone would be worth. The motion
    rule (`assess_motion`) that suggests observations on the clips has no measured
-   accuracy yet; five self-labelled clips are too few to estimate one.
+   accuracy yet; seven self-labelled clips are too few to estimate one.
 
 [SOURCES.md](SOURCES.md) lists data and model provenance and terms.
 [RUN_RESULTS.md](RUN_RESULTS.md) records the measured results.
@@ -77,12 +79,15 @@ between traffic and blockage (`ASSUMED_STATE_GIVEN_ROAD`) and prints
 
 ## Drone inspection library
 
-`prepare_review.py` reads `drone_review.json` (clip, start time, road polygon and
-a provisional visual note for each case) and, for each clip:
+`prepare_review.py` reads `drone_review.json` (clip, start time, road polygon,
+`check_types` and a provisional visual note for each case) and, for each clip:
 
 1. Samples 4 seconds at 8 frames per second and detects vehicles with `drone-ensemble`.
 2. Fits the camera's own motion between samples from background features
    (ECC alignment with vehicle boxes masked out) and moves the road polygon with it.
+   A clip marked `"camera": "hover"` in the catalog skips this and treats the
+   camera as still. Only `highway-dense-slow` uses it: vehicles fill that close
+   view, and the estimate followed the traffic instead of the ground.
 3. Finds each vehicle again a quarter-second later by template matching in the
    motion-corrected frame (`motion.py`). Its shift is its own speed. Pixels are
    converted to approximate km/h by taking the median box short side as a 2 m
@@ -97,7 +102,7 @@ a provisional visual note for each case) and, for each clip:
      closure upstream.
    Every count is the median over samples, so one bad frame cannot flip it.
 5. Writes an annotated 960 px clip, a source frame, an annotated frame and
-   `library.json` to `cv/review_library/` (about 1 MB in total).
+   `library.json` to `cv/review_library/` (about 2.5 MB in total).
 
 The backend serves that folder through `/api/inspection-cases` without
 importing CV dependencies, and `POST /api/inspection-review` appends each

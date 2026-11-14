@@ -32,6 +32,25 @@ class DecisionEngineTests(unittest.TestCase):
         self.assertGreater(disruption["net_value_of_information"], 0)
         self.assertFalse(analyze(load_scenario(variant="normal"))["evoi"]["recommend_inspection"])
 
+    def test_each_kind_of_check_can_change_the_response(self):
+        # Keeping the route wins before a traffic check; a detour wins before a crash or road-damage check.
+        tops = {}
+        for variant in ("disruption", "congestion", "flood"):
+            scenario = load_scenario(variant=variant)
+            now = analyze(scenario)
+            self.assertTrue(now["evoi"]["recommend_inspection"], variant)
+            tops[variant] = now["before"][0]["id"]
+            self.assertEqual("reroute", analyze(scenario, "blocked")["after"][0]["id"])
+            self.assertEqual("hold-course", analyze(scenario, "clear")["after"][0]["id"])
+        self.assertEqual({"disruption": "reroute", "congestion": "hold-course", "flood": "reroute"}, tops)
+
+    def test_the_detour_passes_more_schools_than_the_current_route(self):
+        options = {o["id"]: o["schools_within_300m"] for o in analyze(self.scenario)["before"]}
+        self.assertGreater(options["reroute"], options["hold-course"])
+        exposure = {i["id"]: i for i in analyze(self.scenario)["indicators"]}["community_exposure"]
+        usual = {i["id"]: i for i in analyze(load_scenario(variant="normal"))["indicators"]}["community_exposure"]
+        self.assertGreater(exposure["value"], usual["value"])
+
     def test_observation_produces_after_ranking(self):
         result = analyze(self.scenario, "clear")
         self.assertEqual(len(result["before"]), len(result["after"]))

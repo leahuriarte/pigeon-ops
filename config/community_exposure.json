@@ -1,0 +1,135 @@
+{
+ "basis": "estimated",
+ "radius_m": 300,
+ "source": "OpenStreetMap amenity=school through the Overpass API (https://overpass-api.de/api/interpreter), fetched 2026-11-14",
+ "note": "A school counts when its OpenStreetMap point, or the centre of its mapped outline, lies within radius_m of the route line. OpenStreetMap may miss schools or list closed ones.",
+ "schools_in_map_area": 275,
+ "routes": {
+  "primary": [],
+  "detour": [
+   {
+    "osm_id": "way/436811497",
+    "name": "Barton Hill Elementary School",
+    "lat": 33.7464834,
+    "lon": -118.2890078,
+    "distance_m": 104
+   },
+   {
+    "osm_id": "way/797745383",
+    "name": "Wilmington Middle School",
+    "lat": 33.7975614,
+    "lon": -118.2728066,
+    "distance_m": 129
+   },
+   {
+    "osm_id": "node/358827312",
+    "name": "Broad Avenue Elementary School",
+    "lat": 33.8005733,
+    "lon": -118.262849,
+    "distance_m": 150
+   },
+   {
+    "osm_id": "node/358858623",
+    "name": "WyoTech - Long Beach Campus",
+    "lat": 33.7912275,
+    "lon": -118.2218199,
+    "distance_m": 152
+   },
+   {
+    "osm_id": "way/666017464",
+    "name": "POLA High School",
+    "lat": 33.7405964,
+    "lon": -118.2826539,
+    "distance_m": 236
+   },
+   {
+    "osm_id": "way/1053202963",
+    "name": "Hawaiian Ave Early Education Center",
+    "lat": 33.775215,
+    "lon": -118.2768319,
+    "distance_m": 276
+   }
+  ],
+  "northbound": [
+   {
+    "osm_id": "way/1263523258",
+    "name": "Unnamed school",
+    "lat": 33.8751989,
+    "lon": -118.2019617,
+    "distance_m": 94
+   },
+   {
+    "osm_id": "node/358803174",
+    "name": "Starr King School",
+    "lat": 33.8752939,
+    "lon": -118.2017368,
+    "distance_m": 105
+   },
+   {
+    "osm_id": "node/358858623",
+    "name": "WyoTech - Long Beach Campus",
+    "lat": 33.7912275,
+    "lon": -118.2218199,
+    "distance_m": 152
+   }
+  ],
+  "westbound": [
+   {
+    "osm_id": "way/796874745",
+    "name": "Saint Peter and Saint Paul Roman Catholic School",
+    "lat": 33.7788699,
+    "lon": -118.2695555,
+    "distance_m": 81
+   },
+   {
+    "osm_id": "way/800655210",
+    "name": "Gulf Elementary School",
+    "lat": 33.7854953,
+    "lon": -118.272752,
+    "distance_m": 177
+   },
+   {
+    "osm_id": "way/247958217",
+    "name": "Stephen M White Middle School",
+    "lat": 33.8262551,
+    "lon": -118.2838459,
+    "distance_m": 198
+   },
+   {
+    "osm_id": "way/1266914005",
+    "name": "Halldale Elementary School",
+    "lat": 33.8333389,
+    "lon": -118.3005907,
+    "distance_m": 200
+   },
+   {
+    "osm_id": "way/436811497",
+    "name": "Barton Hill Elementary School",
+    "lat": 33.7464834,
+    "lon": -118.2890078,
+    "distance_m": 235
+   },
+   {
+    "osm_id": "way/1053202963",
+    "name": "Hawaiian Ave Early Education Center",
+    "lat": 33.775215,
+    "lon": -118.2768319,
+    "distance_m": 276
+   },
+   {
+    "osm_id": "way/247958155",
+    "name": "Caroldale Elementary School",
+    "lat": 33.8223966,
+    "lon": -118.2828076,
+    "distance_m": 293
+   },
+   {
+    "osm_id": "way/666017464",
+    "name": "POLA High School",
+    "lat": 33.7405964,
+    "lon": -118.2826539,
+    "distance_m": 299
+   }
+  ]
+ }
+}

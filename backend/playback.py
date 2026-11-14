@@ -225,21 +225,15 @@ class Planner:
         disruption = self.scenario["disruption"]
         affected = next(s for s in shipments if s["id"] == disruption["affected_shipment"])
         rest = [s for s in shipments if s is not affected]
-        window_start = clock(affected["appointment"].split("–")[0])
         action = next(a for a in self.scenario["decision_model"]["actions"] if a["id"] == self.action)
-        outcome = action[self.outcomes_key][self.road]
-        if "detail" in outcome:
-            # Computed outcomes give the affected load's own arrival; lateness_min also counts other pool shipments.
-            target = clock(outcome["detail"]["arrival"])
-        else:
-            lateness = outcome["lateness_min"]
-            target = window_start + lateness if lateness > 0 else clock(affected["eta"])
+        # The affected load's own arrival; the outcome's lateness_min also counts other pool shipments.
+        target = clock(action[self.outcomes_key][self.road]["detail"]["arrival"])
         dest = affected["destination"]
         track = self.truck_start(truck, shipments)
         self.hold_for_inspection(track, affected)
 
-        if action.get("plan", {}).get("route") and "detail" in outcome:
-            self.follow_route_trip(track, affected, action["plan"]["route"], clock(outcome["detail"]["arrival"]))
+        if action["plan"].get("route"):
+            self.follow_route_trip(track, affected, action["plan"]["route"], target)
             self.deliver(track, affected, dest)
             self.run_shipments(track, rest, first_loaded=False)
             return [track]
@@ -288,8 +282,13 @@ class Planner:
         if route is not model.current:
             pieces.append((model.current, position, 0.0, "detour", f"Turning back to {origin} to take the detour", f"Turns back toward {origin} to take the detour", "watch"))
             position = 0.0
-        if self.road == "blocked" and route is model.blocked_route and position < model.incident_at:
+        hits = self.road == "blocked" and route is model.blocked_route and position < model.incident_at
+        if hits:
             pieces.append((route, position, model.incident_at, "driving", f"Carrying {load} toward the CA-47 connector", None, None))
+        if hits and model.slowdown_min is not None:
+            pieces.append(("wait", model.slowdown_min, "blocked", "Crawling through the queue on CA-47", "Joins the queue on CA-47", "risk"))
+            pieces.append((route, model.incident_at, 1.0, "driving", f"Carrying {load} to {dest}", "Clears the queue on CA-47", "watch"))
+        elif hits:
             pieces.append(("wait", model.turnaround_min, "blocked", "Stuck in the queue at the obstruction, turning around", "Reaches the obstruction on CA-47 and has to turn around", "risk"))
             pieces.append((route, model.incident_at, 0.0, "detour", f"Heading back to {origin} to take the detour", None, None))
             pieces.append((model.fallback, 0.0, 1.0, "detour", f"Carrying {load} to {dest} on the detour", f"Back at {origin}, starts the detour", "watch"))

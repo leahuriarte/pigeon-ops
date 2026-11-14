@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from backend import copilot, llm
 from backend.decision_engine import analyze
 from backend.inspection import ASSETS, list_inspections, review_inspection
 from backend.playback import build_playback
@@ -34,20 +35,34 @@ class DemoHandler(BaseHTTPRequestHandler):
             return self._file(ASSETS, unquote(parsed.path.removeprefix("/inspection-assets/")))
         if parsed.path == "/api/scenarios":
             return self._json({"scenarios": available_scenarios()})
-        if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback"):
+        params = {key: values[0] for key, values in parse_qs(parsed.query).items()}
+        # LLM routes: an unavailable LLM is a 200 with available: false, never an error status.
+        if parsed.path == "/api/llm/status":
+            return self._json(llm.status())
+        if parsed.path == "/api/llm/footage":
+            case = next((item for item in list_inspections()["cases"] if item["id"] == params.get("case_id")), None)
+            if case is None:
+                return self._json({"error": "unknown inspection clip"}, 404)
+            try:  # The incident names the kind of check; without a valid one the read is generic.
+                check = load_scenario(variant=params["scenario"])["disruption"].get("check")
+            except (KeyError, ValueError):
+                check = None
+            return self._json(copilot.footage_opinion(case, check=check))
+        if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback", "/api/llm/brief"):
             return self._static(parsed.path)
 
-        params = {key: values[0] for key, values in parse_qs(parsed.query).items()}
         try:
             scenario = load_scenario(variant=params.get("scenario", "disruption"))
         except ValueError as error:
             return self._json({"error": str(error)}, 404)
         if parsed.path == "/api/scenario":
             return self._json({**scenario, "analysis": analyze(scenario)})
-        if parsed.path == "/api/analysis":
+        if parsed.path in ("/api/analysis", "/api/llm/brief"):
             observation = params.get("observation")
             if observation not in (None, "blocked", "clear", "inconclusive"):
                 return self._json({"error": "observation must be blocked, clear, or inconclusive"}, 400)
+            if parsed.path == "/api/llm/brief":
+                return self._json(copilot.decision_brief(scenario, analyze(scenario, observation)))
             return self._json(analyze(scenario, observation))
         try:
             return self._json(build_playback(
@@ -57,16 +72,33 @@ class DemoHandler(BaseHTTPRequestHandler):
             return self._json({"error": str(error)}, 400)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/inspection-review":
+        path = urlparse(self.path).path
+        if path not in ("/api/inspection-review", "/api/llm/ask"):
             return self._json({"error": "not found"}, 404)
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 < length <= 16384:
-                raise ValueError("Review body must be between 1 and 16384 bytes")
+                raise ValueError("Request body must be between 1 and 16384 bytes")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            if path == "/api/llm/ask":
+                return self._json(self._ask(payload))
             return self._json(review_inspection(payload))
         except (ValueError, UnicodeDecodeError) as error:
             return self._json({"error": str(error)}, 400)
+
+    @staticmethod
+    def _ask(payload):
+        if not isinstance(payload, dict):
+            raise ValueError("Request must be a JSON object")
+        variant = payload.get("scenario", "disruption")
+        observation = payload.get("observation")
+        if not isinstance(variant, str):
+            raise ValueError("Scenario must be a name")
+        if observation not in (None, "blocked", "clear", "inconclusive"):
+            raise ValueError("observation must be blocked, clear, or inconclusive")
+        question = copilot.validate_question(payload.get("question"))
+        scenario = load_scenario(variant=variant)  # ValueError for an unknown variant
+        return copilot.ask(scenario, analyze(scenario, observation), question)
 
     def _static(self, request_path):
         relative = "index.html" if request_path == "/" else request_path.lstrip("/")

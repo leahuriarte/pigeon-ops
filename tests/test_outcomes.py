@@ -1,7 +1,7 @@
 """Route-based outcomes."""
 import unittest
 
-from backend.outcomes import apply_route_outcomes, clock_minutes, fraction_along
+from backend.outcomes import clock_minutes, fraction_along
 from backend.scenario import load_scenario
 
 
@@ -50,13 +50,14 @@ class RouteOutcomeTests(unittest.TestCase):
         self.assertGreater(hold["blocked"]["lateness_min"], hold["open"]["lateness_min"])
         self.assertGreater(hold["blocked"]["emissions_kg"], hold["open"]["emissions_kg"])
 
-    def test_override_wins_over_computed_values(self):
-        action(self.scenario, "reroute")["override"] = {"basis": "assumed", "blocked": {"lateness_min": 99}}
-        apply_route_outcomes(self.scenario)
-        outcomes = action(self.scenario, "reroute")["outcomes"]
-        self.assertEqual(99, outcomes["blocked"]["lateness_min"])
-        self.assertEqual("override", outcomes["blocked"]["basis"])
-        self.assertEqual("estimated", outcomes["open"]["basis"])
+    def test_heavy_traffic_delays_the_truck_without_turning_it_back(self):
+        scenario = load_scenario(variant="congestion")
+        hold = action(scenario, "hold-course")["outcomes"]
+        slowdown = scenario["decision_model"]["blockage"]["slowdown_min"]
+        late = clock_minutes(hold["blocked"]["detail"]["arrival"])[0] - clock_minutes(hold["open"]["detail"]["arrival"])[0]
+        self.assertEqual(slowdown, late)
+        self.assertEqual(hold["open"]["detail"]["miles"], hold["blocked"]["detail"]["miles"])
+        self.assertNotIn("detour", hold["blocked"]["detail"]["path"])
 
 
 if __name__ == "__main__":
