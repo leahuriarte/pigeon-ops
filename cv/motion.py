@@ -1,7 +1,7 @@
 """Estimate how fast detected vehicles move in drone video, net of camera motion.
 
-A hovering drone still drifts and turns. The camera's own motion is fitted as a
-similarity transform (shift, rotation, scale) from background features, with
+A hovering drone still drifts and turns. The camera's own motion is fitted as
+an affine transform by ECC image alignment on the background pixels, with
 vehicle boxes masked out so a road full of traffic cannot pass for the
 background. The later frame is warped back by that transform, and each vehicle
 is found again by template matching; its remaining shift is its own motion.

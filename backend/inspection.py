@@ -47,9 +47,12 @@ def review_inspection(payload, library_path=LIBRARY, audit_path=AUDIT):
         raise ValueError("Scenario must be a name")
     web = validate_finding(payload.get("web"))
     scenario = apply_web_evidence(load_scenario(variant=variant), web)
+    check_type = (scenario["disruption"].get("check") or {}).get("type")
+    if check_type and "check_types" in case and check_type not in case["check_types"]:
+        raise ValueError(f"This clip does not fit a {check_type} check")
     analysis = analyze(scenario, observation)
     suggestion = case.get("cv_assessment", {}).get("suggested_observation")
-    llm_suggestion = (cached_footage_opinion(case["id"], (scenario["disruption"].get("check") or {}).get("type")) or {}).get("observation")
+    llm_suggestion = (cached_footage_opinion(case["id"], check_type) or {}).get("observation")
     review = {
         "case_id": case["id"], "scenario": variant, "observation": observation, "web_finding": web,
         "note": note.strip(), "reviewed_at": datetime.now(timezone.utc).isoformat(),

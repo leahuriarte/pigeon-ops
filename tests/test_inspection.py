@@ -25,6 +25,8 @@ class InspectionReviewTests(unittest.TestCase):
              "source": {"source_url": "https://example.com/road", "sha256": "abc"}},
             {"id": "unavailable", "allowed_observations": ["inconclusive"],
              "source": {"source_url": "https://example.com/unavailable", "sha256": "def"}},
+            {"id": "flood-only", "allowed_observations": ["blocked", "clear", "inconclusive"], "check_types": ["environment"],
+             "source": {"source_url": "https://example.com/flood", "sha256": "ghi"}},
         ]}), encoding="utf-8")
         self.payload = {"case_id": "road", "observation": "clear", "scenario": "disruption", "simulated_application": True}
 
@@ -39,10 +41,17 @@ class InspectionReviewTests(unittest.TestCase):
         self.assertTrue(records[0]["simulated_application"])
 
     def test_invalid_reviews_are_rejected_and_not_recorded(self):
-        for changes in ({"case_id": "unavailable"}, {"case_id": "missing"}, {"simulated_application": False}):
+        for changes in ({"case_id": "unavailable"}, {"case_id": "missing"}, {"simulated_application": False},
+                        {"case_id": "flood-only", "scenario": "disruption"}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 review_inspection({**self.payload, **changes}, self.library, self.audit)
         self.assertFalse(self.audit.exists())
+
+    def test_clip_must_fit_the_incident_check(self):
+        result = review_inspection({**self.payload, "case_id": "flood-only", "scenario": "flood"}, self.library, self.audit)
+        self.assertEqual("flood-only", result["review"]["case_id"])
+        with self.assertRaisesRegex(ValueError, "congestion"):
+            review_inspection({**self.payload, "case_id": "flood-only", "scenario": "congestion"}, self.library, self.audit)
 
     def test_base_app_works_without_optional_cv_artifacts(self):
         self.assertEqual([], list_inspections(Path(self.temp.name) / "missing.json")["cases"])
@@ -56,7 +65,7 @@ class InspectionReviewTests(unittest.TestCase):
             server, base = start_server()
             try:
                 with urlopen(base + "/api/inspection-cases") as response:
-                    self.assertEqual(2, len(json.load(response)["cases"]))
+                    self.assertEqual(3, len(json.load(response)["cases"]))
                 with urlopen(base + "/inspection-assets/photo.jpg") as response:
                     self.assertEqual(b"test-photo", response.read())
                 with self.assertRaises(HTTPError) as caught:
@@ -68,6 +77,11 @@ class InspectionReviewTests(unittest.TestCase):
                 malformed = Request(base + "/api/inspection-review", data=b"{", headers={"Content-Type": "application/json"})
                 with self.assertRaises(HTTPError) as caught:
                     urlopen(malformed)
+                self.assertEqual(400, caught.exception.code)
+                mismatch = Request(base + "/api/inspection-review", headers={"Content-Type": "application/json"},
+                                   data=json.dumps({**self.payload, "case_id": "flood-only"}).encode())
+                with self.assertRaises(HTTPError) as caught:
+                    urlopen(mismatch)
                 self.assertEqual(400, caught.exception.code)
             finally:
                 server.shutdown()

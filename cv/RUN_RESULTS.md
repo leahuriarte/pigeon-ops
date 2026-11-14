@@ -67,7 +67,8 @@ separate from the subsequent dashboard integration described below.
 ## Road-state rule and measured CV-only evidence
 
 `road_state.py` labels a road polygon as dense traffic (12 or more vehicles
-within 1.5 vehicle lengths of a neighbour), light traffic (3 or fewer) or unclear.
+whose centre is within 1.5 box sizes of a neighbour's, box size being the square
+root of box area), light traffic (3 or fewer) or unclear.
 Dark frames with few detections are unclear. `evaluate_road_state.py` compares the
 rule on detector boxes with the rule on annotated boxes for 27 hand-drawn road
 polygons from UAV-OBB (`road_rois.json`, highest- and lowest-count frame per video).
@@ -108,7 +109,7 @@ and applies the motion rule to the marked road (`cv/README.md`).
 | flooded-lane | floodwater across the lane | inconclusive | no vehicles in view; the CV tracks vehicles and cannot see water |
 | highway-free-flow | no obstruction | clear | 11 of 11 vehicles moving at 60–100 km/h |
 | city-highway-flow | no obstruction | clear | 6 of 6 vehicles moving |
-| rest-area-parked-trucks | no obstruction | clear | 12 moving on the motorway; 63 parked trucks excluded by the road region |
+| rest-area-parked-trucks | no obstruction | clear | 12 moving on the motorway; 64 parked trucks excluded by the road region |
 
 These are eight hand-picked clips, not an accuracy measurement. In the dense
 close-up clip (`38774214`, highway-dense-slow) cars fill the frame and the

@@ -12,7 +12,8 @@ road, and anything else stays inconclusive.
 import math
 
 DEFAULT_RULE = {
-    # Neighbours closer than this many vehicle lengths count as closely spaced.
+    # Neighbours whose centres are closer than this many box sizes count as closely
+    # spaced. Box size is the square root of box area, averaged over the pair.
     "gap_ratio": 1.5,
     "dense_min_close": 12,
     "light_max_close": 3,

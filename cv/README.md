@@ -64,8 +64,8 @@ overwrites a full run. Data, models and outputs are ignored by Git.
 ## Road-state rule
 
 `road_state.py` is pure Python and tested without CV dependencies. Given vehicle
-boxes and a road polygon, it counts vehicles whose nearest neighbour is within 1.5
-vehicle lengths. 12 or more closely spaced vehicles is `dense_traffic` (signal
+boxes and a road polygon, it counts vehicles whose nearest neighbour's centre is within
+1.5 box sizes (box size is the square root of box area, averaged over the pair). 12 or more closely spaced vehicles is `dense_traffic` (signal
 `blocked`), 3 or fewer is `light_traffic` (`clear`), and anything between is
 `unclear` (`inconclusive`). A dark frame with few detections is `unclear`, because
 missing detections at night are not evidence of an empty road.
@@ -86,8 +86,9 @@ between traffic and blockage (`ASSUMED_STATE_GIVEN_ROAD`) and prints
 2. Fits the camera's own motion between samples from background features
    (ECC alignment with vehicle boxes masked out) and moves the road polygon with it.
    A clip marked `"camera": "hover"` in the catalog skips this and treats the
-   camera as still. Only `highway-dense-slow` uses it: vehicles fill that close
-   view, and the estimate followed the traffic instead of the ground.
+   camera as still. `highway-dense-slow` and `flooded-lane` use it: in
+   `highway-dense-slow` vehicles fill the close view, and the estimate followed
+   the traffic instead of the ground.
 3. Finds each vehicle again a quarter-second later by template matching in the
    motion-corrected frame (`motion.py`). Its shift is its own speed. Pixels are
    converted to approximate km/h by taking the median box short side as a 2 m
@@ -102,7 +103,7 @@ between traffic and blockage (`ASSUMED_STATE_GIVEN_ROAD`) and prints
      closure upstream.
    Every count is the median over samples, so one bad frame cannot flip it.
 5. Writes an annotated 960 px clip, a source frame, an annotated frame and
-   `library.json` to `cv/review_library/` (about 2.5 MB in total).
+   `library.json` to `cv/review_library/` (about 2.8 MB in total).
 
 The backend serves that folder through `/api/inspection-cases` without
 importing CV dependencies, and `POST /api/inspection-review` appends each

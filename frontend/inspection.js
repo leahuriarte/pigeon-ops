@@ -42,8 +42,9 @@ function renderCase() {
   document.querySelector("#inspection-case-title").textContent = selected.title;
   document.querySelector("#inspection-finding").textContent = labels[selected.visual_label] || "Visual review required";
   document.querySelector("#inspection-note").textContent = selected.review_note;
+  const onRoad = Number.isFinite(cv.vehicles_on_road) ? Math.round(cv.vehicles_on_road) : selected.vehicle_detections;
   document.querySelector("#inspection-count").textContent =
-    `${cv.window_seconds} s of footage at ${cv.sample_fps} frames/s · ${selected.vehicle_detections} vehicles on the marked road, ${selected.excluded_detections} outside it (median per frame)`;
+    `${cv.window_seconds} s of footage at ${cv.sample_fps} frames/s · ${onRoad} vehicles on the marked road, ${selected.excluded_detections} outside it (median per frame)`;
   document.querySelector("#inspection-cv").dataset.signal = cv.suggested_observation;
   document.querySelector("#inspection-cv-signal").textContent = signalLabels[cv.suggested_observation];
   document.querySelector("#inspection-cv-reason").textContent = `${cv.reason[0].toUpperCase()}${cv.reason.slice(1)}.`;
@@ -55,7 +56,10 @@ function renderCase() {
   document.querySelector("#inspection-location").textContent = selected.source.location.locationName;
   const source = document.querySelector("#inspection-source");
   source.textContent = `${selected.source.credit} · ${selected.source.license}`;
-  source.href = selected.source.source_url;
+  let sourceUrl = null;
+  try { sourceUrl = new URL(selected.source.source_url); } catch { /* leave the link without a target */ }
+  if (sourceUrl?.protocol === "https:") source.href = sourceUrl.href;
+  else source.removeAttribute("href");
   document.querySelector("#inspection-review-note").value = "";
   document.querySelector("#inspection-error").textContent = "";
   document.querySelectorAll("[name=inspection-observation]").forEach((radio) => {
@@ -76,7 +80,10 @@ export async function openInspection(id, words) {
     libraryPromise = fetch("/api/inspection-cases").then((response) => {
       if (!response.ok) throw new Error("Inspection library could not be loaded");
       return response.json();
-    }).catch(() => ({ cases: [] }));
+    }).catch(() => {
+      libraryPromise = null; // Retry on the next open instead of caching the failure.
+      return { cases: [] };
+    });
   }
   const library = await libraryPromise;
   const incident = demoIncidents.find((item) => item.id === id);
@@ -123,8 +130,10 @@ document.querySelector("#inspection-apply").addEventListener("click", async () =
       body: JSON.stringify(withWeb({ case_id: caseItem.id, scenario: reviewedScenario, observation,
         note: document.querySelector("#inspection-review-note").value, simulated_application: true })),
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "Review could not be applied");
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result) {
+      throw new Error(result?.error || `Review could not be applied (server returned ${response.status})`);
+    }
     if (scenarioId !== reviewedScenario) return;
     window.dispatchEvent(new CustomEvent("inspection-reviewed", { detail: { ...result, caseItem } }));
     dialog.close();

@@ -147,6 +147,11 @@ def write_video(path, frames, fps):
 
 def prepare(catalog_path, clips_dir, output, model_name=MODEL):
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    # Raw clips are gitignored: check them all before touching the committed library.
+    missing = [str(clips_dir / item["file"]) for item in catalog["clips"] if not (clips_dir / item["file"]).is_file()]
+    if missing:
+        raise ValueError(f"Missing clips {', '.join(missing)}; see cv/SOURCES.md for where to download them. "
+                         "The existing library was left unchanged.")
     model = load_model(model_name)
     if output.exists():
         shutil.rmtree(output)
@@ -154,11 +159,11 @@ def prepare(catalog_path, clips_dir, output, model_name=MODEL):
     cases = []
     for item in catalog["clips"]:
         path = clips_dir / item["file"]
-        if not path.is_file():
-            raise ValueError(f"Missing clip {path}; see cv/SOURCES.md for where to download it")
         probe = cv2.VideoCapture(str(path))
         keyframe = read_frame(probe, round(item["start_seconds"] * probe.get(cv2.CAP_PROP_FPS)))
         probe.release()
+        if keyframe is None:
+            raise ValueError(f"Cannot read a frame at {item['start_seconds']} s in {path}")
         road = to_pixels(item["road"], keyframe.shape[1], keyframe.shape[0])
         hover = item.get("camera") == "hover"
         samples, assessment, timing = analyse_clip(path, item["start_seconds"], model, road=road, hover=hover)
