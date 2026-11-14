@@ -1,10 +1,19 @@
 # Offline CV inspection
 
-This optional component detects cars, buses and trucks in local images or video.
-It produces annotated evidence and JSON for human review. It does not classify a
-road as blocked or safe, control a drone, or change the logistics engine's assumed
-inspection accuracy. Start with **California highway images** for the presentation;
-use the annotated datasets to check detector quality.
+This optional component detects cars, buses and trucks in still images and video
+and turns them into reviewable evidence. Nothing here controls a drone or changes
+a dispatch decision on its own. It feeds the dashboard in two ways:
+
+1. **Image review library (used live).** Prepared California images with marked
+   road areas. A dispatcher picks the observation in the dashboard; the engine
+   then uses its assumed 90% accuracy for reviewed imagery.
+2. **Measured CV-only evidence (shown for comparison).** An automatic road-state
+   rule is scored against annotated aerial images. Its error table becomes
+   `decision_model.drone.cv_only` in the scenario config, and the dashboard shows
+   what automated CV alone would be worth.
+
+[SOURCES.md](SOURCES.md) lists data and model provenance and terms.
+[RUN_RESULTS.md](RUN_RESULTS.md) records the measured results.
 
 ## Setup on Windows
 
@@ -15,106 +24,73 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r cv/requirements.txt
 ```
 
-The environment and two pretrained models are already installed on this machine.
-The model files download automatically on first use. Inference is configured for
-CPU; a GPU is not required. `requirements-lock.txt` records the tested environment.
-The main logistics demo still runs without these optional dependencies.
+Models download on first use. Inference runs on CPU. `requirements-lock.txt`
+records the tested environment. The main logistics demo needs none of this.
+Run every script as a module from the repository root (`python -m cv.<name>`).
 
-## Download data
+## Which model
 
-```powershell
-.\.venv\Scripts\python.exe -m cv.download_california
-.\.venv\Scripts\python.exe -m cv.download_data
-.\.venv\Scripts\python.exe -m cv.download_data --dataset transset
-```
+| View | Model | Why |
+| --- | --- | --- |
+| Side-on or oblique cameras (Caltrans, TRANSSET) | `yolo11s.pt` at 1280 | Highway F1 0.844; the ensemble adds nothing here and is 3× slower |
+| Top-down drone (UAV-OBB) | `aerial-ensemble` | COCO `yolo11s` plus DOTA-trained `yolo11m-obb`; aerial F1 0.755 against 0.499 for `yolo11s` alone |
 
-The downloads are already present under `cv/data/`. The first command creates a
-new dated snapshot on every run. Dataset archives are verified against publisher
-checksums. Read [SOURCES.md](SOURCES.md) for provenance, reuse terms and limitations.
-Data, models, environment and generated outputs are ignored by Git.
+`--tile-size` adds overlapping crops. It was slower and less accurate than both
+choices above, so leave it off.
 
-## Inspect images
+## Commands
 
-Use a single image or a folder. Replace the source path with the dated California
-folder printed by the downloader, or any local highway image:
+| Task | Command |
+| --- | --- |
+| Download Caltrans snapshots (new dated folder each run) | `python -m cv.download_california` |
+| Download labeled datasets | `python -m cv.download_data` and `python -m cv.download_data --dataset transset` |
+| Score a detector | `python -m cv.benchmark --model aerial-ensemble` (add `--dataset transset --limit 200` for highway images) |
+| Annotate any images | `python -m cv.inspect_images --source <image-or-folder> --name <run>` |
+| Annotate a video | `python -m cv.inspect_video --source <video> --name <run> --seconds 15` |
+| Score the road-state rule | `python -m cv.evaluate_road_state --model aerial-ensemble` |
+| Build the dashboard image library | `python -m cv.prepare_review` |
+| Collect all runs into one page | `python -m cv.build_report`, then open `cv/outputs/index.html` |
 
-```powershell
-.\.venv\Scripts\python.exe -m cv.inspect_images --source "C:\path\to\highway.jpg" --name my-inspection
-```
+Use the CV environment's Python (`.\.venv\Scripts\python.exe`). Outputs go to
+`cv/outputs/<run>/`. A `--limit` run is saved as `...-firstN` so it never
+overwrites a full run. Data, models and outputs are ignored by Git.
 
-For the downloaded highway dataset:
+## Road-state rule
 
-```powershell
-.\.venv\Scripts\python.exe -m cv.inspect_images --source cv/data/TRANSSET/TRANSSET_v2/images --name highway-images --limit 12
-```
+`road_state.py` is pure Python and tested without CV dependencies. Given vehicle
+boxes and a road polygon, it counts vehicles whose nearest neighbour is within 1.5
+vehicle lengths. 12 or more closely spaced vehicles is `dense_traffic` (signal
+`blocked`), 3 or fewer is `light_traffic` (`clear`), and anything between is
+`unclear` (`inconclusive`). A dark frame with few detections is `unclear`, because
+missing detections at night are not evidence of an empty road.
 
-Open `cv/outputs/<name>/report.html`. It includes annotated images, a contact sheet
-and provenance. `evidence.json` includes pixel-coordinate boxes, detector scores,
-per-image vehicle counts and camera coordinates/timestamps when available.
-California unavailable-camera cards are flagged for source review using a simple
-white-image heuristic; this is not an availability classifier or road-state model.
+`evaluate_road_state.py` applies the same rule to annotated boxes and to detector
+boxes on the 27 hand-drawn road polygons in `road_rois.json`. This measures only
+the error the detector adds. It then combines that table with an assumed link
+between traffic and blockage (`ASSUMED_STATE_GIVEN_ROAD`) and prints
+`decision_engine_likelihoods`. Paste those values into
+`decision_model.drone.cv_only.likelihoods` in `config/port_scenario.json`.
 
-Run `python -m cv.build_report` with the CV environment's Python to collect
-completed runs into `cv/outputs/index.html`.
+## Image review library
 
-Defaults are YOLO11s, image size 1280 and confidence threshold 0.25. `--limit 0`
-analyzes every image. `--tile-size 640` adds overlapping crops, but is slower and
-did not outperform the selected larger model on the initial aerial validation run.
+`prepare_review.py` reads `california_review.json` (road polygons and provisional
+AI-assisted visual notes), runs `yolo11s.pt`, keeps detections inside the road
+area and writes `cv/outputs/review-cases/`. The backend serves that folder through
+`/api/inspection-cases` without importing CV dependencies, and
+`POST /api/inspection-review` appends each review to
+`cv/outputs/inspection-reviews.jsonl`. Without the folder, the dashboard falls back
+to simulated observation buttons.
 
-## Run labeled evaluations
+Unavailable or insufficient-detail images allow only an inconclusive observation.
+Applying an image is an illustration for the fictional scenario, not a report of
+current conditions.
 
-```powershell
-.\.venv\Scripts\python.exe -m cv.benchmark --model yolo11s.pt --imgsz 1280
-.\.venv\Scripts\python.exe -m cv.benchmark --dataset transset --model yolo11s.pt --imgsz 1280 --limit 200
-.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
-```
+## Limits
 
-Each evaluation saves `summary.json`, `per-image.csv`, preview images and an HTML
-report. Precision measures how many detections match references; recall measures
-how many reference vehicles were found. Neither is road-blockage accuracy.
-
-## Optional video inspection
-
-```powershell
-.\.venv\Scripts\python.exe -m cv.inspect_video --source cv/data/UAV-OBB/test_video.mp4 --name aerial-video --seconds 15
-```
-
-This samples two frames per second by default and produces an annotated H.264
-MP4, evidence JSON and an HTML report. Counts are per frame, not unique tracks.
-
-## Review images in the logistics dashboard
-
-The image library is integrated. Prepare it with:
-
-```powershell
-.\.venv\Scripts\python.exe -m cv.prepare_review
-python run.py
-```
-
-Open `http://127.0.0.1:8000`, then choose **Review inspection images**. Select a
-case, inspect its marked road area or source image, choose the supported
-observation, and select **Use for demo**. Rankings and map playback update for
-the fictional scenario. The default library contains 16 Caltrans snapshots and
-three historical California images, including a documented debris example.
-
-`california_review.json` contains normalized road polygons and provisional
-AI-assisted visual notes. They are not independently validated ground truth.
-Green boxes are retained vehicle detections; the orange debris outline is a
-visual annotation, not a debris-model prediction. Image-level labels do not
-measure classifier accuracy. Unavailable or insufficient-detail cases permit
-only an inconclusive observation.
-
-`cv/outputs/review-cases/library.json` is served by `/api/inspection-cases`.
-`POST /api/inspection-review` records the source hash, observation, scenario,
-optional note and review time in `cv/outputs/inspection-reviews.jsonl`. The
-backend loads these precomputed files without importing CV dependencies. If the
-library is absent, the core demo retains its simulated-observation fallback.
-
-Raw inspection tools still return `inconclusive` until review. Applying an
-external image is explicitly an illustration for the synthetic scenario, not
-a report of current conditions. Detector confidence never replaces the engine's
-configured evidence assumptions.
-
-For a still image, use wording such as “vehicle visible in the inspected lane.”
-Do not infer speed, a persistent queue or a confirmed obstruction from vehicle
-count alone. Keep synthetic incident assumptions visible in the demo.
+- A still image shows vehicle spacing, not movement. A red-light queue and a
+  blockage queue look the same.
+- Detection scores are not blockage probabilities.
+- Only 4 of the 27 evaluation frames show dense traffic and none shows a blocked
+  road, so the dense-traffic row of the measured table is mostly smoothing.
+- External images are illustrations. They do not document the fictional CA-47
+  incident.

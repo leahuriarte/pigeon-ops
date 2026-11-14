@@ -97,7 +97,6 @@ def prepare_cases(snapshot, output, catalog_path=ROOT / "california_review.json"
             "vehicle_detections": len(retained), "detections_before_region_filter": len(predictions),
             "excluded_detections": len(predictions) - len(retained),
             "vehicle_model": "YOLO11s, 1280, confidence 0.25",
-            "detector_observation": "inconclusive",
             "allowed_observations": ["inconclusive"] if restricted else ["blocked", "clear", "inconclusive"],
             "review_status": "needs_dispatcher_review", "simulated_application": True,
         })

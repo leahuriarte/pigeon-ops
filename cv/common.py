@@ -89,16 +89,16 @@ def predict_frame(model, frame, image_size=1280, confidence=0.25, tile_size=0):
                                     for detection in predict_frame(member, frame, size, confidence, tile_size)])
     options = {"classes": vehicle_ids(model), "device": "cpu", "verbose": False, "conf": confidence}
     predictions = detections(model.predict(frame, imgsz=image_size, **options)[0])
-    if not tile_size:
-        return predictions
+    # YOLO suppresses overlaps within a class only, so one vehicle can come back as
+    # both car and truck. Every path collapses those into one detection.
     height, width = frame.shape[:2]
-    for top in tile_origins(height, tile_size):
-        for left in tile_origins(width, tile_size):
-            crop = frame[top:top + tile_size, left:left + tile_size]
-            for detection in detections(model.predict(crop, imgsz=tile_size, **options)[0]):
-                x1, y1, x2, y2 = detection["box"]
-                detection["box"] = [x1 + left, y1 + top, x2 + left, y2 + top]
-                predictions.append(detection)
+    tiles = [(top, left) for top in tile_origins(height, tile_size) for left in tile_origins(width, tile_size)] if tile_size else []
+    for top, left in tiles:
+        crop = frame[top:top + tile_size, left:left + tile_size]
+        for detection in detections(model.predict(crop, imgsz=tile_size, **options)[0]):
+            x1, y1, x2, y2 = detection["box"]
+            detection["box"] = [x1 + left, y1 + top, x2 + left, y2 + top]
+            predictions.append(detection)
     return suppress_duplicates(predictions)
 
 

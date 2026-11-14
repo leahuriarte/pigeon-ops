@@ -68,8 +68,6 @@ These metrics are not official oriented-box mAP. Neither dataset labels road
 blockage, congestion severity, travel speed or road safety. No model was trained
 on these data during setup.
 
-## Alternatives considered
-
 ## Historical California review cases
 
 The review library adds three attributed historical examples:
@@ -83,6 +81,38 @@ records image hashes, date descriptions and credits in the generated library.
 Road polygons and visual notes in `california_review.json` were produced through
 AI-assisted visual review and remain provisional. No independent annotator has
 validated these labels, and no blockage-accuracy score is reported from them.
+
+## Pretrained models
+
+- `yolo11n.pt`, `yolo11s.pt`: Ultralytics YOLO11 trained on COCO (car, bus, truck).
+  Best on side-on and oblique views such as Caltrans cameras and TRANSSET.
+- `yolo11s-obb.pt`, `yolo11m-obb.pt`: Ultralytics YOLO11-OBB trained on DOTA v1
+  aerial imagery (small vehicle, large vehicle). Used in `aerial-ensemble` for
+  top-down drone views.
+- All four download from the official Ultralytics release assets on first use and
+  are distributed under AGPL-3.0. No model was fine-tuned.
+- Community VisDrone and Geo-trax checkpoints on Hugging Face fit the drone domain
+  better but were not used: they are unvetted pickled `.pt` files, and VisDrone
+  weights inherit a research-only licence.
+
+## Planned video clips (not yet integrated)
+
+Contract 3 in `AGENTS.md` plans per-clip evidence files in `frontend/evidence/`.
+Only `stub.json` exists, and the dashboard does not read it; the integrated
+evidence path is the still-image review library. The candidate clips below go in
+`cv/clips/raw/` (gitignored). All are 1920×1080 Pexels downloads listed on
+2026-11-14 under the [Pexels license](https://www.pexels.com/license/). None were
+filmed near the Port of LA/Long Beach. "Expected" is a guess from three still
+frames per clip, not ground truth.
+
+| File | Expected | Length | Creator | Source |
+| --- | --- | --- | --- | --- |
+| `blocked_port_queue_13742716.mp4` | blocked | 17 s | Kelly | https://www.pexels.com/video/trucks-in-port-13742716/ |
+| `blocked_highway_queue_13171071.mp4` | blocked | 13 s | Jozef Papp | https://www.pexels.com/video/traffic-on-highway-13171071/ |
+| `clear_topdown_13376785.mp4` | clear | 41 s | tal molcho | https://www.pexels.com/video/traffic-on-highway-13376785/ |
+| `clear_topdown_31570754.mp4` | clear | 11 s | Kenan Turguç | https://www.pexels.com/video/aerial-view-of-city-highway-traffic-31570754/ |
+| `ambiguous_rest_area_15978611.mp4` | inconclusive (parked trucks beside a flowing road) | 41 s | DeLuca G | https://www.pexels.com/video/aerial-view-of-a-highway-with-many-trucks-15978611/ |
+| `ambiguous_dense_moving_38774214.mp4` | inconclusive (dense but moving) | 18 s | Kelly | https://www.pexels.com/video/aerial-view-of-vehicles-on-highway-traffic-38774214/ |
 
 ## Alternatives considered
 

@@ -1,10 +1,17 @@
 import unittest
 
 from cv.metrics import intersection_over_union, match_detections, summarize_counts
-from cv.common import tile_origins
+from cv.common import suppress_duplicates, tile_origins
 
 
 class VehicleMetricTests(unittest.TestCase):
+    def test_one_vehicle_seen_as_two_classes_counts_once(self):
+        predictions = [{"class": "car", "box": [0, 0, 10, 10], "confidence": 0.6},
+                       {"class": "truck", "box": [0, 0, 10, 11], "confidence": 0.8},
+                       {"class": "car", "box": [50, 0, 60, 10], "confidence": 0.5}]
+        kept = suppress_duplicates(predictions)
+        self.assertEqual(["truck", "car"], [item["class"] for item in kept])
+
     def test_tiles_cover_far_edge_and_do_not_repeat_it(self):
         self.assertEqual([0, 512, 1024, 1280], tile_origins(1920, 640))
         self.assertEqual([0], tile_origins(320, 640))

@@ -17,7 +17,7 @@ Requires Python 3.9+ and no package installation.
 python3 run.py
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flow** and **Changed condition**, inspect the shipment and truck network, then click **Run simulated inspection**. The ranked dispatcher options and blockage probability update immediately.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flow** and **Changed condition**, inspect the shipment and truck network, then click **Review inspection images**. The ranked dispatcher options and blockage probability update immediately.
 
 The demo includes 12 fictional shipments, 9 fictional trucks, multiple port-to-warehouse corridors, appointment and readiness context, and visible data-provenance labels. Read [DATA.md](DATA.md) for the source inventory, modeling choices, and limitations.
 
@@ -34,8 +34,8 @@ python3 -m unittest discover -s tests -v
 3. Compare keep course, reroute, and truck-swap options, including stakeholder and environmental effects.
 4. Show why a six-minute simulated inspection is worth gathering in this condition.
 5. Press play under the map to watch the model's pick unfold. Switch **Play out** or the CA-47 toggle to compare options, and click a truck to follow it.
-6. Run the inspection and select **Road blocked**, **Road clear**, or **Inconclusive** as the stub result. The map switches to the new best option.
-7. Show the posterior blockage probability and newly ranked options. Emphasize that a dispatcher approves any action.
+6. Click **Review inspection images**, pick a California image, and choose the observation it supports. The map switches to the new best option. Without the prepared image library (`python -m cv.prepare_review`), simulated **Road blocked**, **Road clear** and **Inconclusive** buttons appear instead.
+7. Show the posterior blockage probability and newly ranked options. Point out the measured line: automated CV alone is not yet worth an inspection, and the page states the accuracy at which it would be. Emphasize that a dispatcher approves any action.
 
 ## How the decision model works
 
@@ -75,7 +75,9 @@ frontend/index.html           Dashboard structure
 frontend/styles.css           Responsive visual design
 frontend/arcgis.css           ArcGIS map styles
 frontend/app.js               Map rendering and interaction
-frontend/evidence/            Inspection evidence files from the CV pipeline
+frontend/inspection.js        Image review dialog (library served by backend/inspection.py)
+frontend/evidence/            Planned per-clip evidence files (contract 3); only a stub so far
+cv/                           Offline CV pipeline with its own environment; see cv/README.md
 tests/                        Decision-model, contract, and server tests
 run.py                        One-command entry point
 ```
@@ -96,7 +98,7 @@ Useful endpoints:
 - Add actions or tune weights in `config/port_scenario.json`; no UI code changes are needed.
 - After moving locations or trucks, or adding shipments, run `python3 scripts/build_road_geometry.py` to fetch road paths for the new legs. It calls the public OSRM demo server about once per second; the app itself reads only the saved file.
 - Add an ArcGIS Location Platform API key only if Esri-hosted basemaps, routing, geocoding, or other metered services are needed. Review current quotas before enabling them.
-- Replace the observation buttons with a prerecorded video plus a CV adapter that returns `blocked`, `clear`, or `inconclusive` and confidence.
+- Produce `frontend/evidence/<clip>.json` from the planned Pexels clips (see cv/SOURCES.md) if video evidence is wanted alongside the image review library.
 - Add a `ScenarioRepository` behind `scenario.py` for SQLite, Postgres, or a logistics API.
 - Add authentication, audit logs, geofencing, aviation checks, and explicit authorization before considering any real-world field integration.
 
