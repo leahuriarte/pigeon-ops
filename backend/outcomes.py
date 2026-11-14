@@ -12,6 +12,7 @@ METERS_PER_MILE = 1609.344
 EARTH_RADIUS_M = 6371008.8
 METRICS = ("lateness_min", "incremental_cost", "emissions_kg", "constraint_breaches")
 STATES = ("open", "blocked")
+INSPECTED = "outcomes_after_inspection"  # the same outcomes when an inspection first holds the decision
 
 
 def clock_minutes(text):
@@ -184,16 +185,18 @@ def apply_override(computed, override):
 
 
 def apply_route_outcomes(scenario):
-    """Fill decision_model.actions[*].outcomes and decision_model.assignments in place."""
+    """Fill each action's outcomes, its outcomes after an inspection, and decision_model.assignments in place."""
     from backend.assignment import AssignmentModel  # assignment builds on RouteModel
 
     model = scenario["decision_model"]
     routes = RouteModel(scenario)
     pool = AssignmentModel(scenario, routes)
     model["planned_trip"] = routes.planned_summary()
+    delay = model.get("drone", {}).get("launch_and_review_minutes", 0)
     for action in model["actions"]:
         plan = action.get("plan")
-        computed = {state: pool.outcome(plan, state) for state in STATES} if plan else {}
-        action["outcomes"] = apply_override(computed, action.get("override"))
-    model["assignments"] = pool.enumerate(model["actions"])
+        for key, minutes in (("outcomes", 0), (INSPECTED, delay)):
+            computed = {state: pool.outcome(plan, state, minutes) for state in STATES} if plan else {}
+            action[key] = apply_override(computed, action.get("override"))
+    model["assignments"] = pool.enumerate(model["actions"], delay)
     return scenario

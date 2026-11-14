@@ -1,6 +1,6 @@
 """Small, auditable expected-value-of-information decision engine."""
 from backend.indicators import compute_indicators
-from backend.outcomes import METRICS
+from backend.outcomes import INSPECTED, METRICS
 
 SIGNALS = ("blocked", "clear", "inconclusive")
 
@@ -53,23 +53,29 @@ def _rank(items):
     return items
 
 
-def rank_actions(model, blocked_probability):
+def rank_actions(model, blocked_probability, inspected=False):
+    """Actions ranked by expected loss; `inspected` uses the outcomes that start after the inspection delay."""
     ranked = []
     for action in model["actions"]:
-        expected, expected_loss = _expectation(action["outcomes"], model, blocked_probability)
+        outcomes = action[INSPECTED if inspected else "outcomes"]
+        expected, expected_loss = _expectation(outcomes, model, blocked_probability)
         ranked.append({
             "id": action["id"], "label": action["label"], "summary": action["summary"],
             "stakeholder_effect": action.get("stakeholder_effect", "No additional stakeholder effect recorded."),
             "expected": expected, "expected_loss": expected_loss,
-            "outcomes": action["outcomes"]
+            "outcomes": outcomes
         })
     return _rank(ranked)
 
 
-def rank_assignments(model, blocked_probability):
+def rank_assignments(model, blocked_probability, inspected=False):
     """Every enumerated truck-to-shipment assignment, ranked by expected loss."""
     ranked = []
     for option in model["assignments"]["options"]:
+        option = dict(option)
+        delayed = option.pop(INSPECTED)
+        if inspected:
+            option["outcomes"] = delayed
         expected, expected_loss = _expectation(option["outcomes"], model, blocked_probability)
         ranked.append({**option, "expected": expected, "expected_loss": expected_loss})
     return _rank(ranked)
@@ -87,13 +93,14 @@ def information_value(model, prior, likelihoods=None):
         signal: likelihoods["blocked"][signal] * prior + likelihoods["open"][signal] * (1 - prior)
         for signal in SIGNALS
     }
-    # Expected loss of the best action after seeing each possible signal.
+    # Expected loss of the best action after seeing each possible signal. Every action starts after the
+    # inspection delay, so the wait shows up as later arrivals and paid waiting time, not as a flat cost.
     expected_loss_with_signal = sum(
-        probability * rank_actions(model, posterior_blocked(prior, signal, likelihoods))[0]["expected_loss"]
+        probability * rank_actions(model, posterior_blocked(prior, signal, likelihoods), True)[0]["expected_loss"]
         for signal, probability in signal_probability.items() if probability
     )
     gross_value = best_now - expected_loss_with_signal
-    inspection_cost = drone["direct_cost"] + drone["delay_cost"]
+    inspection_cost = drone["direct_cost"]
     net_value = gross_value - inspection_cost
     return {
         "best_act_now_loss": best_now,
@@ -102,7 +109,7 @@ def information_value(model, prior, likelihoods=None):
         "inspection_cost": round(inspection_cost, 2),
         "net_value_of_information": round(net_value, 2),
         "recommend_inspection": net_value > 0,
-        "formula": "Net EVI = best expected loss now − expected loss with observation − inspection cost",
+        "formula": "Net EVI = best expected loss now − expected loss after waiting for the observation − inspection cost",
         "assumptions": {
             "inspection_accuracy": drone["accuracy"],
             "accuracy_basis": drone.get("accuracy_basis", "assumed"),
@@ -159,13 +166,13 @@ def analyze(scenario, observation=None):
         "posterior_blocked_probability": round(posterior, 4) if observation else None,
         "observation": observation,
         "before": before,
-        "after": rank_actions(model, posterior) if observation else [],
+        "after": rank_actions(model, posterior, True) if observation else [],
         "evoi": evoi,
         "sensitivity": sensitivity(model),
         "indicators": compute_indicators(scenario, before),
         "assignments": {
             **{key: model["assignments"][key] for key in ("shipments", "trucks", "count")},
             "before": rank_assignments(model, prior),
-            "after": rank_assignments(model, posterior) if observation else [],
+            "after": rank_assignments(model, posterior, True) if observation else [],
         },
     }

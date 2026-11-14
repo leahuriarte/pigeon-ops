@@ -101,7 +101,7 @@
     "lateness_cost_per_minute": 85,
     "emissions_cost_per_kg": 0.25,
     "hard_constraint_penalty": 2500,
-    "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "launch_and_review_minutes": 6, "direct_cost": 90, "delay_cost": 75, "note": "The inspection uses example images and simulated results, not a live drone feed, and PigeonOps does not control a drone. The 90% accuracy is an assumption, used to test how much the recommendation depends on it.",
+    "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "launch_and_review_minutes": 6, "direct_cost": 90, "note": "The inspection uses example images and simulated results, not a live drone feed, and PigeonOps does not control a drone. The 90% accuracy is an assumption, used to test how much the recommendation depends on it.",
       "accuracy_basis": "assumed for a dispatcher who reviews drone images with CV assistance; not yet validated",
       "cv_only": {"basis": "Automated CV alone: detector error measured on 27 UAV-OBB frames (only 4 with dense traffic) combined with an assumed traffic link; regenerate with python -m cv.evaluate_road_state",
         "likelihoods": {"blocked": {"blocked": 0.2417, "clear": 0.2155, "inconclusive": 0.5428}, "open": {"blocked": 0.1027, "clear": 0.5152, "inconclusive": 0.3821}}}},

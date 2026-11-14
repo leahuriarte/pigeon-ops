@@ -10,7 +10,7 @@ estimate built on synthetic data.
 from itertools import permutations
 from math import perm
 
-from backend.outcomes import METERS_PER_MILE, STATES, Trip, _by_id, clock_minutes, clock_text, straight_line_m
+from backend.outcomes import INSPECTED, METERS_PER_MILE, STATES, Trip, _by_id, clock_minutes, clock_text, straight_line_m
 
 MAX_ASSIGNMENTS = 5040  # seven trucks over seven shipments; keeps every API call fast
 
@@ -39,6 +39,7 @@ class AssignmentModel:
         self.shipments = [_by_id(scenario["shipments"], key) for key in shipment_ids]
         self.trucks = {key: _by_id(scenario["trucks"], key) for key in truck_ids}
         self._validate(scenario, bool(config))
+        self.now = clock_minutes(scenario.get("generated_at"))[:1]
         self.planned = {s["id"]: s["truck"] for s in self.shipments}
         self.baseline = {s["id"]: self._row(s, s["truck"], s["route"], "open") for s in self.shipments}
 
@@ -65,16 +66,34 @@ class AssignmentModel:
     def _available(self, truck_id):
         return _clock(self.trucks[truck_id].get("available_at"), f"{truck_id}.available_at")
 
-    def _row(self, shipment, truck_id, route_id, state):
-        """One shipment's trip, arrival and lateness when `truck_id` carries it on `route_id`."""
+    def _held(self, truck_id, delay):
+        """A new trip that starts with `truck_id` waiting for an inspection that ends `delay` minutes from now.
+
+        A truck that is not free until after the inspection ends does not wait.
+        """
+        trip = Trip()
+        if delay:
+            free = clock_minutes(self.trucks[truck_id].get("available_at"))[:1]
+            if free and not self.now:
+                raise ValueError("an inspection delay needs the scenario's generated_at time")
+            hold = delay if not free else self.now[0] + delay - max(free[0], self.now[0])
+            if hold > 0:
+                trip.wait(hold, "hold for inspection")
+        return trip
+
+    def _row(self, shipment, truck_id, route_id, state, delay=0):
+        """One shipment's trip, arrival and lateness when `truck_id` carries it on `route_id`.
+
+        `delay` is how long an inspection holds the decision before any truck acts on it.
+        """
         own_id = shipment["truck"]
         own = self.trucks[own_id]
         planned_trip = self.routes.own_trip(shipment, own, shipment["route"], "open")
         if truck_id == own_id:
-            trip = self.routes.own_trip(shipment, own, route_id, state)
+            trip = self.routes.own_trip(shipment, own, route_id, state, self._held(own_id, delay))
             shift = 0.0
         else:
-            trip, shift = self._fetch(shipment, self.trucks[truck_id], own, route_id, state)
+            trip, shift = self._fetch(shipment, self.trucks[truck_id], own, route_id, state, delay)
         # The planned ETA anchors the clock; route data and availability times supply the change.
         arrival = _clock(shipment["eta"], f"{shipment['id']}.eta") + shift + trip.driver_min - planned_trip.driver_min
         window_start, window_end = clock_minutes(shipment["appointment"])[:2]
@@ -95,27 +114,28 @@ class AssignmentModel:
             "path": trip.path,
         }
 
-    def _fetch(self, shipment, truck, own, route_id, state):
+    def _fetch(self, shipment, truck, own, route_id, state, delay=0):
         """Trip of a reassigned truck that drives to the load on `own`, takes it over and hauls it.
 
         Returns the trip and how much later than planned the trip starts.
         """
         ready = clock_minutes(shipment.get("readiness"))[:1]
         planned_start = max([self._available(own["id"])] + ready)
-        leaves = self._available(truck["id"])
+        trip = self._held(truck["id"], delay)
+        available = self._available(truck["id"])
+        leaves = available + trip.wait_min
         meters = straight_line_m(truck["lat"], truck["lon"], own["lat"], own["lon"]) * self.fetch_circuity
         minutes = meters / METERS_PER_MILE / self.fetch_speed_mph * 60
-        trip = Trip()
         trip.join(meters, minutes, f"drive to load on {own['id']}")
         idle = max([leaves + minutes, self._available(own["id"])] + ready) - (leaves + minutes)
         if idle > 0:
             trip.wait(idle, "wait for handover")
         trip.wait(self.handover_min, "load handover")
         self.routes.own_trip(shipment, own, route_id, state, trip)
-        return trip, leaves - planned_start
+        return trip, available - planned_start
 
-    def _rows(self, trucks, routes, state):
-        return [self._row(s, trucks[s["id"]], routes.get(s["id"], s["route"]), state) for s in self.shipments]
+    def _rows(self, trucks, routes, state, delay=0):
+        return [self._row(s, trucks[s["id"]], routes.get(s["id"], s["route"]), state, delay) for s in self.shipments]
 
     def _score(self, rows):
         """Outcome in the action format: the affected shipment's values plus the change to every other pool shipment."""
@@ -164,14 +184,17 @@ class AssignmentModel:
             raise ValueError(f"plan trucks {plan.get('trucks')} must give each pool shipment its own pool truck")
         return trucks
 
-    def outcome(self, plan, state):
+    def outcome(self, plan, state, delay=0):
         """Outcome of an action plan: optional `route` for the affected shipment, optional `trucks` reassignment."""
         trucks = self._trucks_for(plan)
         route = plan.get("route", self.affected["route"])
-        return self._score(self._rows(trucks, {self.affected["id"]: route}, state))
+        return self._score(self._rows(trucks, {self.affected["id"]: route}, state, delay))
 
-    def enumerate(self, actions):
-        """Every assignment of pool trucks to pool shipments, each shipment on its own route."""
+    def enumerate(self, actions, delay=0):
+        """Every assignment of pool trucks to pool shipments, each shipment on its own route.
+
+        Each option also gets its outcomes when an inspection first holds the decision for `delay` minutes.
+        """
         ids = [s["id"] for s in self.shipments]
         named = {}
         for action in actions:
@@ -190,5 +213,6 @@ class AssignmentModel:
                 "planned": trucks == self.planned,
                 "action": named.get(combo),
                 "outcomes": {state: self._score(self._rows(trucks, {}, state)) for state in STATES},
+                INSPECTED: {state: self._score(self._rows(trucks, {}, state, delay)) for state in STATES},
             })
         return {"shipments": ids, "trucks": list(self.trucks), "count": len(options), "options": options}

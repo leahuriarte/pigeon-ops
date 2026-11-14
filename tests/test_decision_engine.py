@@ -1,6 +1,7 @@
 import unittest
 
 from backend.decision_engine import analyze, likelihoods_from_accuracy, posterior_blocked, rank_actions
+from backend.outcomes import INSPECTED, apply_route_outcomes
 from backend.scenario import available_scenarios, load_scenario
 
 
@@ -47,11 +48,50 @@ class DecisionEngineTests(unittest.TestCase):
         result = analyze(load_scenario(variant="normal"))
         self.assertFalse(result["evoi"]["recommend_inspection"])
 
-    def test_evidence_that_cannot_change_the_action_has_no_value(self):
+    def test_evidence_that_cannot_change_the_action_only_costs_the_wait(self):
         self.scenario["decision_model"]["drone"]["accuracy"] = 0.6
         evoi = analyze(self.scenario)["evoi"]
-        self.assertAlmostEqual(0, evoi["gross_value_of_information"], places=1)
+        model = self.scenario["decision_model"]
+        # Rerouting stays best, six minutes later: six more late minutes and six paid waiting minutes.
+        wait = 6 * model["lateness_cost_per_minute"] + 6 * model["rates"]["driver_hourly_rate"] / 60
+        self.assertAlmostEqual(-wait, evoi["gross_value_of_information"], places=1)
         self.assertFalse(evoi["recommend_inspection"])
+
+    def with_delay(self, minutes):
+        scenario = load_scenario(variant="disruption")
+        scenario["decision_model"]["drone"]["launch_and_review_minutes"] = minutes
+        return apply_route_outcomes(scenario)
+
+    def held(self, scenario, action_id, shipment_id, state="open"):
+        action = next(a for a in scenario["decision_model"]["actions"] if a["id"] == action_id)
+        return next(r for r in action[INSPECTED][state]["detail"]["shipments"] if r["shipment"] == shipment_id)
+
+    def test_inspection_delay_moves_the_free_truck_and_is_not_a_flat_cost(self):
+        row = self.held(self.scenario, "hold-course", "SYN-SHP-1042")
+        self.assertEqual(("10:09", 6.0, 0.0), (row["arrival"], row["slack_min"], row["lateness_min"]))
+        self.assertIn("hold for inspection", row["path"])
+        # SYN-TRK-12 is not free until 09:25, after the inspection ends at 09:18, so it does not wait.
+        self.assertEqual("10:42", self.held(self.scenario, "hold-course", "SYN-SHP-1048")["arrival"])
+        self.assertEqual("10:39", self.held(self.scenario, "swap-truck", "SYN-SHP-1042")["arrival"])
+        evoi = analyze(self.scenario)["evoi"]
+        self.assertEqual(self.scenario["decision_model"]["drone"]["direct_cost"], evoi["inspection_cost"])
+
+    def test_delay_eating_into_slack_lowers_the_net_value_of_inspecting(self):
+        nets = [analyze(self.with_delay(m))["evoi"]["net_value_of_information"] for m in (0, 6, 12, 18)]
+        self.assertEqual(sorted(nets, reverse=True), nets)
+        self.assertEqual(4, len(set(nets)))
+        # Twelve minutes use up SYN-SHP-1042's slack exactly; eighteen make it six minutes late on a clear road.
+        self.assertEqual(0.0, self.held(self.with_delay(12), "hold-course", "SYN-SHP-1042")["lateness_min"])
+        self.assertEqual(6.0, self.held(self.with_delay(18), "hold-course", "SYN-SHP-1042")["lateness_min"])
+        self.assertGreater(nets[2] - nets[3], nets[1] - nets[2])
+
+    def test_ranking_after_an_observation_starts_after_the_delay(self):
+        result = analyze(self.scenario, "clear")
+        arrival = {key: next(a for a in result[key] if a["id"] == "hold-course")["outcomes"]["open"]["detail"]["arrival"]
+                   for key in ("before", "after")}
+        self.assertEqual({"before": "10:03", "after": "10:09"}, arrival)
+        for option in result["assignments"]["after"]:
+            self.assertNotIn(INSPECTED, option)
 
     def test_break_even_accuracy_separates_worth_it_from_not(self):
         threshold = analyze(self.scenario)["evoi"]["break_even_accuracy"]
