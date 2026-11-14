@@ -104,8 +104,8 @@ function effectLine(result) {
   const drone = e.inspection_after.recommend
     ? `a drone check would still be worth it (${money(e.inspection_after.net_value)} net)`
     : `a drone check would not be worth it (${money(e.inspection_after.net_value)} net)`;
-  if (e.prior_after === e.prior_before) return `Using it leaves the chance CA-47 is ${bad} at ${pct(e.prior_before)}.`;
-  return `Using it moves the chance CA-47 is ${bad} from ${pct(e.prior_before)} to ${pct(e.prior_after)}, and ${drone}.`;
+  if (e.prior_after === e.prior_before) return `Using it leaves the chance the incident road is ${bad} at ${pct(e.prior_before)}.`;
+  return `Using it moves the chance the incident road is ${bad} from ${pct(e.prior_before)} to ${pct(e.prior_after)}, and ${drone}.`;
 }
 
 // Runs the web check for an incident and renders the card. `onApply(finding | null, result)` is called
@@ -145,7 +145,7 @@ export async function renderTriage(container, scenarioId, options = {}) {
   const parts = [header(container, scenarioId, options), by, el("h3", null, headline[result.finding]), el("p", "web-summary", result.summary)];
   const isApplied = applied === result.finding;
   if (isApplied) {
-    parts.push(el("p", "web-effect applied", `Applied. The chance CA-47 is ${result.check.bad} is now ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}).`));
+    parts.push(el("p", "web-effect applied", `Applied. The chance the incident road is ${result.check.bad} is now ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}).`));
   } else {
     parts.push(el("p", "web-effect", effectLine(result)));
   }

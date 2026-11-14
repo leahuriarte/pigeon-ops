@@ -194,8 +194,8 @@ The sensitivity curve repeats the net value at 21 evenly spaced priors from 0 to
 | normal | 0.02 | hold-course | 120.72 | 131.90 | −101.18 | no |
 | disruption | 0.40 | reroute | 1227.11 | 1020.91 | +116.20 | yes |
 | disruption_b | 0.80 | reroute | 1227.11 | 1740.61 | −603.50 | no |
-| congestion | 0.50 | hold-course | 1204.91 | 918.60 | +196.32 | yes |
-| flood | 0.25 | reroute | 1227.11 | 917.17 | +219.94 | yes |
+| congestion | 0.50 | hold-course | 12.80 | 15.13 | −92.33 | no |
+| flood | 0.60 | reroute | 1227.11 | 1911.78 | −774.67 | no |
 
 Net value is best loss now minus loss with inspection minus the $90 direct cost.
 
@@ -203,9 +203,11 @@ In `disruption` an inspection can change the decision. A "clear" result drops th
 
 In `disruption_b` the reports are corroborated, so the prior is 80%. Even after a "clear" result the probability stays at 31%, and rerouting is still best. The inspection cannot change the decision. It only makes the reroute start 6 minutes later: 6 more late minutes at $85 plus $3.50 of paid waiting, $513.50, plus the $90 direct cost.
 
-In `congestion` (heavy traffic) the queue only delays the truck, so keeping the route is best before a check. A "jammed" result raises the probability to 95% and the detour becomes best. A traffic check is assumed to be 95% accurate and to take 4 minutes, because a standing queue is easy to see from above.
+In `congestion` the queue is outside Pier 400's gate on one outbound access road, near the start of the primary route. The released truck is upstream of it. Its synthetic 09:40 planned arrival gives 35 minutes of slack; the assumed severe queue adds 30 minutes, giving a 10:10 arrival. The alternate road avoids the queue but adds miles; a swap keeps the affected load on the queued route and disrupts the other delivery. Continuing wins before inspection and after either finding. Traffic-check accuracy is assumed to be 95% with a 4-minute review, but the extra information does not improve the choice. This is not a gate-processing delay.
 
-In `flood` (road damage from a burst water main) a truck that reaches an impassable road loses 15 minutes backing out, so the detour is best before a check. A "clear" result drops the probability to 5% and keeping the route becomes best. A road damage check is assumed to be 85% accurate and to take 8 minutes, because water depth is hard to judge from above and the CV only tracks vehicles.
+In `flood` the hazard is farther north on the connector approach. The synthetic prior of impassability is 60%. With assumed aerial-review accuracy of 65% and an 8-minute wait, the posterior is 45% after a favorable finding or 74% after an unfavorable finding. The detour wins in both cases; inspection adds an estimated $774.67 in loss, including its $90 direct cost. In the modeled impassable case, the truck loses an assumed 15 minutes withdrawing before returning to the route start and detouring. Footage cannot establish safe water depth or pavement condition. These are planning comparisons, not permission to enter water.
+
+`evoi.response_by_observation` exposes the engine's estimated probability, posterior and best delayed response for each possible finding. The UI uses these results to explain whether checking can change the action, rather than inferring it from the incident title.
 
 In `normal`, waiting costs only $3.50 of driver time because SYN-SHP-1042 has 21 minutes of slack, but there is almost nothing to learn.
 
@@ -236,7 +238,7 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 | `rates.driver_hourly_rate` | $35 | assumed | Loaded driver cost per hour, charged for driving and waiting. Round value; not sourced. |
 | `rates.co2_kg_per_mile` | 1.6 kg | estimated | About 10.2 kg CO2 per gallon of diesel (EPA emission factor) divided by about 6.4 miles per gallon for a heavy truck. Tailpipe only. Battery-electric trucks are treated the same; this overstates their emissions. |
 | `blockage.turnaround_min` | 10 min, 15 min in `flood` | assumed | Time lost reaching the closure and turning around; longer when the truck has to back out of standing water. |
-| `blockage.slowdown_min` | 40 min in `congestion` | assumed | Time lost crawling through a standing queue. |
+| `blockage.slowdown_min` | 30 min in `congestion` | assumed | Time lost in a queue on the outbound access road outside Pier 400's gate. |
 | `blockage.route` / `fallback_route` | primary / detour | assumed | The obstruction sits on `primary`; drivers fall back to the Anaheim St detour. |
 | `indicator_rules.at_risk_probability` | 0.5 | assumed | Probability threshold for "at risk" and "infeasible". |
 | Truck `available_at` | SYN-TRK-07 09:12, SYN-TRK-12 09:25 | synthetic | SYN-TRK-07 is free now; 09:25 comes from the scenario's "is free for a handover from 09:25". |
@@ -246,8 +248,8 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 | Route distance and duration | OSRM | estimated | OSRM's car profile with free-flow speeds. Trucks are usually slower, so all times are optimistic. |
 | Constant speed along a route | n/a | assumed | Needed because OSRM gives one duration per route. |
 | Truck position and ETA | scenario | synthetic | From the seeded scenario. |
-| Prior blockage probability | 0.02 / 0.40 / 0.80 / 0.50 / 0.25 | synthetic | Chosen per variant (normal, disruption, disruption_b, congestion, flood) to tell the demo story. |
-| Inspection accuracy | 0.90 crash, 0.95 traffic, 0.85 road damage | assumed | Sensitivity parameter per kind of check, not validated on footage. |
+| Prior blockage probability | 0.02 / 0.40 / 0.80 / 0.50 / 0.60 | synthetic | Chosen per variant (normal, disruption, disruption_b, congestion, flood) to tell the demo story. |
+| Inspection accuracy | 0.90 crash, 0.95 traffic, 0.65 flood visibility | assumed | Sensitivity parameter per kind of check, not validated on footage; aerial footage cannot certify depth or pavement integrity. |
 | Inspection time | 6 min crash, 4 min traffic, 8 min road damage | assumed | `drone.launch_and_review_minutes` per kind of check. |
 | Schools near a route | 300 m | estimated | OpenStreetMap may miss schools or list closed ones; distance is to the school's mapped point or outline centre. |
 | Lateness, emissions and breach weights | $85/min, $0.25/kg, $2,500 | assumed | Unchanged; see DATA.md. |

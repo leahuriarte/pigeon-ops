@@ -431,6 +431,7 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
 .story-picker .options { gap: 10px; }
 .story-picker .option label { display: grid; justify-items: start; gap: 4px; }
 .story-detail { margin-top: 0; color: var(--ink-2); font-size: 12.5px; }
+.decision-context { margin: 10px 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 /* The regular morning has no incident steps, so the stepper is hidden. */
 body[data-step="monitor"] .stepper,
 body[data-story="normal"][data-step="outcome"] .stepper { display: none; }

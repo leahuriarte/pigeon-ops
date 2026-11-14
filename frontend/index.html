@@ -66,7 +66,7 @@
             <li><i class="swatch fleet"></i>Route ahead</li>
             <li><i class="swatch arrow"></i>Moving</li>
             <li><i class="swatch stopped"></i>Stopped</li>
-            <li class="only-incident"><i class="swatch stopped stuck"></i>Stuck</li>
+            <li class="only-incident"><i class="swatch stopped stuck"></i><span id="incident-stop-label">At closure</span></li>
           </ul>
           <div id="truck-card" class="truck-card" hidden aria-live="polite"></div>
           <ol id="event-feed" class="event-feed" aria-live="polite"></ol>
@@ -158,7 +158,7 @@
           <h1 id="start-title">Normal morning vs incident</h1>
           <p class="lede">See the normal plan, introduce a road incident, then decide whether a drone check is worth its cost.</p>
           <fieldset class="story-picker">
-            <legend>Normal baseline + two drone checks</legend>
+            <legend>Normal baseline + four incident decisions</legend>
             <ul id="story-options" class="options"></ul>
           </fieldset>
           <div class="actions">
@@ -194,7 +194,9 @@
         <section class="step step-incident" data-step="incident" aria-labelledby="disruption-title" hidden>
           <p class="tag-line"><span id="situation-eyebrow" class="tag risk">Incident</span><span id="reported-at"></span></p>
           <h1 id="disruption-title">Loading…</h1>
+          <p id="incident-place" class="subhead"></p>
           <p id="disruption-description" class="lede"></p>
+          <p id="decision-context" class="decision-context"></p>
           <dl class="facts">
             <div><dt id="risk-label">Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
             <div><dt id="affected-label">Shipment at risk</dt><dd id="affected">—</dd></div>
@@ -207,6 +209,8 @@
             <h2 id="inspection-title">Check by drone?</h2>
             <p id="recommendation-short" class="verdict-answer">—</p>
             <p id="recommendation" class="verdict-why">Calculating…</p>
+            <p id="inspection-choices" class="decision-context"></p>
+            <p id="inspection-limits" class="note"></p>
             <details class="more"><summary>Calculation</summary>
               <dl class="ledger">
                 <div><dt>Expected loss: act now</dt><dd id="act-loss">—</dd></div>
@@ -247,7 +251,10 @@
             <button id="reinspect-button" class="link" type="button">Review footage</button>
           </div>
           <h1 id="options-title">Choose a response</h1>
+          <p id="response-context" class="decision-context"></p>
+          <p id="response-limits" class="note"></p>
           <p id="ranking-state" class="subhead">Lowest expected loss first. Estimates.</p>
+          <p id="response-why" class="decision-context"></p>
           <ol id="rankings" class="options"></ol>
           <label id="override-reason-wrap" class="override-reason" hidden>Reason for choosing another response
             <textarea id="override-reason" rows="2" maxlength="200"></textarea>
@@ -262,9 +269,9 @@
           <h1 id="outcome-title">Simulation</h1>
           <p id="outcome-sub" class="subhead"></p>
           <div class="road-case only-disruption">
-            <span>Simulate CA-47 as</span>
+            <span id="road-case-label">Simulate the incident road as</span>
             <fieldset class="segmented" style="--n:2">
-              <legend class="visually-hidden">CA-47 road state</legend>
+              <legend class="visually-hidden">Incident road state</legend>
               <input type="radio" name="road" id="road-open" value="open"><label for="road-open">open</label>
               <input type="radio" name="road" id="road-blocked" value="blocked"><label for="road-blocked">blocked</label>
               <span class="glider" aria-hidden="true"></span>

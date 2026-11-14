@@ -59,6 +59,22 @@ class RouteOutcomeTests(unittest.TestCase):
         self.assertEqual(hold["open"]["detail"]["miles"], hold["blocked"]["detail"]["miles"])
         self.assertNotIn("detour", hold["blocked"]["detail"]["path"])
 
+    def test_terminal_access_queue_is_ahead_of_the_load_and_fits_its_buffer(self):
+        from backend.outcomes import RouteModel
+        scenario = load_scenario(variant="congestion")
+        model = RouteModel(scenario)
+        self.assertLess(model.truck_at, model.incident_at)
+        self.assertLess(model.incident_at, 0.1)  # at the terminal end of this route
+        self.assertEqual(35, model.shipment["slack_min"])
+        outcomes = action(scenario, "hold-course")["outcomes"]
+        self.assertEqual("10:10", outcomes["blocked"]["detail"]["arrival"])
+        self.assertEqual(0, outcomes["blocked"]["lateness_min"])
+        self.assertEqual(0, outcomes["blocked"]["constraint_breaches"])
+        # Variant overlays must not move the truck or queue in the crash scenario.
+        crash = RouteModel(load_scenario(variant="disruption"))
+        self.assertGreater(crash.incident_at, 0.5)
+        self.assertGreater(crash.truck_at, model.truck_at)
+
 
 if __name__ == "__main__":
     unittest.main()
