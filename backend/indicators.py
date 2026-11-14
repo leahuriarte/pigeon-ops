@@ -29,19 +29,32 @@ def compute_indicators(scenario, ranked):
     expected_delay = sum(probability[s] * outcomes[s]["lateness_min"] for s in STATES)
     expected_co2 = sum(probability[s] * outcomes[s]["emissions_kg"] for s in STATES)
 
-    # Only the affected shipment is re-simulated; every other assigned shipment runs on plan.
+    # Shipments in the assignment pool are re-simulated one by one; every other assigned shipment runs on plan.
+    if from_routes:
+        rows = {state: {row["shipment"]: row for row in outcomes[state]["detail"]["shipments"]} for state in STATES}
+        pool = list(rows["open"])
+
+        def pool_count(test):
+            return sum(1 for key in pool if sum(probability[s] for s in STATES if test(rows[s][key])) >= threshold)
+
+        pool_late = pool_count(lambda row: row["lateness_min"] > 0)
+        pool_missed = pool_count(lambda row: row["constraint_breaches"] > 0)
+    else:
+        pool = [planned["shipment"]]
+        pool_late = 1 if p_late >= threshold else 0
+        pool_missed = 1 if p_missed >= threshold else 0
     assigned = [s for s in scenario["shipments"] if s["truck"] in truck_ids]
-    others = [s for s in assigned if s["id"] != planned["shipment"]]
+    others = [s for s in assigned if s["id"] not in pool]
     others_late = sum(1 for s in others if s.get("slack_min", 0) < 0)
-    at_risk = others_late + (1 if p_late >= threshold else 0)
-    feasible = len(others) - others_late + (0 if p_missed >= threshold else 1)
+    at_risk = others_late + pool_late
+    feasible = len(others) - others_late + len(pool) - pool_missed
 
     if from_routes:
         added_miles = round(sum(probability[s] * outcomes[s]["detail"]["added_miles"] for s in STATES), 1)
     else:
         added_miles = None
 
-    # Whole-plan CO2: every assigned shipment's full route, plus the change for the affected one.
+    # Whole-plan CO2: every assigned shipment's full route, plus the top option's change to the pool.
     base_miles = sum(routes[s["route"]]["distance_m"] for s in assigned) / METERS_PER_MILE
     co2 = round(base_miles * co2_per_mile + expected_co2 - planned["emissions_kg"], 1)
 

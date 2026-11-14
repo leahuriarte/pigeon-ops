@@ -7,7 +7,7 @@ PigeonOps uses **publicly calibrated synthetic data**. Public sources shape plau
 The shared operating picture in `config/port_scenario.json` contains:
 
 - 12 synthetic shipments across three port terminals and six destination facilities
-- 9 synthetic trucks with assignments, powertrains, status, duty time, and approximate simulated positions
+- 9 synthetic trucks with assignments, powertrains, status, duty time, approximate simulated positions, and availability times for the two trucks the swap option exchanges
 - 4 illustrative corridors, including a current route, candidate detour, and two fleet context routes
 - A playback schedule for every truck, built from the shipment ETAs, appointments, and release holds, with road-following paths in `config/road_geometry.json`
 - 3 scenario variants: routine morning operations, an unverified road disruption, and a corroborated one
@@ -25,7 +25,7 @@ Every data element belongs to one of four classes:
 | Public baseline | Directly based on public geography or published reference material | General port geography, highway corridors, terminal names |
 | Publicly calibrated | Synthetic values shaped by public aggregates or distributions | Cargo categories, speed, turn time, truck characteristics |
 | Derived estimate | Calculated from other scenario values | ETA slack, expected loss, posterior blockage probability |
-| Synthetic or assumed | Created specifically for the demonstration | Shipments, appointments, truck assignments, incident, inspection accuracy |
+| Synthetic or assumed | Created specifically for the demonstration | Shipments, appointments, truck assignments and availability times, incident, inspection accuracy |
 
 The UI exposes these distinctions because a realistic-looking operational record must not be presented as measured real-world data.
 

@@ -202,7 +202,7 @@ class Planner:
         else:
             place = (truck["lat"], truck["lon"])
         track = self.new_track(truck["id"], place, self.start)
-        if truck.get("available_at"):
+        if truck.get("available_at") and clock(truck["available_at"]) > self.start:
             self.stop(track, clock(truck["available_at"]), "busy", "Finishing its previous job")
             self.event(track, "Becomes available for new work")
         return track
@@ -216,12 +216,16 @@ class Planner:
         window_start = clock(affected["appointment"].split("–")[0])
         action = next(a for a in self.scenario["decision_model"]["actions"] if a["id"] == self.action)
         outcome = action["outcomes"][self.road]
-        lateness = outcome["lateness_min"]
-        target = window_start + lateness if lateness > 0 else clock(affected["eta"])
+        if "detail" in outcome:
+            # Computed outcomes give the affected load's own arrival; lateness_min also counts other pool shipments.
+            target = clock(outcome["detail"]["arrival"])
+        else:
+            lateness = outcome["lateness_min"]
+            target = window_start + lateness if lateness > 0 else clock(affected["eta"])
         dest = affected["destination"]
         track = self.truck_start(truck, shipments)
 
-        if action.get("plan") and "detail" in outcome:
+        if action.get("plan", {}).get("route") and "detail" in outcome:
             self.follow_route_trip(track, affected, action["plan"]["route"], clock(outcome["detail"]["arrival"]))
             self.deliver(track, affected, dest)
             self.run_shipments(track, rest, first_loaded=False)

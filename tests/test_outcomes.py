@@ -73,12 +73,11 @@ class RouteOutcomeTests(unittest.TestCase):
         self.assertAlmostEqual(share * routes["primary"]["distance_m"] / METERS_PER_MILE, planned["miles"], delta=0.05)
 
     def test_computed_outcomes_are_labelled_estimates(self):
-        for action_id in ("hold-course", "reroute"):
+        for action_id in ("hold-course", "reroute", "swap-truck"):
             for outcome in action(self.scenario, action_id)["outcomes"].values():
                 self.assertEqual("estimated", outcome["basis"])
-        for outcome in action(self.scenario, "swap-truck")["outcomes"].values():
-            self.assertEqual("override", outcome["basis"])
-            self.assertEqual("assumed", outcome["override_basis"])
+                for row in outcome["detail"]["shipments"]:
+                    self.assertEqual("estimated", row["basis"])
 
     def test_override_wins_over_computed_values(self):
         scenario = load_scenario(variant="disruption")

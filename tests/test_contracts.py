@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_DIR = ROOT / "frontend" / "evidence"
 INDICATOR_IDS = {"shipments_at_risk", "appointments_feasible", "expected_delay_min", "added_miles", "co2_kg", "community_exposure"}
 BASES = {"stub", "estimated", "simulated", "measured"}
+SHIPMENT_ROW = {"shipment", "truck", "route", "reassigned", "arrival", "appointment", "slack_min", "lateness_min",
+                "constraint_breaches", "basis"}
 
 
 class ScenarioContractTests(unittest.TestCase):
@@ -53,6 +55,20 @@ class ScenarioContractTests(unittest.TestCase):
                 for indicator in indicators:
                     self.assertIn(indicator["basis"], BASES)
                 self.assertIn("of", next(i for i in indicators if i["id"] == "appointments_feasible"))
+
+    def test_analysis_assignments_match_contract(self):
+        for item in available_scenarios():
+            with self.subTest(variant=item["id"]):
+                assignments = analyze(load_scenario(variant=item["id"]), "blocked")["assignments"]
+                self.assertLessEqual({"shipments", "trucks", "count", "before", "after"}, set(assignments))
+                self.assertEqual(assignments["count"], len(assignments["before"]))
+                for option in assignments["before"] + assignments["after"]:
+                    self.assertLessEqual({"id", "trucks", "planned", "action", "rank", "expected_loss", "outcomes"},
+                                         set(option))
+                    for state in ("open", "blocked"):
+                        for row in option["outcomes"][state]["detail"]["shipments"]:
+                            self.assertLessEqual(SHIPMENT_ROW, set(row))
+                            self.assertIn(row["basis"], BASES)
 
     def test_disruption_lists_evidence(self):
         self.assertTrue(load_scenario(variant="disruption")["disruption"]["evidence_clips"])

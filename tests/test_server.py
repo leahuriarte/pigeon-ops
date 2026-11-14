@@ -54,9 +54,10 @@ class ServerTests(unittest.TestCase):
 
     def test_analysis_carries_contract_fields(self):
         body = self.get("/api/analysis?scenario=normal&observation=blocked")
-        for key in ("scenario_id", "before", "after", "evoi", "sensitivity", "indicators"):
+        for key in ("scenario_id", "before", "after", "evoi", "sensitivity", "indicators", "assignments"):
             self.assertIn(key, body)
         self.assertEqual(3, len(body["after"]))
+        self.assertEqual(body["assignments"]["count"], len(body["assignments"]["after"]))
 
     def test_bad_input_is_rejected(self):
         self.assertEqual(404, self.status_of("/api/analysis?scenario=nope"))
