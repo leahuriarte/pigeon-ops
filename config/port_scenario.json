@@ -72,11 +72,27 @@
         {"id": "hold-course", "label": "Keep current route", "summary": "Continue on the planned corridor while conditions remain normal.", "stakeholder_effect": "No reassignment or added neighborhood mileage.", "outcomes": {"open": {"lateness_min": 0, "incremental_cost": 0, "emissions_kg": 8, "constraint_breaches": 0}, "blocked": {"lateness_min": 25, "incremental_cost": 260, "emissions_kg": 20, "constraint_breaches": 1}}},
         {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Avoid a low-probability problem at a known time and mileage cost.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "outcomes": {"open": {"lateness_min": 14, "incremental_cost": 190, "emissions_kg": 29, "constraint_breaches": 0}, "blocked": {"lateness_min": 14, "incremental_cost": 190, "emissions_kg": 29, "constraint_breaches": 0}}},
         {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Resequence two healthy loads without a confirmed need.", "stakeholder_effect": "Creates avoidable risk for SYN-SHP-1048.", "outcomes": {"open": {"lateness_min": 10, "incremental_cost": 360, "emissions_kg": 18, "constraint_breaches": 0}, "blocked": {"lateness_min": 8, "incremental_cost": 410, "emissions_kg": 20, "constraint_breaches": 0}}}
-      ]}
+      ]},
+      "indicators_stub": [
+        {"id": "shipments_at_risk", "label": "Shipments at risk", "value": 0, "unit": "shipments", "basis": "stub"},
+        {"id": "appointments_feasible", "label": "Appointments feasible", "value": 11, "of": 12, "unit": "appointments", "basis": "stub"},
+        {"id": "expected_delay_min", "label": "Expected delay", "value": 0, "unit": "min", "basis": "stub"},
+        {"id": "added_miles", "label": "Added miles", "value": 0, "unit": "mi", "basis": "stub"},
+        {"id": "co2_kg", "label": "Estimated CO2", "value": 96, "unit": "kg", "basis": "stub"},
+        {"id": "community_exposure", "label": "Schools within 300 m of routes used", "value": null, "unit": "schools", "basis": "stub"}
+      ]
     },
     "disruption": {
       "id": "port-la-disruption", "name": "Changed condition", "scenario_type": "disruption",
-      "disruption": {"id": "DSP-07", "eyebrow": "ACTIVE DISRUPTION", "title": "Possible overturned vehicle on CA-47 connector", "description": "Two unverified driver reports indicate a partial or full blockage. The medical-equipment load has 12 minutes of appointment slack.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.55, "reported_at": "09:08", "decision_deadline": "09:18", "constraints": ["Warehouse appointment begins at 10:15", "Medical-equipment load is priority critical", "SYN-TRK-12 cannot transfer before 09:25", "A truck swap places SYN-SHP-1048 on watch"]}
+      "disruption": {"id": "DSP-07", "eyebrow": "ACTIVE DISRUPTION", "title": "Possible overturned vehicle on CA-47 connector", "description": "Two unverified driver reports indicate a partial or full blockage. The medical-equipment load has 12 minutes of appointment slack.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.55, "reported_at": "09:08", "decision_deadline": "09:18", "constraints": ["Warehouse appointment begins at 10:15", "Medical-equipment load is priority critical", "SYN-TRK-12 cannot transfer before 09:25", "A truck swap places SYN-SHP-1048 on watch"], "evidence_clips": ["stub"]},
+      "indicators_stub": [
+        {"id": "shipments_at_risk", "label": "Shipments at risk", "value": 1, "unit": "shipments", "basis": "stub"},
+        {"id": "appointments_feasible", "label": "Appointments feasible", "value": 10, "of": 12, "unit": "appointments", "basis": "stub"},
+        {"id": "expected_delay_min", "label": "Expected delay", "value": 10.4, "unit": "min", "basis": "stub"},
+        {"id": "added_miles", "label": "Added miles", "value": 3.1, "unit": "mi", "basis": "stub"},
+        {"id": "co2_kg", "label": "Estimated CO2", "value": 109, "unit": "kg", "basis": "stub"},
+        {"id": "community_exposure", "label": "Schools within 300 m of routes used", "value": null, "unit": "schools", "basis": "stub"}
+      ]
     }
   }
 }

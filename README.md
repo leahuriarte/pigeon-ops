@@ -18,12 +18,6 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Switch between **Normal flo
 
 The demo includes 12 fictional shipments, 9 fictional trucks, multiple port-to-warehouse corridors, appointment and readiness context, and visible data-provenance labels. Read [DATA.md](DATA.md) for the source inventory, modeling choices, and limitations.
 
-Run the automated checks with:
-
-```bash
-python3 -m unittest discover -v
-```
-
 Run the tests:
 
 ```bash
@@ -64,14 +58,18 @@ This is a decision-support prototype, not an operational safety or flight system
 ## Project layout
 
 ```text
-config/port_scenario.json     Scenario, map, shipments, weights, actions
-backend/decision_engine.py    Auditable scoring, ranking, Bayes, information value
-backend/scenario.py           Scenario loading and basic validation seam
+AGENTS.md                     Team rules, file ownership, data contracts (CLAUDE.md imports it)
+DATA.md                       Data sources, modeling choices, limitations
+config/port_scenario.json     Scenario, map, shipments, trucks, weights, actions, variants
+backend/decision_engine.py    Auditable scoring, ranking, Bayes, information value, sensitivity
+backend/scenario.py           Scenario loading and variant overlays
 backend/server.py             Tiny JSON API and static-file server
 frontend/index.html           Dashboard structure
 frontend/styles.css           Responsive visual design
+frontend/arcgis.css           ArcGIS map styles
 frontend/app.js               Map rendering and interaction
-tests/test_decision_engine.py Decision-model tests
+frontend/evidence/            Inspection evidence files from the CV pipeline
+tests/                        Decision-model, contract, and server tests
 run.py                        One-command entry point
 ```
 
@@ -93,25 +91,9 @@ Useful endpoints:
 - Add a `ScenarioRepository` behind `scenario.py` for SQLite, Postgres, or a logistics API.
 - Add authentication, audit logs, geofencing, aviation checks, and explicit authorization before considering any real-world field integration.
 
-## Suggested partner split
+## Team split
 
-**Partner A — operations and decision intelligence**
-
-- Add two scenarios (terminal congestion and missed appointment cascade).
-- Interview an operator/judge and tune weights, constraints, and labels.
-- Add sensitivity analysis: show when the recommendation flips as blockage probability or inspection time changes.
-- Prepare the demo narrative and validate that every metric is defensible.
-
-**Partner B — evidence and product experience**
-
-- Add a 10–20 second prerecorded inspection clip.
-- Implement a `cvAdapter` interface returning label, confidence, timestamp, and source.
-- Upgrade the map to MapLibre/Leaflet and animate truck position.
-- Add a dispatcher “Approve option” interaction and an in-memory audit trail.
-
-**Work together last**
-
-- Integrate one additional scenario, rehearse failure paths, run tests, and verify the demo without internet access.
+Three tracks (engine, map and UI, drone evidence) with separate file ownership, all working on `main`. See `AGENTS.md`.
 
 ## Guardrails
 

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.pt
+cv/clips/raw/
+cv/out/
+.DS_Store
+.claude/settings.local.json

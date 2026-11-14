@@ -34,6 +34,14 @@ class DecisionEngineTests(unittest.TestCase):
     def test_scenario_catalog_contains_demo_pair(self):
         self.assertEqual(["normal", "disruption"], [item["id"] for item in available_scenarios()])
 
+    def test_sensitivity_spans_zero_to_one(self):
+        points = analyze(self.scenario)["sensitivity"]
+        self.assertEqual(21, len(points))
+        self.assertEqual((0, 1), (points[0]["prior"], points[-1]["prior"]))
+        # With no uncertainty an inspection can only cost money.
+        self.assertLess(points[0]["net_value"], 0)
+        self.assertLess(points[-1]["net_value"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
