@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+import json
+import mimetypes
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from backend.decision_engine import analyze
+from backend.scenario import load_scenario
+
+ROOT = Path(__file__).resolve().parents[1]
+FRONTEND = ROOT / "frontend"
+
+
+class DemoHandler(BaseHTTPRequestHandler):
+    def _json(self, payload, status=200):
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/health":
+            return self._json({"status": "ok"})
+        if parsed.path == "/api/scenario":
+            scenario = load_scenario()
+            scenario["analysis"] = analyze(scenario)
+            return self._json(scenario)
+        if parsed.path == "/api/analysis":
+            observation = parse_qs(parsed.query).get("observation", [None])[0]
+            if observation not in (None, "blocked", "clear", "inconclusive"):
+                return self._json({"error": "observation must be blocked, clear, or inconclusive"}, 400)
+            scenario = load_scenario()
+            return self._json(analyze(scenario, observation))
+        return self._static(parsed.path)
+
+    def _static(self, request_path):
+        relative = "index.html" if request_path == "/" else request_path.lstrip("/")
+        candidate = (FRONTEND / relative).resolve()
+        if FRONTEND not in candidate.parents or not candidate.is_file():
+            return self._json({"error": "not found"}, 404)
+        body = candidate.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", mimetypes.guess_type(candidate.name)[0] or "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):
+        print(f"[demo] {self.address_string()} {fmt % args}")
+
+
+def run(host="127.0.0.1", port=8000):
+    print(f"PigeonOps demo running at http://{host}:{port}")
+    ThreadingHTTPServer((host, port), DemoHandler).serve_forever()
+
+
+if __name__ == "__main__":
+    run()

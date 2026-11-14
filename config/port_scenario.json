@@ -1,0 +1,68 @@
+{
+  "id": "port-la-demo",
+  "name": "Port of LA / Long Beach morning dispatch",
+  "generated_at": "2026-11-14T08:00:00-08:00",
+  "map_bounds": {"north": 33.805, "south": 33.715, "west": -118.300, "east": -118.165},
+  "locations": [
+    {"id": "terminal-a", "name": "Pier 400 Terminal", "kind": "terminal", "lat": 33.735, "lon": -118.262},
+    {"id": "terminal-b", "name": "Long Beach Container Terminal", "kind": "terminal", "lat": 33.754, "lon": -118.216},
+    {"id": "warehouse-1", "name": "Carson Cross-Dock", "kind": "warehouse", "lat": 33.796, "lon": -118.250},
+    {"id": "warehouse-2", "name": "West Long Beach DC", "kind": "warehouse", "lat": 33.789, "lon": -118.197},
+    {"id": "incident", "name": "Reported obstruction", "kind": "incident", "lat": 33.773, "lon": -118.237}
+  ],
+  "shipments": [
+    {"id": "SHP-1042", "container": "MSCU-481209", "cargo": "Medical devices", "origin": "terminal-a", "destination": "warehouse-2", "truck": "TRK-07", "appointment": "10:15", "eta": "10:03", "status": "at-risk"},
+    {"id": "SHP-1048", "container": "OOLU-720144", "cargo": "Consumer electronics", "origin": "terminal-b", "destination": "warehouse-1", "truck": "TRK-12", "appointment": "11:00", "eta": "10:42", "status": "watch"},
+    {"id": "SHP-1051", "container": "CMAU-330918", "cargo": "Auto parts", "origin": "terminal-a", "destination": "warehouse-1", "truck": "TRK-19", "appointment": "11:30", "eta": "11:08", "status": "on-time"}
+  ],
+  "routes": [
+    {"id": "primary", "name": "Primary via CA-47 / I-710", "color": "#18a999", "points": [[33.735,-118.262],[33.758,-118.248],[33.773,-118.237],[33.789,-118.197]]},
+    {"id": "detour", "name": "Detour via Anaheim St", "color": "#f6a723", "points": [[33.735,-118.262],[33.741,-118.285],[33.780,-118.284],[33.798,-118.240],[33.789,-118.197]]}
+  ],
+  "disruption": {
+    "id": "DSP-07",
+    "title": "Possible overturned vehicle on CA-47 connector",
+    "description": "Two unverified driver reports indicate a partial or full blockage near the interchange.",
+    "affected_shipment": "SHP-1042",
+    "prior_blocked_probability": 0.55,
+    "reported_at": "09:08",
+    "decision_deadline": "09:18",
+    "constraints": ["Warehouse appointment at 10:15", "Medical cargo priority", "TRK-12 unavailable before 09:25"]
+  },
+  "decision_model": {
+    "lateness_cost_per_minute": 85,
+    "emissions_cost_per_kg": 2.5,
+    "hard_constraint_penalty": 2500,
+    "drone": {
+      "label": "Simulated inspection feed",
+      "accuracy": 0.90,
+      "launch_and_review_minutes": 6,
+      "direct_cost": 90,
+      "delay_cost": 75,
+      "note": "Hackathon simulation only. No command is sent to real hardware."
+    },
+    "actions": [
+      {
+        "id": "hold-course", "label": "Keep current route", "summary": "Stay on CA-47 and preserve the appointment if the report is false.",
+        "outcomes": {
+          "open": {"lateness_min": 0, "incremental_cost": 0, "emissions_kg": 8, "constraint_breaches": 0},
+          "blocked": {"lateness_min": 42, "incremental_cost": 320, "emissions_kg": 25, "constraint_breaches": 1}
+        }
+      },
+      {
+        "id": "reroute", "label": "Reroute via Anaheim St", "summary": "Take the known detour now; reliable but longer.",
+        "outcomes": {
+          "open": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0},
+          "blocked": {"lateness_min": 16, "incremental_cost": 210, "emissions_kg": 31, "constraint_breaches": 0}
+        }
+      },
+      {
+        "id": "swap-truck", "label": "Swap with TRK-12", "summary": "Use the nearer truck after 09:25 and resequence both loads.",
+        "outcomes": {
+          "open": {"lateness_min": 12, "incremental_cost": 410, "emissions_kg": 20, "constraint_breaches": 0},
+          "blocked": {"lateness_min": 9, "incremental_cost": 460, "emissions_kg": 22, "constraint_breaches": 0}
+        }
+      }
+    ]
+  }
+}

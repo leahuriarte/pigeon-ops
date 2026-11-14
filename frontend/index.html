@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PigeonOps — Drone-Assisted Logistics Intelligence</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">P</span><div><strong>PigeonOps</strong><small>Decision intelligence • simulation</small></div></div>
+    <div class="status"><span class="pulse"></span> Port operations live <span id="clock"></span></div>
+  </header>
+  <main>
+    <section class="hero panel">
+      <div><p class="eyebrow">ACTIVE DISRUPTION <span id="disruption-id"></span></p><h1 id="disruption-title">Loading scenario…</h1><p id="disruption-description"></p></div>
+      <div class="risk-gauge"><span>Blockage likelihood</span><strong id="risk-value">—</strong><small>unverified prior</small></div>
+    </section>
+    <section class="layout">
+      <div class="left-column">
+        <section class="panel map-panel">
+          <div class="panel-heading"><div><p class="eyebrow">NETWORK VIEW</p><h2>Port movement map</h2></div><div class="legend"><i class="route-primary"></i> Current <i class="route-detour"></i> Detour</div></div>
+          <svg id="map" viewBox="0 0 760 390" role="img" aria-label="Schematic map of Port of Los Angeles and Long Beach routes">
+            <defs><pattern id="grid" width="38" height="38" patternUnits="userSpaceOnUse"><path d="M38 0L0 0 0 38" fill="none" stroke="#d8e0e5"/></pattern></defs>
+            <rect width="760" height="390" fill="#edf3f5" rx="12"/><rect width="760" height="390" fill="url(#grid)" rx="12"/>
+            <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#c5e1e8"/>
+            <g id="routes"></g><g id="markers"></g><text x="20" y="370" class="water-label">SAN PEDRO BAY • SCHEMATIC</text>
+          </svg>
+          <div id="shipment-strip" class="shipment-strip"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">DISPATCH OPTIONS</p><h2 id="ranking-title">Ranked before inspection</h2></div><span class="human-badge">Human approval required</span></div>
+          <div class="comparison-head"><span>Option</span><span>Late</span><span>Cost</span><span>CO₂</span><span>Breaches</span><span>Loss score</span></div>
+          <div id="rankings"></div>
+          <p class="fine-print">Scores combine configurable lateness, direct cost, emissions, and constraint penalties. Lower is better.</p>
+        </section>
+      </div>
+      <aside class="right-column">
+        <section class="panel">
+          <p class="eyebrow">EXPECTED VALUE OF INFORMATION</p><h2>Is inspection worth it?</h2>
+          <div id="recommendation" class="recommendation">Calculating…</div>
+          <div class="equation"><div><span>Act-now loss</span><strong id="act-loss">—</strong></div><b>−</b><div><span>With evidence</span><strong id="evidence-loss">—</strong></div><b>−</b><div><span>Inspection</span><strong id="inspection-cost">—</strong></div></div>
+          <div class="net-value"><span>Net information value</span><strong id="net-value">—</strong></div>
+          <details><summary>Show assumptions & formula</summary><div id="assumptions"></div></details>
+        </section>
+        <section class="panel observation-panel">
+          <p class="eyebrow">SIMULATED OBSERVATION</p><h2>Inspection review</h2>
+          <div class="feed"><div class="scanline"></div><span>PRERECORDED / CV STUB</span><strong id="feed-label">Awaiting simulated evidence</strong></div>
+          <p class="fine-print" id="drone-note"></p><button id="inspect-button" class="primary">Run simulated inspection</button>
+          <div id="observation-buttons" class="observation-buttons hidden"><p>Choose the observation returned by the stub:</p><button data-observation="blocked">Road blocked</button><button data-observation="clear">Road clear</button><button data-observation="inconclusive">Inconclusive</button></div>
+          <div id="posterior" class="posterior hidden"></div>
+        </section>
+        <section class="panel constraints"><p class="eyebrow">KNOWN CONSTRAINTS</p><ul id="constraints"></ul></section>
+      </aside>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
