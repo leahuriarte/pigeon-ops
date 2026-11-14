@@ -209,7 +209,7 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 | `blockage.turnaround_min` | 10 min | assumed | Time lost reaching the queue and turning around. |
 | `blockage.route` / `fallback_route` | primary / detour | assumed | The obstruction sits on `primary`; drivers fall back to the Anaheim St detour. |
 | `indicator_rules.at_risk_probability` | 0.5 | assumed | Probability threshold for "at risk" and "infeasible". |
-| Truck `available_at` | SYN-TRK-07 09:12, SYN-TRK-12 09:25 | synthetic | SYN-TRK-07 is free now; 09:25 comes from the scenario's "cannot transfer before 09:25". |
+| Truck `available_at` | SYN-TRK-07 09:12, SYN-TRK-12 09:25 | synthetic | SYN-TRK-07 is free now; 09:25 comes from the scenario's "is free for a handover from 09:25". |
 | `assignment_pool.handover_min` | 15 min | assumed | Time to move a container from one truck to another. Not sourced. |
 | `assignment_pool.fetch_circuity` | 1.3 | assumed | Road distance over straight-line distance on the drive to the load. Round value. |
 | `assignment_pool.fetch_speed_mph` | 25 mph | assumed | Speed on the drive to the load, on surface streets. Round value. |

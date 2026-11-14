@@ -101,8 +101,8 @@
     "lateness_cost_per_minute": 85,
     "emissions_cost_per_kg": 0.25,
     "hard_constraint_penalty": 2500,
-    "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "launch_and_review_minutes": 6, "direct_cost": 90, "delay_cost": 75, "note": "Synthetic evidence only. The 90% accuracy is an assumption shown for sensitivity testing; no command is sent to real hardware.",
-      "accuracy_basis": "assumed: a dispatcher reviewing drone imagery with CV assistance; not yet validated",
+    "drone": {"label": "Simulated inspection feed", "accuracy": 0.90, "launch_and_review_minutes": 6, "direct_cost": 90, "delay_cost": 75, "note": "The inspection uses example images and simulated results, not a live drone feed, and PigeonOps does not control a drone. The 90% accuracy is an assumption, used to test how much the recommendation depends on it.",
+      "accuracy_basis": "assumed for a dispatcher who reviews drone images with CV assistance; not yet validated",
       "cv_only": {"basis": "Automated CV alone: detector error measured on 27 UAV-OBB frames (only 4 with dense traffic) combined with an assumed traffic link; regenerate with python -m cv.evaluate_road_state",
         "likelihoods": {"blocked": {"blocked": 0.2417, "clear": 0.2155, "inconclusive": 0.5428}, "open": {"blocked": 0.1027, "clear": 0.5152, "inconclusive": 0.3821}}}},
     "rates": {"cost_per_mile": 1.30, "driver_hourly_rate": 35, "co2_kg_per_mile": 1.6, "basis": "assumed", "note": "Non-driver truck operating cost per mile, loaded driver wage per hour and diesel tailpipe CO2 per mile. Round planning values, not measured for this fleet; see docs/METHODS.md."},
@@ -110,20 +110,20 @@
     "indicator_rules": {"at_risk_probability": 0.5, "basis": "assumed"},
     "assignment_pool": {"shipments": ["SYN-SHP-1042", "SYN-SHP-1048"], "trucks": ["SYN-TRK-07", "SYN-TRK-12"], "handover_min": 15, "fetch_circuity": 1.3, "fetch_speed_mph": 25, "basis": "assumed", "note": "Shipments and trucks the dispatcher may reassign. Trucks' available_at times are synthetic. A reassigned truck leaves at its available_at, drives to the load (the position of the load's current truck) along a straight line stretched by fetch_circuity at fetch_speed_mph, waits until that truck is free, spends handover_min on the handover, then hauls the load from there on the shipment's route."},
     "actions": [
-      {"id": "hold-course", "label": "Keep current route", "summary": "Preserve the appointment if the report is false.", "stakeholder_effect": "No reassignment; highest disruption exposure.", "plan": {"route": "primary"}},
-      {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Take the known detour now; reliable but longer.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "plan": {"route": "detour"}},
+      {"id": "hold-course", "label": "Keep current route", "summary": "Stay on CA-47. The appointment holds if the report is false.", "stakeholder_effect": "No driver is reassigned. If CA-47 is blocked, the truck queues at the obstruction, then drives back and takes the detour.", "plan": {"route": "primary"}},
+      {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Take the Anaheim St detour now. It is longer, but the blockage does not affect it.", "stakeholder_effect": "Adds miles and sends trucks through neighborhood streets.", "plan": {"route": "detour"}},
       {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "SYN-TRK-12 takes over SYN-SHP-1042 after 09:25; SYN-TRK-07 takes SYN-SHP-1048.", "stakeholder_effect": "Both drivers lose time to the handover, and SYN-SHP-1048 loses most of its appointment slack.", "plan": {"trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}}}
     ]
   },
   "scenario_variants": {
     "normal": {
       "id": "port-la-normal", "name": "Normal morning flow", "scenario_type": "normal",
-      "disruption": {"id": "OPS-NORMAL", "eyebrow": "NORMAL OPERATIONS", "title": "Morning dispatch is within planned tolerances", "description": "No confirmed roadway disruption. PigeonOps monitors four tight appointments and recommends acting without additional inspection.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.02, "reported_at": "09:12", "decision_deadline": "09:24", "constraints": ["Four appointments begin within 90 minutes", "SYN-SHP-1042 has 21 minutes of arrival slack", "SYN-TRK-12 remains committed to SYN-SHP-1048"]},
+      "disruption": {"id": "OPS-NORMAL", "eyebrow": "NORMAL OPERATIONS", "title": "Morning dispatch is running to plan", "description": "No road disruption has been confirmed. PigeonOps is watching four tight appointments and recommends acting without an inspection.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.02, "reported_at": "09:12", "decision_deadline": "09:24", "constraints": ["Four appointments begin within 90 minutes", "SYN-SHP-1042 has 21 minutes of arrival slack", "SYN-TRK-12 is assigned to SYN-SHP-1048"]},
       "shipment_overrides": {"SYN-SHP-1042": {"status": "on-time", "slack_min": 21, "eta": "09:54"}, "SYN-SHP-1048": {"status": "on-time", "slack_min": 25, "eta": "10:35"}, "SYN-SHP-1055": {"status": "on-time", "slack_min": 23, "eta": "10:22"}},
       "decision_model": {"actions": [
-        {"id": "hold-course", "label": "Keep current route", "summary": "Continue on the planned corridor while conditions remain normal.", "stakeholder_effect": "No reassignment or added neighborhood mileage.", "plan": {"route": "primary"}},
-        {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Avoid a low-probability problem at a known time and mileage cost.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "plan": {"route": "detour"}},
-        {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Resequence two healthy loads without a confirmed need.", "stakeholder_effect": "Creates avoidable risk for SYN-SHP-1048.", "plan": {"trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}}}
+        {"id": "hold-course", "label": "Keep current route", "summary": "Stay on the planned route; conditions are normal.", "stakeholder_effect": "No driver is reassigned, and trucks drive no extra miles on neighborhood streets.", "plan": {"route": "primary"}},
+        {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Avoids an unlikely blockage, but always costs extra time and miles.", "stakeholder_effect": "Adds miles and sends trucks through neighborhood streets.", "plan": {"route": "detour"}},
+        {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Swaps two loads that are on schedule.", "stakeholder_effect": "Puts SYN-SHP-1048 at risk with no confirmed need.", "plan": {"trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}}}
       ]},
       "indicators_stub": [
         {"id": "shipments_at_risk", "label": "Shipments at risk", "value": 0, "unit": "shipments", "basis": "stub"},
@@ -131,31 +131,31 @@
         {"id": "expected_delay_min", "label": "Expected delay", "value": 0, "unit": "min", "basis": "stub"},
         {"id": "added_miles", "label": "Added miles", "value": 0, "unit": "mi", "basis": "stub"},
         {"id": "co2_kg", "label": "Estimated CO2", "value": 96, "unit": "kg", "basis": "stub"},
-        {"id": "community_exposure", "label": "Schools within 300 m of routes used", "value": null, "unit": "schools", "basis": "stub"}
+        {"id": "community_exposure", "label": "Schools within 300 m of the routes used", "value": null, "unit": "schools", "basis": "stub"}
       ]
     },
     "disruption": {
       "id": "port-la-disruption", "name": "Changed condition", "scenario_type": "disruption",
-      "disruption": {"id": "DSP-07", "eyebrow": "ACTIVE DISRUPTION", "title": "Possible overturned vehicle on CA-47 connector", "description": "Two unverified driver reports indicate a partial or full blockage. The medical-equipment load has 12 minutes of appointment slack.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.40, "reported_at": "09:08", "decision_deadline": "09:18", "constraints": ["Warehouse appointment begins at 10:15", "Medical-equipment load is priority critical", "SYN-TRK-12 cannot transfer before 09:25", "A truck swap places SYN-SHP-1048 on watch"], "evidence_clips": ["stub"]},
+      "disruption": {"id": "DSP-07", "eyebrow": "ACTIVE DISRUPTION", "title": "Possible overturned vehicle on CA-47 connector", "description": "Two drivers report a partial or full blockage; neither report is confirmed. The medical-equipment load, SYN-SHP-1042, has 12 minutes of slack before its appointment.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.40, "reported_at": "09:08", "decision_deadline": "09:18", "constraints": ["SYN-SHP-1042's warehouse appointment starts at 10:15", "The medical-equipment load has critical priority", "SYN-TRK-12 is free for a handover from 09:25", "A truck swap would put SYN-SHP-1048 on watch"], "evidence_clips": ["stub"]},
       "indicators_stub": [
         {"id": "shipments_at_risk", "label": "Shipments at risk", "value": 1, "unit": "shipments", "basis": "stub"},
         {"id": "appointments_feasible", "label": "Appointments feasible", "value": 10, "of": 12, "unit": "appointments", "basis": "stub"},
         {"id": "expected_delay_min", "label": "Expected delay", "value": 10.4, "unit": "min", "basis": "stub"},
         {"id": "added_miles", "label": "Added miles", "value": 3.1, "unit": "mi", "basis": "stub"},
         {"id": "co2_kg", "label": "Estimated CO2", "value": 109, "unit": "kg", "basis": "stub"},
-        {"id": "community_exposure", "label": "Schools within 300 m of routes used", "value": null, "unit": "schools", "basis": "stub"}
+        {"id": "community_exposure", "label": "Schools within 300 m of the routes used", "value": null, "unit": "schools", "basis": "stub"}
       ]
     },
     "disruption_b": {
       "id": "port-la-disruption-b", "name": "Changed condition, corroborated", "scenario_type": "disruption",
-      "disruption": {"id": "DSP-08", "eyebrow": "ACTIVE DISRUPTION", "title": "Overturned vehicle on CA-47 connector, corroborated", "description": "Four driver reports and a synthetic traffic-feed alert agree on a full blockage. The medical-equipment load has 12 minutes of appointment slack.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.80, "reported_at": "09:08", "decision_deadline": "09:18", "constraints": ["Warehouse appointment begins at 10:15", "Medical-equipment load is priority critical", "SYN-TRK-12 cannot transfer before 09:25", "A truck swap places SYN-SHP-1048 on watch"], "evidence_clips": ["stub"]},
+      "disruption": {"id": "DSP-08", "eyebrow": "ACTIVE DISRUPTION", "title": "Corroborated report of an overturned vehicle on CA-47 connector", "description": "Four drivers and a simulated traffic-feed alert all report a full blockage. The medical-equipment load, SYN-SHP-1042, has 12 minutes of slack before its appointment.", "affected_shipment": "SYN-SHP-1042", "prior_blocked_probability": 0.80, "reported_at": "09:08", "decision_deadline": "09:18", "constraints": ["SYN-SHP-1042's warehouse appointment starts at 10:15", "The medical-equipment load has critical priority", "SYN-TRK-12 is free for a handover from 09:25", "A truck swap would put SYN-SHP-1048 on watch"], "evidence_clips": ["stub"]},
       "indicators_stub": [
         {"id": "shipments_at_risk", "label": "Shipments at risk", "value": null, "unit": "shipments", "basis": "stub"},
         {"id": "appointments_feasible", "label": "Appointments feasible", "value": null, "of": 12, "unit": "appointments", "basis": "stub"},
         {"id": "expected_delay_min", "label": "Expected delay", "value": null, "unit": "min", "basis": "stub"},
         {"id": "added_miles", "label": "Added miles", "value": null, "unit": "mi", "basis": "stub"},
         {"id": "co2_kg", "label": "Estimated CO2", "value": null, "unit": "kg", "basis": "stub"},
-        {"id": "community_exposure", "label": "Schools within 300 m of routes used", "value": null, "unit": "schools", "basis": "stub"}
+        {"id": "community_exposure", "label": "Schools within 300 m of the routes used", "value": null, "unit": "schools", "basis": "stub"}
       ]
     }
   }

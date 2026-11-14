@@ -65,5 +65,5 @@ def compute_indicators(scenario, ranked):
         _indicator("expected_delay_min", "Expected delay", round(expected_delay, 1), "min", basis),
         _indicator("added_miles", "Added miles", added_miles, "mi", basis),
         _indicator("co2_kg", "Estimated CO2", co2, "kg", basis),
-        _indicator("community_exposure", "Schools within 300 m of routes used", None, "schools", "stub"),
+        _indicator("community_exposure", "Schools within 300 m of the routes used", None, "schools", "stub"),
     ]
