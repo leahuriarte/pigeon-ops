@@ -47,7 +47,14 @@ def fraction_along(geometry, lat, lon):
     return best_along / walked if walked else 0.0
 
 
-class _Trip:
+def straight_line_m(lat1, lon1, lat2, lon2):
+    """Straight-line distance in metres, with the same flat approximation as fraction_along."""
+    dx = math.radians(lon2 - lon1) * EARTH_RADIUS_M * math.cos(math.radians((lat1 + lat2) / 2))
+    dy = math.radians(lat2 - lat1) * EARTH_RADIUS_M
+    return math.hypot(dx, dy)
+
+
+class Trip:
     """Accumulates driving and waiting along whole-route fractions."""
 
     def __init__(self):
@@ -58,6 +65,11 @@ class _Trip:
         self.meters += share * route["distance_m"]
         self.drive_min += share * route["duration_s"] / 60
         self.path.append(note or route["id"])
+
+    def join(self, meters, minutes, note):
+        self.meters += meters
+        self.drive_min += minutes
+        self.path.append(note)
 
     def wait(self, minutes, note):
         self.wait_min += minutes
@@ -100,23 +112,34 @@ class RouteModel:
             raise ValueError("blockage fallback_route must differ from the blocked route")
         self.turnaround_min = blockage["turnaround_min"]
         incident = _by_id(scenario["locations"], blockage["location"])
+        self.truck = truck
         self.truck_at = fraction_along(self.current["geometry"], truck["lat"], truck["lon"])
         self.incident_at = fraction_along(self.blocked_route["geometry"], incident["lat"], incident["lon"])
-        self.eta = clock_minutes(self.shipment["eta"])[0]
-        self.window_start, self.window_end = clock_minutes(self.shipment["appointment"])[:2]
         self.planned = self.trip(self.current["id"], "open")
 
     def trip(self, route_id, state):
-        """Remaining trip from the truck's position if it follows `route_id` and the road is `state`."""
+        """Remaining trip from the affected truck's position if it follows `route_id` and the road is `state`."""
+        return self.own_trip(self.shipment, self.truck, route_id, state)
+
+    def own_trip(self, shipment, truck, route_id, state, trip=None):
+        """Remaining trip of a shipment's load from `truck`'s position, projected onto the shipment's route.
+
+        Appends to `trip` when given, so a reassigned truck can drive to the load first.
+        """
+        current = self.routes[shipment["route"]]
         route = self.routes[route_id]
-        trip = _Trip()
-        if route is self.current:
-            position = self.truck_at
-        else:
-            if not _same_start(route, self.current):
-                raise ValueError(f"route {route_id} must start where {self.current['id']} starts")
-            trip.drive(self.current, self.truck_at, 0.0, f"{self.current['id']} back to start")
+        position = fraction_along(current["geometry"], truck["lat"], truck["lon"])
+        trip = Trip() if trip is None else trip
+        if route is not current:
+            if not _same_start(route, current):
+                raise ValueError(f"route {route_id} must start where {current['id']} starts")
+            trip.drive(current, position, 0.0, f"{current['id']} back to start")
             position = 0.0
+        self.follow(trip, route, position, state)
+        return trip
+
+    def follow(self, trip, route, position, state):
+        """Drive `route` from `position` to its end, turning back at the obstruction if it is blocked."""
         if state == "blocked" and route is self.blocked_route and position < self.incident_at:
             trip.drive(route, position, self.incident_at, f"{route['id']} to obstruction")
             trip.wait(self.turnaround_min, "turnaround at obstruction")
@@ -124,29 +147,9 @@ class RouteModel:
             trip.drive(self.fallback, 0.0, 1.0)
         else:
             trip.drive(route, position, 1.0)
-        return trip
 
     def cost(self, trip):
         return trip.miles * self.rates["cost_per_mile"] + trip.driver_min * self.rates["driver_hourly_rate"] / 60
-
-    def outcome(self, trip):
-        # The shipment's planned ETA anchors the clock; route data supplies the change.
-        arrival = self.eta + trip.driver_min - self.planned.driver_min
-        return {
-            "lateness_min": round(max(0.0, arrival - self.window_start), 1),
-            "incremental_cost": round(self.cost(trip) - self.cost(self.planned), 2),
-            "emissions_kg": round(trip.miles * self.rates["co2_kg_per_mile"], 1),
-            "constraint_breaches": 1 if arrival > self.window_end else 0,
-            "basis": "estimated",
-            "detail": {
-                "arrival": clock_text(arrival),
-                "miles": round(trip.miles, 2),
-                "added_miles": round(trip.miles - self.planned.miles, 2),
-                "driver_min": round(trip.driver_min, 1),
-                "trip_cost": round(self.cost(trip), 2),
-                "path": trip.path,
-            },
-        }
 
     def planned_summary(self):
         return {
@@ -181,12 +184,16 @@ def apply_override(computed, override):
 
 
 def apply_route_outcomes(scenario):
-    """Fill decision_model.actions[*].outcomes in place from route data and overrides."""
+    """Fill decision_model.actions[*].outcomes and decision_model.assignments in place."""
+    from backend.assignment import AssignmentModel  # assignment builds on RouteModel
+
     model = scenario["decision_model"]
     routes = RouteModel(scenario)
+    pool = AssignmentModel(scenario, routes)
     model["planned_trip"] = routes.planned_summary()
     for action in model["actions"]:
         plan = action.get("plan")
-        computed = {state: routes.outcome(routes.trip(plan["route"], state)) for state in STATES} if plan else {}
+        computed = {state: pool.outcome(plan, state) for state in STATES} if plan else {}
         action["outcomes"] = apply_override(computed, action.get("override"))
+    model["assignments"] = pool.enumerate(model["actions"])
     return scenario

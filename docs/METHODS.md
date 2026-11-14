@@ -2,7 +2,7 @@
 
 This file lists every formula the backend uses and every assumption behind it. All inputs are synthetic or estimated (see [DATA.md](../DATA.md)). Nothing here is measured.
 
-The code lives in `backend/outcomes.py` (action outcomes), `backend/decision_engine.py` (ranking and value of inspection) and `backend/indicators.py` (plan indicators). Settings live in `config/port_scenario.json` under `decision_model`.
+The code lives in `backend/outcomes.py` (trips and action outcomes), `backend/assignment.py` (truck assignment), `backend/decision_engine.py` (ranking and value of inspection) and `backend/indicators.py` (plan indicators). Settings live in `config/port_scenario.json` under `decision_model`.
 
 ## Worked example
 
@@ -13,7 +13,20 @@ In the `disruption` variant, truck SYN-TRK-07 carries SYN-SHP-1042 on the `prima
 | hold-course | open | 10:03 | 8.13 | 24.6 | 0 | 0 | 13.0 | 0 | primary |
 | hold-course | blocked | 11:03 | 26.99 | 84.5 | 47.9 | 59.46 | 43.2 | 1 | primary to obstruction, 10 min turnaround, back to start, detour |
 | reroute | either | 10:29 | 19.11 | 50.7 | 14.0 | 29.46 | 30.6 | 0 | primary back to start, detour |
-| swap-truck | open / blocked | n/a | n/a | n/a | 12 / 9 | 410 / 460 | 20 / 22 | 0 | override, no route data |
+| swap-truck | open | 10:39 | 11.37 | 47.4 | 23.8 | 38.03 | 23.4 | 0 | SYN-TRK-12 drives to the load, 15 min handover, primary |
+| swap-truck | blocked | 11:39 | 30.23 | 107.3 | 83.7 | 97.49 | 53.5 | 1 | as above, then obstruction, turnaround, back to start, detour |
+
+For `swap-truck` the arrival, miles and driver minutes are SYN-SHP-1042's own. Lateness, cost and CO2 also include the change to SYN-SHP-1048 (section 4). Every action reports both shipments:
+
+| Action | Road | SYN-SHP-1042 truck, arrival, slack | SYN-SHP-1048 truck, arrival, slack |
+| --- | --- | --- | --- |
+| hold-course | open | SYN-TRK-07, 10:03, +12 min | SYN-TRK-12, 10:42, +18 min |
+| hold-course | blocked | SYN-TRK-07, 11:03, −47.9 min | SYN-TRK-12, 10:42, +18 min |
+| reroute | either | SYN-TRK-07, 10:29, −14 min | SYN-TRK-12, 10:42, +18 min |
+| swap-truck | open | SYN-TRK-12, 10:39, −23.8 min | SYN-TRK-07, 10:57, +3 min |
+| swap-truck | blocked | SYN-TRK-12, 11:39, −83.7 min | SYN-TRK-07, 10:57, +3 min |
+
+Slack is appointment window start minus arrival; negative means late.
 
 Regenerate these numbers with `analyze(load_scenario(variant="disruption"))`.
 
@@ -68,15 +81,60 @@ incremental_cost    = trip cost − planned trip cost
 
 The shipment's ETA anchors the clock. It is a synthetic input that already includes things the route model does not see, such as gate time. Route data only supplies the change from that plan.
 
-Each computed outcome has `basis: "estimated"` and a `detail` block with arrival, miles, added miles, driver minutes, trip cost and path.
+Each computed outcome has `basis: "estimated"` and a `detail` block with the affected shipment's arrival, miles, driver minutes, trip cost and path, the added miles of the whole assignment pool, and `shipments`, one row per pool shipment (section 4).
 
 ### Overrides
 
 An action may have an `override` block with `open` and/or `blocked` values for any of `lateness_min`, `incremental_cost`, `emissions_kg` and `constraint_breaches`. An override value always wins over the computed value. An outcome with any overridden value gets `basis: "override"` and `override_basis` (for example `"assumed"`).
 
-An action with no `plan` must override all four values in both states. `swap-truck` does this, because there is no route data for the truck transfer yet. Its numbers are hand-entered and include the knock-on cost to SYN-SHP-1048.
+An action with no `plan` must override all four values in both states. No action does this at present.
 
-## 4. Ranking and value of inspection
+## 4. Truck assignment
+
+`decision_model.assignment_pool` lists the shipments and trucks the dispatcher may reassign. In every variant it is SYN-SHP-1042 and SYN-SHP-1048 with their trucks, SYN-TRK-07 and SYN-TRK-12. The pool must contain the affected shipment and each pool shipment's truck. A pool truck may not carry any shipment outside the pool, because the model does not sequence several loads on one truck.
+
+The backend lists every assignment of pool trucks to pool shipments with `itertools.permutations(trucks, number of shipments)`. Two trucks over two shipments give two assignments: the plan and the swap. With a spare third truck there would be 3 × 2 = 6. The backend refuses pools with more than 5,040 assignments.
+
+### Arrival of one shipment
+
+Each shipment has a planned truck and a planned ETA. If its planned truck keeps it, the trip is the one in section 2:
+
+```text
+arrival = planned ETA + (driver minutes of this trip − driver minutes of the planned trip)
+```
+
+If another truck takes it, that truck has to fetch the load from the planned truck. Each pool truck has a synthetic `available_at` time.
+
+```text
+fetch miles      = straight-line distance from the new truck to the planned truck × fetch_circuity
+fetch minutes    = fetch miles / fetch_speed_mph × 60
+handover starts  = latest of (new truck available_at + fetch minutes, planned truck available_at, load ready time)
+haul             = the planned truck's remaining trip on the chosen route, with the blockage rules of section 2
+planned start    = latest of (planned truck available_at, load ready time)
+arrival          = planned ETA + (new truck available_at − planned start)
+                   + fetch minutes + wait for handover + handover_min + haul minutes − planned trip minutes
+```
+
+The new truck's trip is the fetch, any wait for the handover, the handover and the haul. Its miles, driver minutes, cost and CO2 follow section 2. Lateness and missed window use the shipment's own appointment.
+
+Worked example: SYN-TRK-12 is free at 09:25, 13 minutes after SYN-TRK-07. It is 3.2 road miles from SYN-TRK-07 (2.5 straight-line miles × 1.3), which takes 7.7 minutes at 25 mph. With the 15-minute handover, SYN-SHP-1042 arrives 13 + 7.7 + 15 = 35.7 minutes after its 10:03 ETA, at 10:39. The load is still before the obstruction, so a blocked road costs the swap the same hour it costs holding course.
+
+### Score of an assignment
+
+Every action is scored on the same pool, so actions stay comparable:
+
+```text
+lateness_min        = affected shipment's lateness + Σ other pool shipments (lateness − planned lateness)
+constraint_breaches = same pattern
+emissions_kg        = same pattern
+incremental_cost    = Σ pool shipments (trip cost − planned trip cost)
+```
+
+For `hold-course` and `reroute` the other shipments run on plan, so these equal the single-shipment numbers of section 3. Loss and expected loss are those of section 5, with the same weights. The $85 per late minute therefore applies to SYN-SHP-1048 too.
+
+`swap-truck` is the action whose `plan.trucks` gives the swapped assignment. The planned assignment matches `hold-course`. The analysis response returns every assignment ranked by expected loss, under `assignments.before` (prior) and `assignments.after` (posterior, after an observation).
+
+## 5. Ranking and value of inspection
 
 These formulas are unchanged from the kickoff version.
 
@@ -122,17 +180,17 @@ In `disruption` an inspection can change the decision. A "clear" result drops th
 
 In `disruption_b` the reports are corroborated, so the prior is 80%. Even after a "clear" result the probability stays at 31%, and rerouting is still best. The inspection cannot change the decision, so its gross value is zero and its net value is minus its cost.
 
-## 5. Plan indicators
+## 6. Plan indicators
 
-Indicators describe the whole plan under the top-ranked option before any inspection. `p` is the prior blockage probability. Only the affected shipment is re-simulated. Every other shipment with an assigned truck is assumed to run on plan.
+Indicators describe the whole plan under the top-ranked option before any inspection. `p` is the prior blockage probability. Pool shipments (section 4) are re-simulated one by one. Every other shipment with an assigned truck is assumed to run on plan.
 
 | Indicator | Formula |
 | --- | --- |
-| `shipments_at_risk` | Other assigned shipments with negative `slack_min`, plus 1 if P(affected shipment arrives after window start) ≥ `at_risk_probability` |
-| `appointments_feasible` | Assigned shipments, minus other shipments with negative slack, minus 1 if P(affected shipment misses window end) ≥ `at_risk_probability`. `of` is the total number of shipments, including unassigned ones |
+| `shipments_at_risk` | Assigned shipments outside the pool with negative `slack_min`, plus each pool shipment with P(arrives after window start) ≥ `at_risk_probability` |
+| `appointments_feasible` | Assigned shipments, minus those outside the pool with negative slack, minus each pool shipment with P(misses window end) ≥ `at_risk_probability`. `of` is the total number of shipments, including unassigned ones |
 | `expected_delay_min` | p × blocked lateness + (1 − p) × open lateness of the top option |
 | `added_miles` | p × blocked added miles + (1 − p) × open added miles of the top option, against the planned trip |
-| `co2_kg` | Full route miles of every assigned shipment × `co2_kg_per_mile`, plus the top option's expected emissions minus the planned trip's emissions |
+| `co2_kg` | Full route miles of every assigned shipment × `co2_kg_per_mile`, plus the top option's expected emissions (which include the change to other pool shipments) minus the planned trip's emissions |
 | `community_exposure` | Not computed yet. It needs a school location dataset. Value `null`, basis `stub` |
 
 P(...) here is the sum of the probabilities of the road states in which the condition holds.
@@ -141,7 +199,7 @@ Indicators are `basis: "estimated"` when the top option's outcomes come from rou
 
 Each shipment counts as one full trip on its route. Return trips and empty repositioning are not counted, so `co2_kg` understates fleet emissions.
 
-## 6. Assumptions
+## 7. Assumptions
 
 | Setting | Value | Basis | Notes |
 | --- | --- | --- | --- |
@@ -151,6 +209,10 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 | `blockage.turnaround_min` | 10 min | assumed | Time lost reaching the queue and turning around. |
 | `blockage.route` / `fallback_route` | primary / detour | assumed | The obstruction sits on `primary`; drivers fall back to the Anaheim St detour. |
 | `indicator_rules.at_risk_probability` | 0.5 | assumed | Probability threshold for "at risk" and "infeasible". |
+| Truck `available_at` | SYN-TRK-07 09:12, SYN-TRK-12 09:25 | synthetic | SYN-TRK-07 is free now; 09:25 comes from the scenario's "cannot transfer before 09:25". |
+| `assignment_pool.handover_min` | 15 min | assumed | Time to move a container from one truck to another. Not sourced. |
+| `assignment_pool.fetch_circuity` | 1.3 | assumed | Road distance over straight-line distance on the drive to the load. Round value. |
+| `assignment_pool.fetch_speed_mph` | 25 mph | assumed | Speed on the drive to the load, on surface streets. Round value. |
 | Route distance and duration | OSRM | estimated | OSRM's car profile with free-flow speeds. Trucks are usually slower, so all times are optimistic. |
 | Constant speed along a route | n/a | assumed | Needed because OSRM gives one duration per route. |
 | Truck position and ETA | scenario | synthetic | From the seeded scenario. |
@@ -163,5 +225,8 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 - Rerouting is modeled as driving back to the start of the current route. A real dispatcher would use the nearest junction, so detour costs are overstated.
 - Waiting in the queue counts toward driver time and cost but not toward emissions. Idling emissions are left out.
 - The inspection's six-minute delay is a fixed `delay_cost`; it does not move the truck's arrival time.
-- `swap-truck` is still a hand-entered override.
-- Only one shipment responds to the disruption. Knock-on effects on other shipments appear only through the swap override.
+- Only pool shipments respond to the disruption. Shipments outside the pool run on plan.
+- The drive to the load is a straight line at a fixed speed. It ignores the blockage, so in the blocked state it understates how long SYN-TRK-12 needs to reach SYN-TRK-07 from beyond the obstruction.
+- Each reassigned shipment is computed on its own. In a swap each truck drives to the other's position instead of both meeting once, which overstates the swap's driving.
+- A truck that hands its load over is treated as free at its `available_at`, not at the end of the handover.
+- A truck's own position is used as its load's position, even for trucks that have not picked their load up yet.

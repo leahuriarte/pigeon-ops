@@ -1,5 +1,6 @@
 """Small, auditable expected-value-of-information decision engine."""
 from backend.indicators import compute_indicators
+from backend.outcomes import METRICS
 
 SIGNALS = ("blocked", "clear", "inconclusive")
 
@@ -33,28 +34,45 @@ def posterior_blocked(prior, observation, likelihoods):
     return blocked / (blocked + open_) if blocked + open_ else prior
 
 
+def _expectation(outcomes, model, blocked_probability):
+    """Expected metrics and expected loss over the two road states."""
+    open_metrics, blocked_metrics = outcomes["open"], outcomes["blocked"]
+    expected_loss = (blocked_probability * _loss(blocked_metrics, model)
+                     + (1 - blocked_probability) * _loss(open_metrics, model))
+    expected = {
+        key: round(blocked_probability * blocked_metrics[key] + (1 - blocked_probability) * open_metrics[key], 1)
+        for key in METRICS
+    }
+    return expected, round(expected_loss, 2)
+
+
+def _rank(items):
+    items.sort(key=lambda item: item["expected_loss"])
+    for index, item in enumerate(items, start=1):
+        item["rank"] = index
+    return items
+
+
 def rank_actions(model, blocked_probability):
     ranked = []
     for action in model["actions"]:
-        open_metrics = action["outcomes"]["open"]
-        blocked_metrics = action["outcomes"]["blocked"]
-        open_loss = _loss(open_metrics, model)
-        blocked_loss = _loss(blocked_metrics, model)
-        expected_loss = blocked_probability * blocked_loss + (1 - blocked_probability) * open_loss
-        expected = {
-            key: round(blocked_probability * blocked_metrics[key] + (1 - blocked_probability) * open_metrics[key], 1)
-            for key in ("lateness_min", "incremental_cost", "emissions_kg", "constraint_breaches")
-        }
+        expected, expected_loss = _expectation(action["outcomes"], model, blocked_probability)
         ranked.append({
             "id": action["id"], "label": action["label"], "summary": action["summary"],
             "stakeholder_effect": action.get("stakeholder_effect", "No additional stakeholder effect recorded."),
-            "expected": expected, "expected_loss": round(expected_loss, 2),
+            "expected": expected, "expected_loss": expected_loss,
             "outcomes": action["outcomes"]
         })
-    ranked.sort(key=lambda item: item["expected_loss"])
-    for index, item in enumerate(ranked, start=1):
-        item["rank"] = index
-    return ranked
+    return _rank(ranked)
+
+
+def rank_assignments(model, blocked_probability):
+    """Every enumerated truck-to-shipment assignment, ranked by expected loss."""
+    ranked = []
+    for option in model["assignments"]["options"]:
+        expected, expected_loss = _expectation(option["outcomes"], model, blocked_probability)
+        ranked.append({**option, "expected": expected, "expected_loss": expected_loss})
+    return _rank(ranked)
 
 
 def information_value(model, prior, likelihoods=None):
@@ -145,4 +163,9 @@ def analyze(scenario, observation=None):
         "evoi": evoi,
         "sensitivity": sensitivity(model),
         "indicators": compute_indicators(scenario, before),
+        "assignments": {
+            **{key: model["assignments"][key] for key in ("shipments", "trucks", "count")},
+            "before": rank_assignments(model, prior),
+            "after": rank_assignments(model, posterior) if observation else [],
+        },
     }

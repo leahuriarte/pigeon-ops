@@ -28,8 +28,8 @@
     {"id": "SYN-SHP-1082", "container": "SYN-C-1082", "cargo": "Precision instruments", "commodity_code": "SCTG 38", "origin": "terminal-a", "destination": "warehouse-1", "truck": "SYN-TRK-19", "appointment": "15:00–15:30", "readiness": "Hold until 10:40", "eta": "14:18", "slack_min": 42, "priority": "high", "status": "planned", "route": "northbound"}
   ],
   "trucks": [
-    {"id": "SYN-TRK-07", "status": "en-route", "assignment": "SYN-SHP-1042", "fuel": "Diesel", "duty_remaining_hr": 5.8, "lat": 33.756, "lon": -118.248},
-    {"id": "SYN-TRK-12", "status": "available-soon", "available_at": "09:25", "assignment": "SYN-SHP-1048", "fuel": "Battery electric", "duty_remaining_hr": 7.1, "lat": 33.782, "lon": -118.218},
+    {"id": "SYN-TRK-07", "status": "en-route", "assignment": "SYN-SHP-1042", "fuel": "Diesel", "duty_remaining_hr": 5.8, "available_at": "09:12", "lat": 33.756, "lon": -118.248},
+    {"id": "SYN-TRK-12", "status": "available-soon", "assignment": "SYN-SHP-1048", "fuel": "Battery electric", "duty_remaining_hr": 7.1, "available_at": "09:25", "lat": 33.782, "lon": -118.218},
     {"id": "SYN-TRK-19", "status": "en-route", "assignment": "SYN-SHP-1051", "fuel": "Diesel", "duty_remaining_hr": 4.9, "lat": 33.799, "lon": -118.246},
     {"id": "SYN-TRK-22", "status": "at-terminal", "assignment": "SYN-SHP-1055", "fuel": "Natural gas", "duty_remaining_hr": 6.4, "lat": 33.749, "lon": -118.275},
     {"id": "SYN-TRK-31", "status": "en-route", "assignment": "SYN-SHP-1058", "fuel": "Diesel", "duty_remaining_hr": 5.2, "lat": 33.813, "lon": -118.211},
@@ -108,10 +108,11 @@
     "rates": {"cost_per_mile": 1.30, "driver_hourly_rate": 35, "co2_kg_per_mile": 1.6, "basis": "assumed", "note": "Non-driver truck operating cost per mile, loaded driver wage per hour and diesel tailpipe CO2 per mile. Round planning values, not measured for this fleet; see docs/METHODS.md."},
     "blockage": {"route": "primary", "location": "incident", "fallback_route": "detour", "turnaround_min": 10, "basis": "assumed", "note": "If the road is blocked, a truck on the blocked route drives to the obstruction, loses turnaround_min in the queue, drives back to the route start and takes the fallback route."},
     "indicator_rules": {"at_risk_probability": 0.5, "basis": "assumed"},
+    "assignment_pool": {"shipments": ["SYN-SHP-1042", "SYN-SHP-1048"], "trucks": ["SYN-TRK-07", "SYN-TRK-12"], "handover_min": 15, "fetch_circuity": 1.3, "fetch_speed_mph": 25, "basis": "assumed", "note": "Shipments and trucks the dispatcher may reassign. Trucks' available_at times are synthetic. A reassigned truck leaves at its available_at, drives to the load (the position of the load's current truck) along a straight line stretched by fetch_circuity at fetch_speed_mph, waits until that truck is free, spends handover_min on the handover, then hauls the load from there on the shipment's route."},
     "actions": [
       {"id": "hold-course", "label": "Keep current route", "summary": "Preserve the appointment if the report is false.", "stakeholder_effect": "No reassignment; highest disruption exposure.", "plan": {"route": "primary"}},
       {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Take the known detour now; reliable but longer.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "plan": {"route": "detour"}},
-      {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Use the nearer truck after 09:25 and resequence both loads.", "stakeholder_effect": "Protects the priority load but puts SYN-SHP-1048 on watch.", "override": {"basis": "assumed", "reason": "No route data for the truck transfer yet; hand-entered estimate that includes the knock-on cost to SYN-SHP-1048.", "open": {"lateness_min": 12, "incremental_cost": 410, "emissions_kg": 20, "constraint_breaches": 0}, "blocked": {"lateness_min": 9, "incremental_cost": 460, "emissions_kg": 22, "constraint_breaches": 0}}}
+      {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "SYN-TRK-12 takes over SYN-SHP-1042 after 09:25; SYN-TRK-07 takes SYN-SHP-1048.", "stakeholder_effect": "Both drivers lose time to the handover, and SYN-SHP-1048 loses most of its appointment slack.", "plan": {"trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}}}
     ]
   },
   "scenario_variants": {
@@ -122,7 +123,7 @@
       "decision_model": {"actions": [
         {"id": "hold-course", "label": "Keep current route", "summary": "Continue on the planned corridor while conditions remain normal.", "stakeholder_effect": "No reassignment or added neighborhood mileage.", "plan": {"route": "primary"}},
         {"id": "reroute", "label": "Reroute via Anaheim St", "summary": "Avoid a low-probability problem at a known time and mileage cost.", "stakeholder_effect": "Adds mileage and neighborhood road exposure.", "plan": {"route": "detour"}},
-        {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Resequence two healthy loads without a confirmed need.", "stakeholder_effect": "Creates avoidable risk for SYN-SHP-1048.", "override": {"basis": "assumed", "reason": "No route data for the truck transfer yet; hand-entered estimate that includes the knock-on cost to SYN-SHP-1048.", "open": {"lateness_min": 10, "incremental_cost": 360, "emissions_kg": 18, "constraint_breaches": 0}, "blocked": {"lateness_min": 8, "incremental_cost": 410, "emissions_kg": 20, "constraint_breaches": 0}}}
+        {"id": "swap-truck", "label": "Swap with SYN-TRK-12", "summary": "Resequence two healthy loads without a confirmed need.", "stakeholder_effect": "Creates avoidable risk for SYN-SHP-1048.", "plan": {"trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}}}
       ]},
       "indicators_stub": [
         {"id": "shipments_at_risk", "label": "Shipments at risk", "value": 0, "unit": "shipments", "basis": "stub"},
