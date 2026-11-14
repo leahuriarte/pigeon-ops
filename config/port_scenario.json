@@ -160,22 +160,22 @@
       {
         "id": "hold-course",
         "label": "Keep current route",
-        "summary": "Stay on CA-47. The appointment holds if the report is false.",
-        "stakeholder_effect": "No driver is reassigned. If CA-47 is blocked, the truck queues at the obstruction, then drives back and takes the detour.",
+        "summary": "Stay on CA-47.",
+        "stakeholder_effect": "A closure forces a return trip and detour.",
         "plan": {"route": "primary"}
       },
       {
         "id": "reroute",
         "label": "Reroute via Anaheim St",
-        "summary": "Take the Anaheim St detour now. It is longer, but the blockage does not affect it.",
-        "stakeholder_effect": "Adds miles and sends trucks through neighborhood streets.",
+        "summary": "Take Anaheim St now.",
+        "stakeholder_effect": "Adds driving through neighborhood streets.",
         "plan": {"route": "detour"}
       },
       {
         "id": "swap-truck",
         "label": "Swap with SYN-TRK-12",
-        "summary": "SYN-TRK-12 takes over SYN-SHP-1042 after 09:25; SYN-TRK-07 takes SYN-SHP-1048.",
-        "stakeholder_effect": "Both drivers lose time to the handover, and SYN-SHP-1048 loses most of its appointment slack.",
+        "summary": "Swap the loads on SYN-TRK-07 and SYN-TRK-12 after 09:25.",
+        "stakeholder_effect": "Handover reduces SYN-SHP-1048's arrival buffer.",
         "plan": {
           "trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}
         }
@@ -190,42 +190,65 @@
       "disruption": {
         "id": "SYN-OPS-NORMAL",
         "eyebrow": "NORMAL OPERATIONS",
-        "title": "Morning dispatch is running to plan",
-        "description": "No road disruption has been confirmed. PigeonOps is watching four tight appointments and recommends acting without an inspection.",
+        "title": "Morning dispatch",
+        "description": "No incidents reported. Four appointments start within 90 minutes.",
         "affected_shipment": "SYN-SHP-1042",
         "prior_blocked_probability": 0.02,
         "reported_at": "09:12",
         "decision_deadline": "09:24",
-        "constraints": ["Four appointments begin within 90 minutes", "SYN-SHP-1042 has 21 minutes of arrival slack", "SYN-TRK-12 is assigned to SYN-SHP-1048"]
+        "constraints": [
+          "Four appointments begin within 90 minutes",
+          "SYN-SHP-1042 has 21 minutes of arrival slack",
+          "SYN-TRK-12 is assigned to SYN-SHP-1048"
+        ]
       },
       "shipment_overrides": {
-        "SYN-SHP-1042": {"status": "on-time", "slack_min": 21, "eta": "09:54"},
-        "SYN-SHP-1048": {"status": "on-time", "slack_min": 25, "eta": "10:35"},
-        "SYN-SHP-1055": {"status": "on-time", "slack_min": 23, "eta": "10:22"}
+        "SYN-SHP-1042": {
+          "status": "on-time",
+          "slack_min": 21,
+          "eta": "09:54"
+        },
+        "SYN-SHP-1048": {
+          "status": "on-time",
+          "slack_min": 25,
+          "eta": "10:35"
+        },
+        "SYN-SHP-1055": {
+          "status": "on-time",
+          "slack_min": 23,
+          "eta": "10:22"
+        }
       },
       "decision_model": {
         "actions": [
           {
             "id": "hold-course",
             "label": "Keep current route",
-            "summary": "Stay on the planned route; conditions are normal.",
-            "stakeholder_effect": "No driver is reassigned, and trucks drive no extra miles on neighborhood streets.",
-            "plan": {"route": "primary"}
+            "summary": "Keep the planned route.",
+            "stakeholder_effect": "Keeps both drivers on their loads.",
+            "plan": {
+              "route": "primary"
+            }
           },
           {
             "id": "reroute",
             "label": "Reroute via Anaheim St",
-            "summary": "Avoids an unlikely blockage, but always costs extra time and miles.",
-            "stakeholder_effect": "Adds miles and sends trucks through neighborhood streets.",
-            "plan": {"route": "detour"}
+            "summary": "Take Anaheim St.",
+            "stakeholder_effect": "Adds miles to avoid an unlikely closure.",
+            "plan": {
+              "route": "detour"
+            }
           },
           {
             "id": "swap-truck",
             "label": "Swap with SYN-TRK-12",
-            "summary": "Swaps two loads that are on schedule.",
-            "stakeholder_effect": "Puts SYN-SHP-1048 at risk with no confirmed need.",
+            "summary": "Swap the two loads.",
+            "stakeholder_effect": "Uses appointment slack for handover.",
             "plan": {
-              "trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}
+              "trucks": {
+                "SYN-SHP-1042": "SYN-TRK-12",
+                "SYN-SHP-1048": "SYN-TRK-07"
+              }
             }
           }
         ]
@@ -233,13 +256,13 @@
     },
     "disruption": {
       "id": "port-la-disruption",
-      "name": "Possible crash, unconfirmed",
+      "name": "Unconfirmed crash on CA-47",
       "scenario_type": "disruption",
       "disruption": {
         "id": "SYN-DSP-07",
         "eyebrow": "ACTIVE DISRUPTION",
-        "title": "Possible overturned vehicle on CA-47 connector",
-        "description": "Two drivers report a partial or full blockage; neither report is confirmed. The medical-equipment load, SYN-SHP-1042, has 12 minutes of slack before its appointment.",
+        "title": "Possible crash on CA-47",
+        "description": "Two drivers disagree about a wreck blocking the connector.",
         "affected_shipment": "SYN-SHP-1042",
         "prior_blocked_probability": 0.4,
         "reported_at": "09:14",
@@ -250,18 +273,27 @@
           "SYN-TRK-12 is free for a handover from 09:25",
           "A truck swap would put SYN-SHP-1048 on watch"
         ],
-        "check": {"type": "crash", "label": "Crash check", "bad": "blocked", "good": "open"}
+        "check": {
+          "type": "crash",
+          "label": "Crash check",
+          "bad": "blocked",
+          "good": "open"
+        },
+        "location_label": "CA-47 connector",
+        "evidence_summary": "Unconfirmed reports",
+        "inspection_limits": "Footage covers the visible section of road.",
+        "basis": "synthetic"
       }
     },
     "disruption_b": {
       "id": "port-la-disruption-b",
-      "name": "Crash, corroborated",
+      "name": "Corroborated CA-47 closure",
       "scenario_type": "disruption",
       "disruption": {
         "id": "SYN-DSP-08",
         "eyebrow": "ACTIVE DISRUPTION",
-        "title": "Corroborated report of an overturned vehicle on CA-47 connector",
-        "description": "Four drivers and a simulated traffic-feed alert all report a full blockage. The medical-equipment load, SYN-SHP-1042, has 12 minutes of slack before its appointment.",
+        "title": "CA-47 closure reports",
+        "description": "Four drivers and a traffic alert report a closure. Same road and load as the possible-crash case.",
         "affected_shipment": "SYN-SHP-1042",
         "prior_blocked_probability": 0.8,
         "reported_at": "09:14",
@@ -272,58 +304,117 @@
           "SYN-TRK-12 is free for a handover from 09:25",
           "A truck swap would put SYN-SHP-1048 on watch"
         ],
-        "check": {"type": "crash", "label": "Crash check", "bad": "blocked", "good": "open"}
-      }
-    },
-    "congestion": {
-      "id": "port-la-congestion",
-      "name": "Heavy traffic",
-      "scenario_type": "disruption",
-      "disruption": {
-        "id": "SYN-DSP-09",
-        "eyebrow": "ACTIVE DISRUPTION",
-        "title": "Heavy truck queue reported on CA-47 connector",
-        "description": "A driver reports trucks backed up on the connector after a terminal gate slowdown. Nobody has said how long the queue is or whether it is moving. The medical-equipment load, SYN-SHP-1042, has 12 minutes of slack before its appointment.",
-        "affected_shipment": "SYN-SHP-1042",
-        "prior_blocked_probability": 0.5,
-        "reported_at": "09:14",
-        "decision_deadline": "09:24",
-        "check": {"type": "congestion", "label": "Traffic check", "bad": "jammed", "good": "flowing"},
-        "constraints": [
-          "SYN-SHP-1042's warehouse appointment starts at 10:15",
-          "The medical-equipment load has critical priority",
-          "SYN-TRK-12 is free for a handover from 09:25",
-          "A truck swap would put SYN-SHP-1048 on watch"
-        ]
+        "check": {
+          "type": "crash",
+          "label": "Crash check",
+          "bad": "blocked",
+          "good": "open"
+        },
+        "location_label": "CA-47 connector",
+        "evidence_summary": "Multiple agreeing reports",
+        "inspection_limits": "",
+        "basis": "synthetic"
       },
       "decision_model": {
-        "blockage": {
-          "effect": "slowdown",
-          "slowdown_min": 40,
-          "note": "If the queue is at a standstill, a truck on the route drives to the back of it, loses slowdown_min crawling through, and continues on the same route. slowdown_min is assumed."
-        },
         "actions": [
           {
             "id": "hold-course",
             "label": "Keep current route",
-            "summary": "Stay on CA-47. The appointment holds if the queue is moving.",
-            "stakeholder_effect": "No driver is reassigned. If the queue is at a standstill, the driver idles in it and the load arrives late.",
-            "plan": {"route": "primary"}
+            "summary": "Continue toward the reported closure.",
+            "stakeholder_effect": "Reaching a closure forces a return trip and detour.",
+            "plan": {
+              "route": "primary"
+            }
           },
           {
             "id": "reroute",
             "label": "Reroute via Anaheim St",
-            "summary": "Take the Anaheim St detour now. It is longer, but the queue does not affect it.",
-            "stakeholder_effect": "Adds miles and sends trucks through neighborhood streets.",
-            "plan": {"route": "detour"}
+            "summary": "Take Anaheim St now.",
+            "stakeholder_effect": "Adds miles to avoid the reported closure.",
+            "plan": {
+              "route": "detour"
+            }
           },
           {
             "id": "swap-truck",
             "label": "Swap with SYN-TRK-12",
-            "summary": "SYN-TRK-12 takes over SYN-SHP-1042 after 09:25; SYN-TRK-07 takes SYN-SHP-1048.",
-            "stakeholder_effect": "Both drivers lose time to the handover, and SYN-SHP-1048 loses most of its appointment slack.",
+            "summary": "Swap the loads on SYN-TRK-07 and SYN-TRK-12 after 09:25.",
+            "stakeholder_effect": "Handover reduces SYN-SHP-1048's arrival buffer.",
             "plan": {
-              "trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}
+              "trucks": {
+                "SYN-SHP-1042": "SYN-TRK-12",
+                "SYN-SHP-1048": "SYN-TRK-07"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "congestion": {
+      "id": "port-la-congestion",
+      "name": "Pier 400 outbound access-road queue",
+      "scenario_type": "disruption",
+      "disruption": {
+        "id": "SYN-DSP-09",
+        "eyebrow": "ACTIVE DISRUPTION",
+        "title": "Pier 400 exit-road queue",
+        "description": "A driver reports a queue outside Pier 400's exit gate. The load has cleared the gate; the assumed 30 min delay fits its 35 min arrival buffer.",
+        "affected_shipment": "SYN-SHP-1042",
+        "prior_blocked_probability": 0.5,
+        "reported_at": "09:14",
+        "decision_deadline": "09:24",
+        "check": {
+          "type": "congestion",
+          "label": "Traffic check",
+          "bad": "jammed",
+          "good": "flowing"
+        },
+        "constraints": [
+          "SYN-SHP-1042 appointment: 10:15–10:45; synthetic planned arrival 09:40",
+          "Severe queue adds 30 min (assumed), giving a 10:10 arrival without inspection",
+          "Load is outside the gate; queue affects one outbound road only",
+          "Swapping trucks still encounters the queue and disrupts SYN-SHP-1048"
+        ],
+        "location_label": "Pier 400 outbound access road",
+        "evidence_summary": "Uncertain queue movement",
+        "inspection_limits": "Queue movement doesn't predict waiting time.",
+        "basis": "synthetic"
+      },
+      "decision_model": {
+        "blockage": {
+          "effect": "slowdown",
+          "slowdown_min": 30,
+          "note": "Synthetic queue outside Pier 400 gate on one outbound access road, not terminal gate processing. Severe queue adds an assumed 30 minutes; the truck then continues without extra mileage. The alternate outbound road avoids it."
+        },
+        "actions": [
+          {
+            "id": "hold-course",
+            "label": "Continue through the exit queue",
+            "summary": "Stay on the outbound access road.",
+            "stakeholder_effect": "Wait through the queue, then continue without extra miles.",
+            "plan": {
+              "route": "primary"
+            }
+          },
+          {
+            "id": "reroute",
+            "label": "Use the alternate exit via Anaheim St",
+            "summary": "Return for the alternate exit via Anaheim St.",
+            "stakeholder_effect": "Avoids the queue; adds miles through neighborhood streets.",
+            "plan": {
+              "route": "detour"
+            }
+          },
+          {
+            "id": "swap-truck",
+            "label": "Swap with SYN-TRK-12",
+            "summary": "Swap the two loads.",
+            "stakeholder_effect": "The queue remains on the route; handover uses the other load's buffer.",
+            "plan": {
+              "trucks": {
+                "SYN-SHP-1042": "SYN-TRK-12",
+                "SYN-SHP-1048": "SYN-TRK-07"
+              }
             }
           }
         ],
@@ -332,65 +423,239 @@
           "launch_and_review_minutes": 4,
           "accuracy_basis": "assumed for a dispatcher who reviews drone footage with a CV suggestion; set higher than for a crash because a standing queue is easy to see from above; not yet validated"
         }
+      },
+      "locations": [
+        {
+          "id": "terminal-a",
+          "name": "Pier 400 Terminal",
+          "kind": "terminal",
+          "lat": 33.735,
+          "lon": -118.262
+        },
+        {
+          "id": "terminal-b",
+          "name": "Long Beach Container Terminal",
+          "kind": "terminal",
+          "lat": 33.754,
+          "lon": -118.216
+        },
+        {
+          "id": "terminal-c",
+          "name": "TraPac Terminal",
+          "kind": "terminal",
+          "lat": 33.747,
+          "lon": -118.278
+        },
+        {
+          "id": "warehouse-1",
+          "name": "Carson Cross-Dock",
+          "kind": "warehouse",
+          "lat": 33.824,
+          "lon": -118.251
+        },
+        {
+          "id": "warehouse-2",
+          "name": "West Long Beach DC",
+          "kind": "warehouse",
+          "lat": 33.789,
+          "lon": -118.197
+        },
+        {
+          "id": "warehouse-3",
+          "name": "Rancho Dominguez Hub",
+          "kind": "warehouse",
+          "lat": 33.849,
+          "lon": -118.205
+        },
+        {
+          "id": "warehouse-4",
+          "name": "Compton Fulfillment Center",
+          "kind": "warehouse",
+          "lat": 33.887,
+          "lon": -118.224
+        },
+        {
+          "id": "warehouse-5",
+          "name": "Torrance Consolidation Center",
+          "kind": "warehouse",
+          "lat": 33.835,
+          "lon": -118.314
+        },
+        {
+          "id": "warehouse-6",
+          "name": "Wilmington Transfer Yard",
+          "kind": "warehouse",
+          "lat": 33.781,
+          "lon": -118.264
+        },
+        {
+          "id": "incident",
+          "name": "Pier 400 outbound access road",
+          "kind": "incident",
+          "lat": 33.74372,
+          "lon": -118.260285
+        }
+      ],
+      "truck_overrides": {
+        "SYN-TRK-07": {
+          "lon": -118.26188,
+          "lat": 33.737973
+        }
+      },
+      "shipment_overrides": {
+        "SYN-SHP-1042": {
+          "eta": "09:40",
+          "slack_min": 35,
+          "status": "watch",
+          "readiness": "Released 08:54"
+        }
       }
     },
     "flood": {
       "id": "port-la-flood",
-      "name": "Road damage",
+      "name": "Flooded northern connector approach",
       "scenario_type": "disruption",
       "disruption": {
         "id": "SYN-DSP-10",
         "eyebrow": "ACTIVE DISRUPTION",
-        "title": "Burst water main may have flooded CA-47 connector",
-        "description": "The city reports a burst water main beside the connector. One driver says water is across the lanes; it is not known whether trucks can still pass or whether the road surface is damaged. The medical-equipment load, SYN-SHP-1042, has 12 minutes of slack before its appointment.",
+        "title": "Water on the northern connector approach",
+        "description": "A utility report and driver describe water across the connector after a burst main. Depth and pavement condition are unknown.",
         "affected_shipment": "SYN-SHP-1042",
-        "prior_blocked_probability": 0.25,
+        "prior_blocked_probability": 0.6,
         "reported_at": "09:14",
         "decision_deadline": "09:24",
-        "check": {"type": "environment", "label": "Road damage check", "bad": "impassable", "good": "passable"},
+        "check": {
+          "type": "environment",
+          "label": "Flood visibility check",
+          "bad": "impassable",
+          "good": "passable"
+        },
         "constraints": [
-          "SYN-SHP-1042's warehouse appointment starts at 10:15",
-          "The medical-equipment load has critical priority",
-          "SYN-TRK-12 is free for a handover from 09:25",
-          "A truck swap would put SYN-SHP-1048 on watch"
-        ]
+          "SYN-SHP-1042 appointment: 10:15–10:45; synthetic planned arrival 10:03",
+          "Water depth and pavement condition remain unverified",
+          "Assumed visual-check accuracy: 65%; review wait: 8 min",
+          "The Anaheim St route avoids the modeled flooded section"
+        ],
+        "location_label": "Northern connector approach",
+        "evidence_summary": "Water reported; passage uncertain",
+        "inspection_limits": "Footage can't establish safe water depth or pavement condition.",
+        "basis": "synthetic"
       },
       "decision_model": {
         "blockage": {
           "turnaround_min": 15,
-          "note": "If the road is impassable, a truck on the route drives to the flooded section, loses turnaround_min backing out, drives back to the route start and takes the fallback route. turnaround_min is assumed."
+          "note": "In the synthetic impassable case, the truck loses an assumed 15 minutes withdrawing before returning to the route start and detouring. No real movement is authorized."
         },
         "actions": [
           {
             "id": "hold-course",
-            "label": "Keep current route",
-            "summary": "Stay on CA-47. The appointment holds if trucks can still get through.",
-            "stakeholder_effect": "No driver is reassigned. If the road is impassable, the driver has to back out of standing water, then drive back and take the detour.",
-            "plan": {"route": "primary"}
+            "label": "Keep the connector plan",
+            "summary": "Keep the connector route if passable.",
+            "stakeholder_effect": "Impassable water requires turning back and detouring.",
+            "plan": {
+              "route": "primary"
+            }
           },
           {
             "id": "reroute",
-            "label": "Reroute via Anaheim St",
-            "summary": "Take the Anaheim St detour now. It is longer, but the flooding does not affect it.",
-            "stakeholder_effect": "Adds miles and sends trucks through neighborhood streets.",
-            "plan": {"route": "detour"}
+            "label": "Avoid the water via Anaheim St",
+            "summary": "Take Anaheim St around the flooded section.",
+            "stakeholder_effect": "Adds miles through neighborhood streets.",
+            "plan": {
+              "route": "detour"
+            }
           },
           {
             "id": "swap-truck",
             "label": "Swap with SYN-TRK-12",
-            "summary": "SYN-TRK-12 takes over SYN-SHP-1042 after 09:25; SYN-TRK-07 takes SYN-SHP-1048.",
-            "stakeholder_effect": "Both drivers lose time to the handover, and SYN-SHP-1048 loses most of its appointment slack.",
+            "summary": "Swap the two loads.",
+            "stakeholder_effect": "The water remains on the route; handover uses the other load's buffer.",
             "plan": {
-              "trucks": {"SYN-SHP-1042": "SYN-TRK-12", "SYN-SHP-1048": "SYN-TRK-07"}
+              "trucks": {
+                "SYN-SHP-1042": "SYN-TRK-12",
+                "SYN-SHP-1048": "SYN-TRK-07"
+              }
             }
           }
         ],
         "drone": {
-          "accuracy": 0.85,
+          "accuracy": 0.65,
           "launch_and_review_minutes": 8,
-          "accuracy_basis": "assumed for a dispatcher who reviews drone footage; set lower than for a crash because water depth and road damage are hard to judge from above, and the CV only tracks vehicles; not yet validated"
+          "accuracy_basis": "assumed 65% for dispatcher-reviewed aerial footage of standing water; unvalidated and unable to certify depth or pavement condition"
         }
-      }
+      },
+      "locations": [
+        {
+          "id": "terminal-a",
+          "name": "Pier 400 Terminal",
+          "kind": "terminal",
+          "lat": 33.735,
+          "lon": -118.262
+        },
+        {
+          "id": "terminal-b",
+          "name": "Long Beach Container Terminal",
+          "kind": "terminal",
+          "lat": 33.754,
+          "lon": -118.216
+        },
+        {
+          "id": "terminal-c",
+          "name": "TraPac Terminal",
+          "kind": "terminal",
+          "lat": 33.747,
+          "lon": -118.278
+        },
+        {
+          "id": "warehouse-1",
+          "name": "Carson Cross-Dock",
+          "kind": "warehouse",
+          "lat": 33.824,
+          "lon": -118.251
+        },
+        {
+          "id": "warehouse-2",
+          "name": "West Long Beach DC",
+          "kind": "warehouse",
+          "lat": 33.789,
+          "lon": -118.197
+        },
+        {
+          "id": "warehouse-3",
+          "name": "Rancho Dominguez Hub",
+          "kind": "warehouse",
+          "lat": 33.849,
+          "lon": -118.205
+        },
+        {
+          "id": "warehouse-4",
+          "name": "Compton Fulfillment Center",
+          "kind": "warehouse",
+          "lat": 33.887,
+          "lon": -118.224
+        },
+        {
+          "id": "warehouse-5",
+          "name": "Torrance Consolidation Center",
+          "kind": "warehouse",
+          "lat": 33.835,
+          "lon": -118.314
+        },
+        {
+          "id": "warehouse-6",
+          "name": "Wilmington Transfer Yard",
+          "kind": "warehouse",
+          "lat": 33.781,
+          "lon": -118.264
+        },
+        {
+          "id": "incident",
+          "name": "Northern connector approach",
+          "kind": "incident",
+          "lat": 33.780881,
+          "lon": -118.226268
+        }
+      ]
     }
   }
 }

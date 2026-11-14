@@ -27,9 +27,9 @@ export function withWeb(target) {
 const pct = (value) => `${Math.round(value * 100)}%`;
 const money = (value) => `${value < 0 ? "−" : ""}$${Math.round(Math.abs(value)).toLocaleString("en-US")}`;
 const headline = {
-  corroborates: "Public feeds back up the report",
-  contradicts: "Public feeds point the other way",
-  nothing_found: "Nothing in the public feeds yet",
+  corroborates: "Feeds support the report",
+  contradicts: "Feeds contradict the report",
+  nothing_found: "No matching reports",
 };
 
 function el(tag, className, text) {
@@ -82,7 +82,7 @@ function header(container, scenarioId, options) {
 
 function evidenceList(result) {
   const box = el("details", "more web-evidence");
-  box.append(el("summary", null, `What the agent found (${result.evidence.length} record${result.evidence.length === 1 ? "" : "s"})`));
+  box.append(el("summary", null, `Sources (${result.evidence.length})`));
   if (!result.evidence.length) box.append(el("p", "note", "No records near the reported spot."));
   const list = el("ul");
   result.evidence.forEach((item) => {
@@ -105,11 +105,10 @@ function evidenceList(result) {
 function effectLine(result) {
   const e = result.effect;
   const bad = result.check.bad;
-  const drone = e.inspection_after.recommend
-    ? `a drone check would still be worth it (${money(e.inspection_after.net_value)} estimated net)`
-    : `a drone check would not be worth it (${money(e.inspection_after.net_value)} estimated net)`;
-  if (e.prior_after === e.prior_before) return `Using it leaves the assumed chance CA-47 is ${bad} at ${pct(e.prior_before)}.`;
-  return `Using it moves the chance CA-47 is ${bad} from ${pct(e.prior_before)} (assumed) to ${pct(e.prior_after)} (estimated), and ${drone}.`;
+  const risk = e.prior_after === e.prior_before
+    ? `${pct(e.prior_before)} unchanged (assumed)`
+    : `${pct(e.prior_before)} assumed → ${pct(e.prior_after)} estimated`;
+  return `Road ${bad}: ${risk}. Check: ${money(e.inspection_after.net_value)} estimated net value.`;
 }
 
 // Runs the web check for an incident and renders the card. `onApply(finding | null, result)` is called
@@ -120,7 +119,7 @@ export async function renderTriage(container, scenarioId, options = {}) {
   const feed = mode;
   container.hidden = false;
   container.replaceChildren(header(container, scenarioId, options),
-    el("p", "note", `Searching the CHP incident log, Caltrans message signs and NWS alerts near the reported spot${mode === "demo" ? " (demo feed)" : ""}…`));
+    el("p", "note", `Searching nearby CHP, Caltrans and NWS reports${mode === "demo" ? " (synthetic)" : ""}…`));
   const key = `${scenarioId}|${mode}`;
   let result = results.get(key);
   if (!result) {
@@ -135,7 +134,7 @@ export async function renderTriage(container, scenarioId, options = {}) {
   }
   if (stale()) return;
   if (!result.available) {
-    container.replaceChildren(header(container, scenarioId, options), el("p", "note", "The web check could not run. Decide with the drone check alone."));
+    container.replaceChildren(header(container, scenarioId, options), el("p", "note", "Web check unavailable."));
     return;
   }
 
@@ -144,13 +143,14 @@ export async function renderTriage(container, scenarioId, options = {}) {
     ? el("span", "tag llm", `AI agent · ${result.confidence} confidence · unvalidated`)
     : el("span", "tag llm", "Keyword rule · no AI");
   const source = result.mode === "live"
-    ? "Live public feeds describe real roads now. The incident on this page is fictional, so a real match is unlikely."
-    : `Demo feed: synthetic records written for this incident, not real reports.${result.fallback_reason ? " Shown because every live feed failed." : ""}`;
+    ? "Live reports; fictional scenario."
+    : `Synthetic demo reports.${result.fallback_reason ? " Live feeds unavailable." : ""}`;
 
-  const parts = [header(container, scenarioId, options), by, el("h3", null, headline[result.finding]), el("p", "web-summary", result.summary)];
+  const parts = [header(container, scenarioId, options), el("h3", null, headline[result.finding])];
+  if (result.finding === "nothing_found") parts.push(el("p", "note", "Missing reports are weak evidence."));
   const isApplied = applied === result.finding && appliedMode === feed;
   if (isApplied) {
-    parts.push(el("p", "web-effect applied", `Applied. The estimated chance CA-47 is ${result.check.bad} is now ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}, assumed).`));
+    parts.push(el("p", "web-effect applied", `Applied: road ${result.check.bad} chance ${pct(result.effect.prior_after)} estimated (was ${pct(result.effect.prior_before)} assumed).`));
   } else {
     parts.push(el("p", "web-effect", effectLine(result)));
   }
@@ -178,11 +178,11 @@ export async function renderTriage(container, scenarioId, options = {}) {
     if (!stale()) renderTriage(container, scenarioId, options);
   });
   actions.append(use, error);
-  parts.push(actions, evidenceList(result));
-  const notes = [source, `The update uses an assumed reliability for web reports (${result.effect.likelihoods_basis}).`];
-  if (result.agent_note) notes.push(result.agent_note.startsWith("LLM unavailable")
-    ? "The AI agent is unavailable, so a keyword rule decided."
-    : "The AI agent's report failed a check, so a keyword rule decided.");
+  const evidence = evidenceList(result);
+  evidence.append(el("p", "web-summary", result.summary), by);
+  if (result.agent_note) evidence.append(el("p", "fine-print", result.agent_note));
+  parts.push(actions, evidence);
+  const notes = [source, `Report reliability: ${result.effect.likelihoods_basis}.`];
   const fine = el("p", "fine-print", notes.join(" "));
   if (result.agent_note) fine.title = result.agent_note;
   parts.push(fine);

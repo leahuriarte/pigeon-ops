@@ -32,17 +32,31 @@ class DecisionEngineTests(unittest.TestCase):
         self.assertGreater(disruption["net_value_of_information"], 0)
         self.assertFalse(analyze(load_scenario(variant="normal"))["evoi"]["recommend_inspection"])
 
-    def test_each_kind_of_check_can_change_the_response(self):
-        # Keeping the route wins before a traffic check; a detour wins before a crash or road-damage check.
-        tops = {}
-        for variant in ("disruption", "congestion", "flood"):
-            scenario = load_scenario(variant=variant)
-            now = analyze(scenario)
-            self.assertTrue(now["evoi"]["recommend_inspection"], variant)
-            tops[variant] = now["before"][0]["id"]
-            self.assertEqual("reroute", analyze(scenario, "blocked")["after"][0]["id"])
-            self.assertEqual("hold-course", analyze(scenario, "clear")["after"][0]["id"])
-        self.assertEqual({"disruption": "reroute", "congestion": "hold-course", "flood": "reroute"}, tops)
+    def test_incidents_have_distinct_decision_consequences(self):
+        # Same road state keys, different operational decisions and reasons to seek evidence.
+        expected = {
+            "disruption": ("reroute", True, "reroute", "hold-course"),
+            "disruption_b": ("reroute", False, "reroute", "reroute"),
+            "congestion": ("hold-course", False, "hold-course", "hold-course"),
+            "flood": ("reroute", False, "reroute", "reroute"),
+        }
+        for variant, (now_id, inspect, bad_id, good_id) in expected.items():
+            with self.subTest(variant=variant):
+                scenario = load_scenario(variant=variant)
+                now = analyze(scenario)
+                self.assertEqual(now_id, now["before"][0]["id"])
+                self.assertEqual(inspect, now["evoi"]["recommend_inspection"])
+                for observation, action_id in (("blocked", bad_id), ("clear", good_id)):
+                    after = analyze(scenario, observation)
+                    self.assertEqual(action_id, after["after"][0]["id"])
+                    branch = next(b for b in now["evoi"]["response_by_observation"] if b["observation"] == observation)
+                    self.assertEqual(action_id, branch["action"])
+                    self.assertAlmostEqual(after["posterior_blocked_probability"], branch["posterior"], places=4)
+                    self.assertEqual(after["after"][0]["expected_loss"], branch["expected_loss"])
+                branches = now["evoi"]["response_by_observation"]
+                self.assertAlmostEqual(1, sum(b["probability"] for b in branches))
+                loss = sum(b["probability"] * b["expected_loss"] for b in branches)
+                self.assertAlmostEqual(now["evoi"]["expected_loss_after_inspection"], loss, places=2)
 
     def test_the_detour_passes_more_schools_than_the_current_route(self):
         options = {o["id"]: o["schools_within_300m"] for o in analyze(self.scenario)["before"]}

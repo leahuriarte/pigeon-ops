@@ -54,6 +54,23 @@ class PlaybackTests(unittest.TestCase):
         missing = set(required_legs(scenarios)) - set(geometry)
         self.assertEqual(set(), missing, "run scripts/build_road_geometry.py")
 
+    def test_each_incident_playback_agrees_with_its_model_and_location(self):
+        for variant in ("disruption", "disruption_b", "congestion", "flood"):
+            scenario = load_scenario(variant=variant)
+            for inspected in (False, True):
+                for action_id in ("hold-course", "reroute"):
+                    for road in ("open", "blocked"):
+                        playback = build_playback(scenario, action_id, road, inspected=inspected)
+                        action = next(a for a in scenario["decision_model"]["actions"] if a["id"] == action_id)
+                        key = "outcomes_after_inspection" if inspected else "outcomes"
+                        checkin = next(e for e in playback["events"] if "SYN-SHP-1042" in e["text"] and e["text"].startswith("Checks in"))
+                        self.assertAlmostEqual(clock(action[key][road]["detail"]["arrival"]), checkin["t"], delta=1)
+                        if action_id == "hold-course" and road == "blocked":
+                            events = " ".join(e["text"] for e in playback["events"])
+                            self.assertIn(scenario["disruption"]["location_label"], events)
+                            if variant == "congestion":
+                                self.assertNotIn("queue on CA-47", events)
+
 
 if __name__ == "__main__":
     unittest.main()

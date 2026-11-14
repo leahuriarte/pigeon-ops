@@ -95,10 +95,18 @@ def information_value(model, prior, likelihoods=None):
     }
     # Expected loss of the best action after seeing each possible signal. Every action starts after the
     # inspection delay, so the wait shows up as later arrivals and paid waiting time, not as a flat cost.
-    expected_loss_with_signal = sum(
-        probability * rank_actions(model, posterior_blocked(prior, signal, likelihoods), True)[0]["expected_loss"]
-        for signal, probability in signal_probability.items() if probability
-    )
+    responses = []
+    for signal, probability in signal_probability.items():
+        if not probability:
+            continue
+        posterior = posterior_blocked(prior, signal, likelihoods)
+        best = rank_actions(model, posterior, True)[0]
+        responses.append({
+            "observation": signal, "probability": probability,
+            "posterior": posterior, "action": best["id"], "label": best["label"],
+            "expected_loss": best["expected_loss"], "basis": "estimated",
+        })
+    expected_loss_with_signal = sum(row["probability"] * row["expected_loss"] for row in responses)
     gross_value = best_now - expected_loss_with_signal
     inspection_cost = drone["direct_cost"]
     net_value = gross_value - inspection_cost
@@ -109,6 +117,7 @@ def information_value(model, prior, likelihoods=None):
         "inspection_cost": round(inspection_cost, 2),
         "net_value_of_information": round(net_value, 2),
         "recommend_inspection": net_value > 0,
+        "response_by_observation": responses,
         "formula": "Net EVI = best expected loss now − expected loss after waiting for the observation − inspection cost",
         "assumptions": {
             "inspection_accuracy": drone["accuracy"],

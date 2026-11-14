@@ -75,11 +75,13 @@ The prototype currently uses a hand-curated, deterministic scenario so the hacka
 1. Select a terminal, destination, commodity class, truck, appointment, and readiness state.
 2. Assign a corridor and an ETA with appointment slack.
 3. Mark shipments as on time, watch, at risk, planned, or unassigned.
-4. In each incident variant, introduce an uncertain road state with a prior probability (40% and 80% for the crash reports, 50% for heavy traffic, 25% for road damage).
+4. In each incident variant, introduce an uncertain road state with a synthetic prior probability (40% and 80% for the crash reports, 50% for the Pier 400 exit-road queue, 60% for the flooded connector approach).
 5. Compute each action's outcomes from route distance and duration, then its loss under open and blocked states.
 6. Calculate the value of an imperfect observation and update the probability with Bayes' rule after a simulated result.
 
 The normal scenario uses a 2% blockage prior, so inspection is not cost-effective. The disruption scenario makes information valuable because the preferred action differs materially between road states. The corroborated disruption (`disruption_b`, 80% prior) shows the opposite case: rerouting is best whatever the inspection says, so inspection is not worth its cost.
+
+The queue scenario places the released load outside Pier 400's gate on one outbound access road. Its synthetic 09:40 ETA leaves 35 minutes before the appointment; an assumed severe queue adds 30 minutes and no miles. This models an access-road delay, not terminal gate processing, which changing the road route would not bypass. The flood scenario places the hazard farther north on the connector approach. Aerial review is assumed only 65% accurate and cannot establish water depth or pavement integrity. Both modeled drone findings favor avoiding the flooded section. All locations, reports, release times and incident parameters are fictional; the footage illustrates other places.
 
 ## Decision model
 

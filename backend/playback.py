@@ -278,18 +278,21 @@ class Planner:
         origin = self.name(affected["origin"])
         dest = self.name(affected["destination"])
         pieces = []  # (route, from, to, kind, text, event before, tone) or ("wait", minutes, ...)
+        place = self.scenario["disruption"].get("location_label", "CA-47 connector")
+        flood = self.scenario["disruption"].get("check", {}).get("type") == "environment"
         position = model.truck_at
         if route is not model.current:
             pieces.append((model.current, position, 0.0, "detour", f"Turning back to {origin} to take the detour", f"Turns back toward {origin} to take the detour", "watch"))
             position = 0.0
         hits = self.road == "blocked" and route is model.blocked_route and position < model.incident_at
         if hits:
-            pieces.append((route, position, model.incident_at, "driving", f"Carrying {load} toward the CA-47 connector", None, None))
+            pieces.append((route, position, model.incident_at, "driving", f"Carrying {load} toward {place}", None, None))
         if hits and model.slowdown_min is not None:
-            pieces.append(("wait", model.slowdown_min, "blocked", "Crawling through the queue on CA-47", "Joins the queue on CA-47", "risk"))
-            pieces.append((route, model.incident_at, 1.0, "driving", f"Carrying {load} to {dest}", "Clears the queue on CA-47", "watch"))
+            pieces.append(("wait", model.slowdown_min, "blocked", f"Queue delay at {place} (assumed)", f"Joins the queue at {place}", "watch"))
+            pieces.append((route, model.incident_at, 1.0, "driving", f"Carrying {load} to {dest}", f"Clears the queue at {place}", "watch"))
         elif hits:
-            pieces.append(("wait", model.turnaround_min, "blocked", "Stuck in the queue at the obstruction, turning around", "Reaches the obstruction on CA-47 and has to turn around", "risk"))
+            text = f"Withdrawing from the water hazard at {place}" if flood else f"Turning back at the closure on {place}"
+            pieces.append(("wait", model.turnaround_min, "blocked", text, text, "risk"))
             pieces.append((route, model.incident_at, 0.0, "detour", f"Heading back to {origin} to take the detour", None, None))
             pieces.append((model.fallback, 0.0, 1.0, "detour", f"Carrying {load} to {dest} on the detour", f"Back at {origin}, starts the detour", "watch"))
         else:

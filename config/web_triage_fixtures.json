@@ -67,22 +67,22 @@
         "id": "SYN-CMS-4703",
         "source": "Caltrans message sign (synthetic)",
         "source_url": "https://quickmap.dot.ca.gov/",
-        "title": "Sign on SR-47 North, S/O Ocean Blvd",
-        "detail": "TRUCK QUEUE AHEAD / TERMINAL GATE DELAYS",
+        "title": "Pier 400 outbound access road (synthetic report)",
+        "detail": "OUTBOUND ACCESS ROAD QUEUE / GATE PROCESSING ALREADY COMPLETE",
         "time": "09:05",
-        "lat": 33.7655,
-        "lon": -118.2401
+        "lat": 33.74372,
+        "lon": -118.260285
       },
       {
         "feed": "chp",
         "id": "SYN-CHP-0914D",
         "source": "CHP incident log (synthetic)",
         "source_url": "https://cad.chp.ca.gov/",
-        "title": "1125-Traffic Hazard at SR47 N / Ocean Blvd Con",
-        "detail": "TRUCKS BACKED UP ON CONNECTOR FROM TERMINAL GATE; STOPPED IN #1 LN",
+        "title": "Pier 400 outbound access road (synthetic report)",
+        "detail": "TRUCKS BACKED UP OUTSIDE PIER 400 GATE ON CA47-BOUND ACCESS ROAD; QUEUE MOVEMENT UNKNOWN",
         "time": "09:09",
-        "lat": 33.7741,
-        "lon": -118.2358
+        "lat": 33.74372,
+        "lon": -118.260285
       }
     ],
     "flood": [
