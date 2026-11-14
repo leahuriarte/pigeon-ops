@@ -1000,7 +1000,7 @@ async function showObservation(analysis, summary = null) {
     clear: `The inspection showed the road clear, so the chance CA-47 is ${bad} drops from ${prior} to ${posterior}. “${best}” has the lowest expected loss.`,
     inconclusive: `The inspection was inconclusive, so the chance CA-47 is ${bad} stays at ${prior} and the ranking is the same as before.`,
   }[observation];
-  $("#risk-value").innerHTML = `${posterior}<small>updated by the drone check</small>`;
+  $("#risk-value").innerHTML = `${posterior}<small>${posterior === prior ? "unchanged by the drone check" : `was ${prior} before the drone check`}</small>`;
   $("#recommendation-short").innerHTML = `Checked: ${finding}<small>The best response is now ${esc(best)}.</small>`;
   renderSensitivity($("#sensitivity"), analysis, check());
   renderBrief($("#brief-respond"), activeScenario, observation);
@@ -1319,7 +1319,10 @@ window.addEventListener("inspection-reviewed", ({ detail }) => {
   const cv = detail.review.cv_suggestion;
   const choice = detail.review.observation;
   const agreement = !cv ? "" : cv === choice ? ` (matches the CV suggestion)` : ` (CV suggested ${findingText(cv)}; you overrode it)`;
-  const summary = `Drone footage reviewed: ${findingText(choice)}${agreement}. The chance CA-47 is ${check().bad} changes from ${pct(detail.analysis.prior_blocked_probability)} to ${pct(detail.analysis.posterior_blocked_probability)}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
+  const before = pct(detail.analysis.prior_blocked_probability);
+  const after = pct(detail.analysis.posterior_blocked_probability);
+  const chance = before === after ? `stays at ${before}` : `changes from ${before} to ${after}`;
+  const summary = `Drone footage reviewed: ${findingText(choice)}${agreement}. The chance CA-47 is ${check().bad} ${chance}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;
