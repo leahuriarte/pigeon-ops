@@ -61,7 +61,7 @@
       "cv_assessment": {
         "motion_state": "stopped_traffic",
         "signal": "blocked",
-        "reason": "1 vehicle(s) standing still and 1 crawling under 10 km/h, of 2 on the marked road; nothing moves through",
+        "reason": "1 vehicle standing still and 1 crawling under 10 km/h, of 2 on the marked road; nothing moves through",
         "vehicles_on_road": 2.0,
         "stopped": 1.0,
         "slow": 1.0,

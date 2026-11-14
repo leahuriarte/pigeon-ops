@@ -1,11 +1,12 @@
 const dialog = document.querySelector("#inspection-dialog");
-const picker = document.querySelector("#inspection-case");
+const clips = document.querySelector("#inspection-clips");
 const video = document.querySelector("#inspection-video");
 const photo = document.querySelector("#inspection-photo");
 const toggle = document.querySelector("#inspection-image-toggle");
 let libraryPromise;
 let cases = [];
 let selected;
+let selectedId = null;
 let scenarioId;
 let showSource = false;
 let submitting = false;
@@ -17,6 +18,7 @@ const labels = {
   insufficient_detail: "Insufficient detail",
   image_unavailable: "Footage unavailable",
 };
+const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const signalLabels = {
   blocked: "Road blocked",
   clear: "Road clear: traffic gets through",
@@ -32,8 +34,9 @@ function showMedia() {
 }
 
 function renderCase() {
-  selected = cases.find((item) => item.id === picker.value);
+  selected = cases.find((item) => item.id === selectedId);
   if (!selected) return;
+  clips.querySelectorAll(".clip").forEach((button) => button.setAttribute("aria-selected", String(button.dataset.case === selectedId)));
   showSource = false;
   video.src = selected.annotated_video;
   video.poster = selected.annotated_image;
@@ -50,9 +53,10 @@ function renderCase() {
   document.querySelector("#inspection-cv-signal").textContent = signalLabels[cv.suggested_observation];
   document.querySelector("#inspection-cv-reason").textContent = `${cv.reason[0].toUpperCase()}${cv.reason.slice(1)}.`;
   document.querySelector("#inspection-cv-basis").textContent = cv.basis;
-  document.querySelector("#inspection-date").textContent = selected.source.historical
-    ? `Pre-recorded · ${selected.source.date_description || selected.source.source_date}`
-    : `Saved ${new Date(selected.source.retrieved_at).toLocaleString()}`;
+  const recorded = selected.source.date_description || selected.source.source_date || "";
+  document.querySelector("#inspection-date").textContent = !selected.source.historical
+    ? `Saved ${new Date(selected.source.retrieved_at).toLocaleString()}`
+    : /^pre-recorded/i.test(recorded) ? recorded : `Pre-recorded · ${recorded}`;
   document.querySelector("#inspection-location").textContent = selected.source.location.locationName;
   const source = document.querySelector("#inspection-source");
   source.textContent = `${selected.source.credit} · ${selected.source.license}`;
@@ -80,11 +84,14 @@ export async function openInspection(id) {
   cases = library.cases || [];
   if (!cases.length) return false;
   scenarioId = id;
-  picker.replaceChildren(...cases.map((item) => new Option(
-    `${item.title} · CV: ${signalLabels[item.cv_assessment.suggested_observation].split(":")[0].toLowerCase()}`, item.id)));
-  picker.value = cases[0].id;
+  clips.innerHTML = cases.map((item) => `<button class="clip" type="button" role="tab" data-case="${escapeHtml(item.id)}" aria-selected="false">
+    <img src="${escapeHtml(item.annotated_image)}" alt="">
+    <span>${escapeHtml(item.title)}</span>
+  </button>`).join("");
+  selectedId = cases[0].id;
   renderCase();
   dialog.showModal();
+  window.dispatchEvent(new Event("inspection-dialog-open"));
   return true;
 }
 
@@ -93,7 +100,12 @@ export function resetInspection() {
   scenarioId = null;
 }
 
-picker.addEventListener("change", renderCase);
+clips.addEventListener("click", (event) => {
+  const button = event.target.closest(".clip");
+  if (!button || submitting) return;
+  selectedId = button.dataset.case;
+  renderCase();
+});
 toggle.addEventListener("click", () => {
   showSource = !showSource;
   showMedia();
@@ -112,7 +124,7 @@ document.querySelector("#inspection-apply").addEventListener("click", async () =
   submitting = true;
   button.disabled = true;
   button.textContent = "Applying…";
-  picker.disabled = true;
+  clips.querySelectorAll(".clip").forEach((clip) => { clip.disabled = true; });
   try {
     const response = await fetch("/api/inspection-review", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -130,6 +142,6 @@ document.querySelector("#inspection-apply").addEventListener("click", async () =
     submitting = false;
     button.disabled = false;
     button.textContent = "Apply to scenario";
-    picker.disabled = false;
+    clips.querySelectorAll(".clip").forEach((clip) => { clip.disabled = false; });
   }
 });

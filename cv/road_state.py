@@ -143,7 +143,8 @@ def assess_motion(samples, rule=DEFAULT_MOTION_RULE):
     elif stopped >= rule["min_stopped_for_blocked"] and not_moving_share >= rule["blocked_not_moving_share"]:
         state = "stopped_traffic"
         crawling = f" and {slow:g} crawling under {rule['moving_above_kmh']} km/h" if slow else ""
-        reason = f"{stopped:g} vehicle(s) standing still{crawling}, of {on_road:g} on the marked road; nothing moves through"
+        noun = "vehicle" if stopped == 1 else "vehicles"
+        reason = f"{stopped:g} {noun} standing still{crawling}, of {on_road:g} on the marked road; nothing moves through"
     elif moving >= rule["min_moving_for_clear"] and moving_share >= rule["clear_moving_share"]:
         state = "free_flow"
         reason = f"{moving:g} of {on_road:g} vehicles on the marked road are moving through"

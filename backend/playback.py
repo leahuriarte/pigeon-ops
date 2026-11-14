@@ -17,7 +17,7 @@ import json
 import math
 from pathlib import Path
 
-from backend.outcomes import RouteModel
+from backend.outcomes import INSPECTED, RouteModel
 
 ROOT = Path(__file__).resolve().parents[1]
 ROAD_GEOMETRY = ROOT / "config" / "road_geometry.json"
@@ -87,11 +87,15 @@ def load_geometry(path=ROAD_GEOMETRY):
 
 
 class Planner:
-    def __init__(self, scenario, geometry, action, road):
+    def __init__(self, scenario, geometry, action, road, inspected=False):
         self.scenario = scenario
         self.geometry = geometry
         self.action = action
         self.road = road
+        # After an inspection the trucks act late: the option's delayed outcomes apply and the wait is shown.
+        self.outcomes_key = INSPECTED if inspected else "outcomes"
+        drone = scenario["decision_model"].get("drone", {})
+        self.inspection_min = drone.get("launch_and_review_minutes", 0) if inspected else 0
         self.speed_m_per_min = scenario["operations"]["network_speed_mph"] * 1609.344 / 60
         self.start = clock(scenario["generated_at"][11:16])
         self.places = {loc["id"]: loc for loc in scenario["locations"]}
@@ -207,6 +211,14 @@ class Planner:
             self.event(track, "Becomes available for new work")
         return track
 
+    def hold_for_inspection(self, track, shipment):
+        """Keep a free truck where it is until the inspection result is in (backend/assignment.py `_held`)."""
+        until = self.start + self.inspection_min
+        if until <= track["t"] + 0.01:
+            return
+        self.event(track, "Holds position until the drone inspection result is in", "watch")
+        self.stop(track, until, "waiting", "Holding for the drone inspection result", shipment["id"])
+
     # Focus truck options ------------------------------------------------------
     def plan_focus(self, truck, shipments, tracks_by_id, all_shipments):
         """SYN-TRK-07 and the affected load play out the selected dispatch option."""
@@ -215,7 +227,7 @@ class Planner:
         rest = [s for s in shipments if s is not affected]
         window_start = clock(affected["appointment"].split("–")[0])
         action = next(a for a in self.scenario["decision_model"]["actions"] if a["id"] == self.action)
-        outcome = action["outcomes"][self.road]
+        outcome = action[self.outcomes_key][self.road]
         if "detail" in outcome:
             # Computed outcomes give the affected load's own arrival; lateness_min also counts other pool shipments.
             target = clock(outcome["detail"]["arrival"])
@@ -224,6 +236,7 @@ class Planner:
             target = window_start + lateness if lateness > 0 else clock(affected["eta"])
         dest = affected["destination"]
         track = self.truck_start(truck, shipments)
+        self.hold_for_inspection(track, affected)
 
         if action.get("plan", {}).get("route") and "detail" in outcome:
             self.follow_route_trip(track, affected, action["plan"]["route"], clock(outcome["detail"]["arrival"]))
@@ -236,7 +249,8 @@ class Planner:
         partner_loads = sorted((s for s in all_shipments if s["truck"] == SWAP_TRUCK), key=lambda s: clock(s["eta"]))
         handed_over = partner_loads[0] if partner_loads else None
         helper = self.truck_start(partner, partner_loads)
-        own_arrival = self.start + self.minutes([track["place"], DETOUR_VIA[0], TRANSFER_SITE])
+        self.hold_for_inspection(helper, affected)
+        own_arrival = track["t"] + self.minutes([track["place"], DETOUR_VIA[0], TRANSFER_SITE])
         helper_arrival = helper["t"] + self.minutes([helper["place"], TRANSFER_SITE])
         meet = max(own_arrival, helper_arrival)
 
@@ -349,6 +363,7 @@ class Planner:
             "end": end,
             "action": self.action,
             "road": self.road,
+            "inspected": self.outcomes_key == INSPECTED,
             "focus_truck": FOCUS_TRUCK,
             "tracks": ordered,
             "events": events,
@@ -365,13 +380,13 @@ class Planner:
         ]
 
 
-def build_playback(scenario, action="hold-course", road="open", geometry=None):
+def build_playback(scenario, action="hold-course", road="open", geometry=None, inspected=False):
     actions = {a["id"] for a in scenario["decision_model"]["actions"]}
     if action not in actions:
         raise ValueError(f"unknown action: {action}")
     if road not in ("open", "blocked"):
         raise ValueError("road must be open or blocked")
-    planner = Planner(scenario, load_geometry() if geometry is None else geometry, action, road)
+    planner = Planner(scenario, load_geometry() if geometry is None else geometry, action, road, inspected)
     return planner.build()
 
 

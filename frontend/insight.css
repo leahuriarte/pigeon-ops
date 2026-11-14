@@ -1,0 +1,27 @@
+/* Styles for frontend/insight.js: the inspection payoff chart and the per-road-state rows on option cards.
+   Colours and fonts come from the :root tokens in styles.css; the fallbacks repeat those values. */
+.sensitivity { margin: 12px 0 0; }
+.sensitivity h3 { margin: 0 0 2px; font-family: var(--font-display, inherit); font-size: 14px; font-weight: 600; }
+.sensitivity .sens-sub { margin: 0 0 6px; color: var(--ink-2, #55514a); font-size: 12.5px; }
+.sensitivity svg { display: block; width: 100%; max-width: 440px; height: auto; overflow: visible; touch-action: pan-y; }
+.sensitivity svg text { fill: var(--ink-2, #55514a); font-family: var(--font-mono, inherit); font-size: 10px; paint-order: stroke; stroke: var(--card, #fbf8f1); stroke-width: 3px; stroke-linejoin: round; }
+.sensitivity .sens-band { fill: var(--ok-bg, #dcefe2); }
+.sensitivity svg .sens-band-label { fill: var(--ok, #1f7a4a); font-family: var(--font-display, inherit); font-weight: 600; stroke: var(--ok-bg, #dcefe2); }
+.sensitivity .sens-zero { stroke: var(--hair, #cdc5b5); stroke-width: 1; }
+.sensitivity .sens-line { fill: none; stroke: var(--ink, #15181c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.sensitivity .sens-mark { stroke: var(--ink, #15181c); stroke-width: 1; stroke-dasharray: 3 3; }
+.sensitivity .sens-dot { fill: var(--ink, #15181c); stroke: var(--card, #fbf8f1); stroke-width: 2; }
+.sensitivity .sens-dot.hollow { fill: var(--card, #fbf8f1); stroke: var(--ink, #15181c); stroke-width: 1.5; }
+.sensitivity svg .sens-mark-label { fill: var(--ink, #15181c); font-family: var(--font-display, inherit); font-weight: 600; }
+.sensitivity .sens-hover line { stroke: var(--signal, #f2612a); stroke-width: 1; }
+.sensitivity .sens-hover circle { fill: var(--signal, #f2612a); stroke: var(--card, #fbf8f1); stroke-width: 2; }
+.sensitivity .sens-readout { margin: 4px 0 0; color: var(--ink-2, #55514a); font-size: 12.5px; }
+.sensitivity figcaption { margin-top: 6px; font-size: 13px; }
+
+.option-cases { display: grid; margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.4; }
+.option-cases li { display: grid; gap: 1px; padding: 5px 0; border-top: 1px solid var(--hair, #cdc5b5); }
+.option-cases .case { display: flex; align-items: baseline; gap: 6px; font-weight: 600; }
+.option-cases .case::before { content: ""; flex: none; width: 8px; height: 8px; background: var(--ok, #1f7a4a); }
+.option-cases li.warn .case::before { background: var(--watch, #8f5b00); }
+.option-cases li.bad .case::before { background: var(--risk, #bf2a1e); }
+.option-cases .case small { color: var(--ink-2, #55514a); font-family: var(--font-mono, inherit); font-size: 11.5px; font-weight: 400; }

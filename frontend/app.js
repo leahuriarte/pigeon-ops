@@ -1,4 +1,5 @@
 import { openInspection, resetInspection } from "./inspection.js";
+import { inspectionSentence, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -180,6 +181,7 @@ async function loadPlayback({ keepTime = false } = {}) {
   renderer?.setPlayback(playback, tracks);
   renderTallyFrame();
   updateFrame();
+  if (mode === "report") renderReport();
 }
 
 function renderTicks() {
@@ -194,12 +196,6 @@ function renderTicks() {
 
 function renderPlanNote() {
   if (scenario.scenario_type !== "disruption") return;
-  const best = modelPick;
-  $$("#playback-action option").forEach((option) => {
-    const action = scenario.decision_model.actions.find((a) => a.id === option.value);
-    option.textContent = action.label + (option.value === best.id ? " (model’s pick)" : "");
-  });
-  $("#playback-action").value = plan.action;
   $(`#road-${plan.road}`).checked = true;
   const outcome = scenario.decision_model.actions.find((a) => a.id === plan.action).outcomes[plan.road];
   $("#plan-note").textContent = outcome.lateness_min > 0
@@ -213,8 +209,7 @@ function updateFrame() {
   slider.value = currentTime;
   slider.style.setProperty("--p", `${((currentTime - span.start) / (span.end - span.start)) * 100}%`);
   slider.setAttribute("aria-valuetext", clockLabel(currentTime));
-  $("#map-clock").textContent = clockLabel(currentTime);
-  $("#ops-clock").textContent = clockLabel(currentTime);
+  $("#clock").textContent = clockLabel(currentTime);
   const states = tracks.map((track) => stateAt(track, currentTime));
   renderer?.update(states);
   updateFleetLive(states);
@@ -243,7 +238,7 @@ function frame(now) {
     return;
   }
   setPlaying(false);
-  if (mode === "incident") showReport();
+  if (mode === "incident" && step === "outcome") showReport();
 }
 
 function setPlaying(value) {
@@ -290,17 +285,14 @@ function updateTruckCard(states) {
 let feedKey = "";
 function updateEventFeed() {
   const relevant = playback.events.filter((event) => !selectedTruck || event.truck === selectedTruck);
-  const past = relevant.filter((event) => event.t <= currentTime + 0.01).slice(-3);
+  const past = relevant.filter((event) => event.t <= currentTime + 0.01).at(-1);
   const next = relevant.find((event) => event.t > currentTime + 0.01);
-  const key = `${selectedTruck}|${past.map((e) => e.t + e.truck).join()}|${next?.t}`;
+  const key = `${selectedTruck}|${past ? past.t + past.truck : ""}|${next?.t}`;
   if (key === feedKey) return;
   feedKey = key;
-  const row = (event, upcoming) => `<li class="${upcoming ? "upcoming" : event.tone}">
-    <time>${clockLabel(event.t)}</time>
-    <button class="link quiet" type="button" data-truck="${esc(event.truck)}">${esc(shortTruck(event.truck))}</button>
-    <span>${upcoming ? "Next: " : ""}${esc(event.text)}</span></li>`;
-  const rows = [...past.map((event) => row(event, false)), next ? row(next, true) : ""];
-  $("#event-feed").innerHTML = rows.join("") || '<li class="upcoming"><span>Press play to follow the morning.</span></li>';
+  const row = (event, upcoming) => `<li class="${upcoming ? "upcoming" : event.tone}"><time>${clockLabel(event.t)}</time><button class="link quiet" type="button" data-truck="${esc(event.truck)}">${esc(shortTruck(event.truck))}</button><span>${upcoming ? "Next: " : ""}${esc(event.text)}</span></li>`;
+  // Nothing to show until something has happened, unless a truck is being followed.
+  $("#event-feed").innerHTML = !past && !selectedTruck ? "" : [past ? row(past, false) : "", next ? row(next, true) : ""].join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -401,12 +393,14 @@ function renderTallyFrame() {
     <span class="tally-bar" aria-hidden="true"><i></i></span>
     <span class="tally-foot"></span></li>`).join("");
   const best = modelPick?.id;
-  $("#tally-race").innerHTML = actions.filter((a) => tallies[a.id]).map((a) => `<li>
-    <button type="button" class="tally-row${a.id === plan.action ? " current" : ""}" data-show="${esc(a.id)}" aria-pressed="${a.id === plan.action}">
-      <span class="tally-row-name">${esc(a.label)}${a.id === best ? ' <small>model’s pick</small>' : ""}</span>
-      <span class="tally-row-bar" aria-hidden="true"><i class="ghost"></i><i class="fill"></i></span>
-      <span class="tally-row-value"></span>
-    </button></li>`).join("");
+  $("#tally-race").innerHTML = actions.filter((a) => tallies[a.id]).map((a) => {
+    const notes = [a.id === plan.action && "your choice", a.id === best && "model’s pick"].filter(Boolean).join(", ");
+    return `<li class="race-row${a.id === plan.action ? " current" : ""}" data-action="${esc(a.id)}">
+      <span class="race-name">${esc(a.label)}${notes ? ` <small>${notes}</small>` : ""}</span>
+      <span class="race-bar" aria-hidden="true"><i class="ghost"></i><i class="fill"></i></span>
+      <span class="race-value"></span>
+    </li>`;
+  }).join("");
   const r = scenario.decision_model;
   const shipments = [...new Set(current.map((row) => row.shipment))].join(" and ");
   $("#tally-note").textContent = `Covers ${shipments}, the shipments the responses change, from ${clockLabel(span.start)} until each is delivered. Cost adds truck running cost ($${r.rates.cost_per_mile.toFixed(2)}/mi), driver time ($${r.rates.driver_hourly_rate}/h), delay (${money(r.lateness_cost_per_minute)}/min), CO₂ ($${r.emissions_cost_per_kg.toFixed(2)}/kg) and ${money(r.hard_constraint_penalty)} per missed appointment. All rates are assumed.`;
@@ -435,12 +429,12 @@ function updateTally() {
   });
   const finals = Object.fromEntries(Object.entries(tallies).map(([id, rows]) => [id, totalsAt(rows, Infinity).cost]));
   const top = Math.max(...Object.values(finals), 1);
-  $$("#tally-race .tally-row").forEach((row) => {
-    const id = row.dataset.show;
+  $$("#tally-race .race-row").forEach((row) => {
+    const id = row.dataset.action;
     const cost = totalsAt(tallies[id], currentTime).cost;
     row.querySelector(".ghost").style.width = `${(finals[id] / top * 100).toFixed(1)}%`;
     row.querySelector(".fill").style.width = `${(cost / top * 100).toFixed(1)}%`;
-    setHTML(`race-${id}`, row.querySelector(".tally-row-value"), `${money(cost)} <small>of ${money(finals[id])}</small>`);
+    setHTML(`race-${id}`, row.querySelector(".race-value"), `${money(cost)} <small>of ${money(finals[id])}</small>`);
   });
 }
 
@@ -450,18 +444,9 @@ function bump(node) {
   node.classList.add("bump");
 }
 
-async function watchResponse(actionId) {
-  if (actionId === plan.action && playing) return;
-  plan = { ...plan, action: actionId };
-  setPlaying(false);
-  await loadPlayback();
-  $(".map-block").scrollIntoView({ behavior: "smooth", block: "start" });
-  setPlaying(true);
-}
-
 function selectTruck(id) {
   selectedTruck = id;
-  renderShipments();
+  if (id) setView("map");
   renderFleet();
   renderTicks();
   renderer?.setSelected(id);
@@ -769,7 +754,7 @@ function renderDecision() {
   $("#disruption-title").textContent = d.title;
   $("#disruption-description").textContent = d.description;
   $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
-  $("#risk-value").textContent = pct(d.prior_blocked_probability);
+  $("#risk-value").innerHTML = `${pct(d.prior_blocked_probability)}<small>assumed from the reports</small>`;
   $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
   $("#deadline").textContent = d.decision_deadline;
 }
@@ -797,80 +782,83 @@ function indicatorChange(item, base) {
   const worse = (diff > 0) !== higherIsBetter.has(item.id);
   return { amount: `${diff > 0 ? "+" : "−"}${shown}`, tone: worse ? "worse" : "better", arrow: diff > 0 ? "▲" : "▼" };
 }
+const shortLabels = { community_exposure: "Schools near routes" };
 function renderIndicators(indicators) {
   const compare = scenario.scenario_type !== "normal" && baseline;
-  const scope = "Each number covers every shipment in the plan, assuming you take the top-ranked response without inspecting first.";
-  $("#indicators-note").textContent = compare
-    ? `${scope} Arrows compare each one with the usual morning.`
-    : `${scope} This is the usual morning that incidents are compared with.`;
-  $("#indicators").innerHTML = indicators.map((item) => {
-    const label = indicatorLabel(item);
-    const basis = `<span class="basis ${esc(item.basis)}">${esc(basisLabel[item.basis] ?? item.basis)}</span>`;
-    if (item.value === null || item.value === undefined) {
-      return `<li class="kpi pending"><span class="kpi-label">${label}</span><span class="kpi-value">—</span><span class="kpi-foot">${basis}</span></li>`;
-    }
+  const missing = indicators.filter((item) => item.value === null || item.value === undefined);
+  const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
+  $("#indicators-note").textContent = `Whole plan, estimated. Assumes the top-ranked response with no inspection.${compare ? " Arrows compare with the usual morning." : ""}${pending}`;
+  $("#indicators").innerHTML = indicators.filter((item) => !missing.includes(item)).map((item) => {
+    const label = shortLabels[item.id] ?? indicatorLabel(item);
+    const basis = basisLabel[item.basis] ?? item.basis;
+    const title = `title="${indicatorLabel(item)} · ${esc(basis)}"`;
     const of = item.of !== undefined ? ` of ${whole(item.of)}` : "";
     // Count units repeat the label, so only physical units are printed.
     const unit = ["min", "mi", "kg"].includes(item.unit) ? ` <small>${esc(item.unit)}</small>` : "";
-    let delta = '<span class="kpi-delta">Usual morning</span>';
+    let delta = '<span class="stat-delta">Usual morning</span>';
     const base = compare && baseline.find((b) => b.id === item.id);
-    if (base && base.value !== null) {
+    if (item.basis !== "estimated") {
+      delta = `<span class="stat-delta">${esc(basis)}</span>`;
+    } else if (base && base.value !== null) {
       const change = indicatorChange(item, base);
       delta = change
-        ? `<span class="kpi-delta ${change.tone}"><span aria-hidden="true">${change.arrow}</span> ${change.amount} vs usual</span>`
-        : '<span class="kpi-delta">Same as usual</span>';
+        ? `<span class="stat-delta ${change.tone}"><span aria-hidden="true">${change.arrow}</span> ${change.amount} vs usual</span>`
+        : '<span class="stat-delta">Same as usual</span>';
     }
-    return `<li class="kpi"><span class="kpi-label">${label}</span><span class="kpi-value">${indicatorNumber(item, item.value)}${of}${unit}</span><span class="kpi-foot">${delta}${basis}</span></li>`;
+    return `<li class="stat" ${title}><span class="stat-label">${label}</span><b class="stat-value">${indicatorNumber(item, item.value)}${of}${unit}</b>${delta}</li>`;
   }).join("");
 }
 
-function renderRankings(items, observation = null) {
+function renderRankings(items, observation = null, blocked = scenario.disruption.prior_blocked_probability) {
   $("#ranking-state").textContent = observation
     ? `Ranked by expected loss after ${observationLabels[observation]}`
     : "Ranked by expected loss before inspection";
   $("#rankings").innerHTML = items.map((item) => {
     const e = item.expected;
+    const id = `response-${esc(item.id)}`;
     return `<li class="option${item.rank === 1 ? " top" : ""}">
-      <div class="option-head">
-        <span class="rank">${item.rank}</span>
-        <b class="option-name">${esc(item.label)}</b>
-        <span class="option-loss"><b>${money(item.expected_loss)}</b><small>expected loss</small></span>
-      </div>
-      <p>${esc(item.summary)}</p>
-      <p class="muted">${esc(item.stakeholder_effect)}</p>
-      <button class="link watch" type="button" data-watch="${esc(item.id)}">Preview on the map</button>
-      <dl class="option-metrics">
-        <div><dt>Delay</dt><dd>${whole(e.lateness_min)} min</dd></div>
-        <div><dt>Direct cost</dt><dd>${money(e.incremental_cost)}</dd></div>
-        <div><dt>CO₂</dt><dd>${whole(e.emissions_kg)} kg</dd></div>
-        <div><dt>Breaches</dt><dd>${e.constraint_breaches.toFixed(1)}</dd></div>
-      </dl>
+      <input type="radio" name="response" id="${id}" value="${esc(item.id)}"${item.id === plan.action ? " checked" : ""}>
+      <label for="${id}">
+        <span class="option-head">
+          <span class="rank">${item.rank}</span>
+          <b class="option-name">${esc(item.label)}</b>
+          ${item.rank === 1 ? '<span class="tag pick">Recommended</span>' : ""}
+          <span class="option-loss"><b>${money(item.expected_loss)}</b><small>expected loss</small></span>
+        </span>
+        <span class="option-summary">${esc(item.summary)}</span>
+        ${outcomeCases(item, blocked, scenario.disruption.affected_shipment)}
+        <span class="option-more">${esc(item.stakeholder_effect)}</span>
+        <span class="option-metrics"><span><small>Delay</small>${whole(e.lateness_min)} min</span><span><small>Direct cost</small>${money(e.incremental_cost)}</span><span><small>CO₂</small>${whole(e.emissions_kg)} kg</span><span><small>Missed appts</small>${e.constraint_breaches.toFixed(1)}</span></span>
+      </label>
     </li>`;
   }).join("");
+  renderConfirm();
+}
+
+function actionLabel(id) {
+  return scenario.decision_model.actions.find((a) => a.id === id)?.label ?? id;
+}
+
+function renderConfirm() {
+  $("#confirm-button").textContent = `Confirm: ${actionLabel(plan.action)}`;
 }
 
 function renderEvoi(analysis) {
   const e = analysis.evoi;
   const best = analysis.before[0];
-  $("#recommendation").textContent = e.recommend_inspection
-    ? `Inspect CA-47 before acting. Inspecting lowers the expected loss by ${money(e.gross_value_of_information)} and costs ${money(e.inspection_cost)}, so it comes out ${money(e.net_value_of_information)} ahead.`
-    : `Act now. Inspecting costs ${money(e.inspection_cost)} and lowers the expected loss by ${money(e.gross_value_of_information)}.`;
+  $("#recommendation").textContent = inspectionSentence(e);
   $("#recommendation-short").innerHTML = e.recommend_inspection
-    ? `Inspect CA-47 first<small>If you act now: ${esc(best.label)}</small>`
-    : scenario.scenario_type !== "disruption" && best.id === "hold-course"
-      ? "No action needed<small>Trucks are on plan. A drone check would cost more than it saves.</small>"
-      : `${esc(best.label)}<small>Inspecting costs more than it saves</small>`;
+    ? `Yes, check first<small>If you decide now instead, the best response is ${esc(best.label)}.</small>`
+    : `No, decide now<small>The best response is ${esc(best.label)}.</small>`;
   $("#act-loss").textContent = money(e.best_act_now_loss);
   $("#evidence-loss").textContent = money(e.expected_loss_after_inspection);
   $("#inspection-cost").textContent = money(e.inspection_cost);
   $("#net-value").textContent = money(e.net_value_of_information);
-  const breakEven = e.break_even_accuracy === null
-    ? "Even perfect evidence would not pay for an inspection."
-    : `An inspection pays off once its evidence is at least ${pct(e.break_even_accuracy)} accurate.`;
-  const cv = e.cv_only;
-  $("#cv-only").textContent = cv
-    ? `Still-image CV alone (vehicle spacing, measured on 27 aerial frames): ${money(cv.net_value_of_information)} net. The clip suggestion uses vehicle motion and has not been measured yet. ${breakEven}`
-    : breakEven;
+  $("#inspect-button").classList.toggle("primary", e.recommend_inspection);
+  $("#skip-inspection").classList.toggle("primary", !e.recommend_inspection);
+  $("#inspect-button").textContent = e.recommend_inspection ? "Review drone footage" : "Review drone footage anyway";
+  $("#cv-only").textContent = accuracyNote(e);
+  renderSensitivity($("#sensitivity"), analysis);
   const a = e.assumptions;
   $("#assumptions").innerHTML = [
     ["Inspection accuracy", `${pct(a.inspection_accuracy)} (${esc(a.accuracy_basis)})`],
@@ -881,13 +869,9 @@ function renderEvoi(analysis) {
 
 function renderShipments() {
   const attention = scenario.shipments.filter((item) => attentionStatuses.has(item.status));
-  const visible = selectedTruck
-    ? scenario.shipments.filter((item) => item.truck === selectedTruck)
-    : shipmentFilter === "all" ? scenario.shipments : attention;
-  $("#shipment-count").textContent = `${scenario.shipments.length} active, ${attention.length} need attention`;
-  $("#truck-filter").hidden = !selectedTruck;
-  $("#shipments .segmented").classList.toggle("inactive", Boolean(selectedTruck));
-  $("#truck-filter-id").textContent = selectedTruck ?? "";
+  const visible = shipmentFilter === "all" ? scenario.shipments : attention;
+  $("#shipment-count").textContent = scenario.shipments.length;
+  $("#shipment-summary").textContent = `${scenario.shipments.length} active, ${attention.length} need attention`;
   const affectedId = scenario.disruption.affected_shipment;
   $("#shipment-list").innerHTML = visible.length ? visible.map((item) => {
     const unassigned = item.truck === "Unassigned";
@@ -906,7 +890,8 @@ function renderShipments() {
 
 function renderFleet() {
   const electric = scenario.trucks.filter((item) => item.fuel === "Battery electric").length;
-  $("#fleet-count").textContent = `${scenario.trucks.length} trucks, ${electric} battery electric`;
+  $("#fleet-count").textContent = scenario.trucks.length;
+  $("#fleet-summary").textContent = `${scenario.trucks.length} trucks, ${electric} battery electric`;
   $("#fleet-list").innerHTML = scenario.trucks.map((truck) => `<tr class="${truck.id === selectedTruck ? "selected" : ""}">
     <td><button class="link" type="button" data-truck="${esc(truck.id)}" aria-pressed="${truck.id === selectedTruck}">${esc(truck.id)}</button><span class="detail">${esc(truck.assignment)}, ${esc(truck.fuel.toLowerCase())}</span></td>
     <td class="live" data-live="${esc(truck.id)}"></td>
@@ -936,21 +921,37 @@ function renderDefinitions() {
     ["Needs attention", "A shipment with status at risk, watch, or unassigned."],
     ["Slack", "Minutes between a shipment’s ETA and the start of its appointment window."],
     ["Blockage probability", "The chance that CA-47 is blocked. It starts at the value set for the incident report and is recalculated with Bayes’ rule after an inspection result."],
-    ["Breach", "A hard rule that an outcome breaks, such as missing an appointment window."],
-    ["Expected loss", `Delay × ${money(m.lateness_cost_per_minute)} per minute, plus direct cost, plus CO₂ × $${m.emissions_cost_per_kg.toFixed(2)} per kg, plus breaches × ${money(m.hard_constraint_penalty)}. The blocked and open outcomes are averaged using the blockage probability.`],
+    ["Missed appointment (breach)", "A hard rule that an outcome breaks, such as missing an appointment window."],
+    ["Expected loss", `Delay × ${money(m.lateness_cost_per_minute)} per minute, plus direct cost, plus CO₂ × $${m.emissions_cost_per_kg.toFixed(2)} per kg, plus missed appointments × ${money(m.hard_constraint_penalty)}. The blocked and open outcomes are averaged using the blockage probability.`],
     ["Net value of inspecting", "Expected loss if you act now, minus expected loss if you inspect first, minus the cost of inspecting. The page recommends inspecting when the net value is above zero."],
   ];
   $("#definitions").innerHTML = definitions.map(([term, text]) => `<dt>${term}</dt><dd>${esc(text)}</dd>`).join("");
 }
 
+// ---------------------------------------------------------------------------
+// Drone check. The simulated buttons and a reviewed clip share showObservation.
+// ---------------------------------------------------------------------------
+let observed = null; // The applied observation, or null without a drone check.
+let dialogOpen = false;
+
 function resetObservation() {
   resetInspection();
+  observed = null;
   $("#selected-evidence").hidden = true;
-  $("#posterior").hidden = true;
   $("#observation-buttons").hidden = true;
   $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", "false"));
   $("#inspect-button").disabled = false;
-  $("#inspect-button").textContent = "Review drone footage";
+  $("#reinspect-button").textContent = "Review drone footage";
+  $("#posterior").textContent = `No drone check. The chance CA-47 is blocked stays at ${pct(scenario.disruption.prior_blocked_probability)}.`;
+}
+
+// Opens the footage dialog, or falls back to simulated results when there is no library.
+async function startInspection() {
+  if (await openInspection(activeScenario)) return;
+  setStep("incident");
+  $("#observation-buttons").hidden = false;
+  $("#inspect-button").textContent = "Waiting for a result";
+  $("#inspect-button").disabled = true;
 }
 
 async function observe(observation) {
@@ -959,25 +960,28 @@ async function observe(observation) {
   await showObservation(await response.json());
 }
 
-// Shared by the simulated feed buttons and a reviewed inspection image.
-async function showObservation(analysis) {
+async function showObservation(analysis, summary = null) {
   const observation = analysis.observation;
+  observed = observation;
   $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.observation === observation)));
-  renderRankings(analysis.after, observation);
   const prior = pct(analysis.prior_blocked_probability);
   const posterior = pct(analysis.posterior_blocked_probability);
   const best = analysis.after[0].label;
   modelPick = analysis.after[0];
   const finding = { blocked: "road blocked", clear: "road clear", inconclusive: "inconclusive" }[observation];
   logDecision(`Inspection: ${finding}. Chance CA-47 is blocked ${prior} → ${posterior}. Best response: ${best}.`);
-  $("#posterior").textContent = {
+  $("#posterior").textContent = summary ?? {
     blocked: `The inspection showed the road blocked, so the chance CA-47 is blocked rises from ${prior} to ${posterior}. “${best}” has the lowest expected loss.`,
     clear: `The inspection showed the road clear, so the chance CA-47 is blocked drops from ${prior} to ${posterior}. “${best}” has the lowest expected loss.`,
     inconclusive: `The inspection was inconclusive, so the chance CA-47 is blocked stays at ${prior} and the ranking is the same as before.`,
   }[observation];
-  $("#posterior").hidden = false;
+  $("#risk-value").innerHTML = `${posterior}<small>updated by the drone check</small>`;
+  $("#recommendation-short").innerHTML = `Checked: ${finding}<small>The best response is now ${esc(best)}.</small>`;
+  renderSensitivity($("#sensitivity"), analysis);
   // Play the map out with the new best option and the now more likely road state.
   plan = { action: analysis.after[0].id, road: analysis.posterior_blocked_probability >= 0.5 ? "blocked" : "open" };
+  renderRankings(analysis.after, observation, analysis.posterior_blocked_probability);
+  setStep("respond");
   await loadPlayback({ keepTime: true });
 }
 
@@ -994,12 +998,12 @@ async function loadScenario(id, { keepTime = false } = {}) {
   }
   document.body.dataset.scenario = scenario.scenario_type;
   $("#drone-note").textContent = scenario.decision_model.drone.note;
-  $("#playback-action").innerHTML = scenario.decision_model.actions.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join("");
   plan = {
     action: scenario.analysis.before[0].id,
     road: scenario.disruption.prior_blocked_probability >= 0.5 ? "blocked" : "open",
   };
   modelPick = scenario.analysis.before[0];
+  furthest = 0;
   resetObservation();
   renderDecision();
   renderIndicators(scenario.analysis.indicators);
@@ -1016,18 +1020,21 @@ async function loadScenario(id, { keepTime = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Operating mode. The morning opens in monitoring on the usual plan. While it
-// plays, the incident alert arrives INCIDENT_DELAY_MIN after the start, and the
-// page switches to the incident data at the same clock time. When the morning
-// has played out, the shift report compares today with the usual morning.
-// The presenter menu (P, or ?presenter in the address) restarts or forces each step.
+// Flow. The morning opens in monitoring on the usual plan (step start). While
+// it plays, the incident report arrives INCIDENT_DELAY_MIN after the start and
+// the page switches to the incident data at the same clock time (step
+// incident). The dispatcher decides on a drone check, chooses a response
+// (step respond) and watches it play out (step outcome). When the morning has
+// played out, the shift report compares today with the usual morning.
 // ---------------------------------------------------------------------------
 const INCIDENT_DELAY_MIN = 2;
+const steps = ["start", "incident", "respond", "outcome"];
 let mode = "monitoring";
+let step = "start";
+let furthest = 0; // Index in steps of the furthest step reached in this run.
 let incidentVariant = "disruption";
-let incidentVariants = [];
+let incidents = []; // { id, title, prior } for each incident variant.
 let decisionLog = [];
-let alertSeen = false;
 
 function logDecision(text) {
   decisionLog.push({ t: currentTime, text });
@@ -1042,44 +1049,107 @@ function renderMode() {
     : atRisk ? [`${deliveries(atRisk)} at risk`, "watch"] : ["All deliveries on track", "ok"];
   $("#ops-status").textContent = text;
   $("#ops-status").className = `ops-status ${tone}`;
-  $("#alert-count").hidden = mode !== "incident" || alertSeen;
-  $("#report").hidden = mode !== "report";
-  renderPresenter();
+  renderStepper();
+  renderOutcome();
 }
 
-function renderPresenter() {
-  $("#presenter-incidents").innerHTML = incidentVariants.map((item) => {
-    const active = mode !== "monitoring" && item.id === activeScenario;
-    return `<button type="button" data-presenter="incident" data-variant="${esc(item.id)}" aria-pressed="${active}">Send incident: ${esc(item.label)}</button>`;
-  }).join("");
-  $('[data-presenter="report"]').disabled = mode === "monitoring";
-  $("#presenter-note").textContent = {
-    monitoring: `Press play and the incident arrives at ${clockLabel(span.start + INCIDENT_DELAY_MIN)}.`,
-    incident: "The shift report opens when the morning finishes.",
-    report: "Showing the shift report.",
-  }[mode];
+function setStep(name) {
+  step = name;
+  furthest = Math.max(furthest, steps.indexOf(name));
+  document.body.dataset.step = name;
+  $$(".step[data-step]").forEach((section) => { section.hidden = section.dataset.step !== name; });
+  $(".panel-body").scrollTop = 0;
+  if (name === "start") renderStart();
+  if (name === "respond") renderConfirm();
+  renderMode();
+}
+
+function setView(name) {
+  document.body.dataset.view = name;
+  $$("button[data-view]").forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.view === name)));
+  $$(".view").forEach((panel) => { panel.hidden = panel.id !== `view-${name}`; });
+}
+
+function setSpeed(value) {
+  speed = value;
+  $("#playback-speed").value = String(value);
+}
+
+function renderStepper() {
+  const at = steps.indexOf(step);
+  const states = {
+    incident: at === 1 && !dialogOpen ? "current" : at >= 1 ? "done" : "pending",
+    inspect: dialogOpen ? "current" : observed ? "done" : at >= 2 ? "skipped" : "pending",
+    respond: at === 2 ? "current" : at > 2 ? "done" : "pending",
+    outcome: at === 3 ? (mode === "report" ? "done" : "current") : "pending",
+  };
+  const reached = { incident: furthest >= 1, inspect: furthest >= 1, respond: furthest >= 2, outcome: furthest >= 3 };
+  $$("#stepper [data-goto]").forEach((button) => {
+    const key = button.dataset.goto;
+    button.closest("li").dataset.state = states[key];
+    button.disabled = step === "start" || !reached[key];
+    if (states[key] === "current") button.setAttribute("aria-current", "step");
+    else button.removeAttribute("aria-current");
+  });
+}
+
+const jumpButton = (item) => `<button class="btn jump-btn" type="button" data-incident="${esc(item.id)}"><b>${esc(item.title)}</b><small>${pct(item.prior)} chance the road is blocked</small></button>`;
+
+function renderStart() {
+  $("#start-note").textContent = `The morning starts at ${clockLabel(span.start)} on the usual plan. The incident report arrives at ${clockLabel(span.start + INCIDENT_DELAY_MIN)}.`;
+  $("#incident-jumps").innerHTML = incidents.map(jumpButton).join("");
+}
+
+function renderOutcome() {
+  const report = mode === "report";
+  $("#report").hidden = !report;
+  $("#outcome-title").textContent = report ? "Shift report" : `Playing out: ${actionLabel(plan.action)}`;
+  if (!report) $("#outcome-sub").textContent = "";
+  $("#skip-end").hidden = report;
+  $("#change-response").hidden = report;
+  $("#report-restart").hidden = !report;
+  const others = incidents.filter((item) => item.id !== activeScenario);
+  $("#next-incidents").innerHTML = others.map(jumpButton).join("");
+  $("#next-incidents-wrap").hidden = !report || !others.length;
 }
 
 async function triggerIncident(variant = incidentVariant) {
-  const first = mode === "monitoring";
   incidentVariant = variant;
   mode = "incident";
-  alertSeen = false;
   await loadScenario(variant, { keepTime: true });
   const d = scenario.disruption;
-  logDecision(first ? `Alert: ${d.title} (reported ${d.reported_at}).` : `Alert updated: ${d.title}.`);
-  const banner = $(".situation");
-  banner.classList.remove("arrived");
-  void banner.offsetWidth;
-  banner.classList.add("arrived");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  logDecision(`Alert: ${d.title} (reported ${d.reported_at}).`);
+  setStep("incident");
+}
+
+// Start a fresh run at the moment the incident report arrives.
+async function jumpToIncident(variant) {
+  setPlaying(false);
+  mode = "monitoring";
+  decisionLog = [];
+  currentTime = span.start + INCIDENT_DELAY_MIN;
+  await triggerIncident(variant);
 }
 
 async function restartMorning() {
   mode = "monitoring";
   decisionLog = [];
+  setSpeed(5);
   await loadScenario("normal");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  setStep("start");
+  setView("map");
+}
+
+function confirmResponse() {
+  const label = actionLabel(plan.action);
+  logDecision(plan.action === modelPick?.id
+    ? `Dispatcher chose ${label}, the model’s pick.`
+    : `Dispatcher chose ${label}. The model ranked ${modelPick.label} first.`);
+  mode = "incident";
+  setStep("outcome");
+  setView("map");
+  setSpeed(15);
+  setPlaying(true);
 }
 
 function showReport() {
@@ -1088,19 +1158,12 @@ function showReport() {
   mode = "report";
   renderReport();
   renderMode();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function closeReport() {
-  mode = "incident";
-  renderMode();
 }
 
 function renderReport() {
   const d = scenario.disruption;
   const day = new Date(scenario.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  $("#report-title").textContent = `${day}, ${clockLabel(span.start)} to ${clockLabel(currentTime)}`;
-  $("#report-summary").textContent = `One incident: ${d.title}. Every figure below is estimated from simulated data.`;
+  $("#outcome-sub").textContent = `${day}, ${clockLabel(span.start)} to ${clockLabel(currentTime)}. One incident: ${d.title}. Every figure is estimated from simulated data.`;
 
   $("#report-indicators").innerHTML = scenario.analysis.indicators.map((item) => {
     const base = baseline?.find((b) => b.id === item.id);
@@ -1113,16 +1176,7 @@ function renderReport() {
   }).join("");
 
   const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
-  const picked = plan.action === modelPick?.id;
-  $("#report-tally-scope").textContent = `${action.label}, if CA-47 is ${plan.road}${picked ? " (the model’s pick)" : ""}. Usual morning in grey.`;
-  const rows = tallies[plan.action];
-  const plain = (html) => html.replace(/<[^>]+>/g, "");
-  $("#report-tally").innerHTML = rows ? tallyMetrics.map((metric) => {
-    const final = totalsAt(rows, Infinity)[metric.id];
-    return `<div><dt>${metric.label.replace(" so far", "")}</dt><dd>${plain(metric.format(final))} <small class="muted">${plain(metric.format(planTotals[metric.id]))}</small></dd></div>`;
-  }).join("") : "";
-
-  const closing = picked
+  const closing = plan.action === modelPick?.id
     ? `Response on the map at the end of the shift: ${action.label}, the model’s pick.`
     : `Response on the map at the end of the shift: ${action.label}. The model ranked ${modelPick.label} first.`;
   $("#report-log").innerHTML = [...decisionLog, { t: currentTime, text: closing }]
@@ -1130,49 +1184,69 @@ function renderReport() {
 }
 
 function bindEvents() {
-  $("#inspect-button").addEventListener("click", async () => {
-    if (await openInspection(activeScenario)) return;
-    $("#observation-buttons").hidden = false;
-    $("#inspect-button").textContent = "Waiting for a result";
-    $("#inspect-button").disabled = true;
+  const fail = (error) => console.error(error);
+  $("#start-button").addEventListener("click", () => {
+    setView("map");
+    setPlaying(true);
+  });
+  $("#inspect-button").addEventListener("click", () => startInspection().catch(fail));
+  $("#reinspect-button").addEventListener("click", () => startInspection().catch(fail));
+  $("#skip-inspection").addEventListener("click", () => {
+    logDecision("Dispatcher decided without a drone check.");
+    setStep("respond");
   });
   $$("[data-observation]").forEach((button) => button.addEventListener("click", () => observe(button.dataset.observation).catch((error) => {
     $("#posterior").textContent = error.message;
-    $("#posterior").hidden = false;
+    setStep("respond");
   })));
+  $("#rankings").addEventListener("change", (event) => {
+    if (event.target.name !== "response") return;
+    plan = { ...plan, action: event.target.value };
+    renderConfirm();
+    loadPlayback({ keepTime: true }).catch(fail);
+  });
+  $("#confirm-button").addEventListener("click", confirmResponse);
+  $("#skip-end").addEventListener("click", () => {
+    setPlaying(false);
+    currentTime = span.end;
+    updateFrame();
+    showReport();
+  });
+  $("#change-response").addEventListener("click", () => {
+    setPlaying(false);
+    setStep("respond");
+  });
+  $("#restart").addEventListener("click", () => restartMorning().catch(fail));
+  $("#report-restart").addEventListener("click", () => restartMorning().catch(fail));
+  $("#stepper").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-goto]");
+    if (!button || button.disabled) return;
+    setPlaying(false);
+    if (button.dataset.goto === "inspect") startInspection().catch(fail);
+    else setStep(button.dataset.goto);
+  });
+  $$("button[data-view]").forEach((tab) => tab.addEventListener("click", () => setView(tab.dataset.view)));
+  window.addEventListener("inspection-dialog-open", () => {
+    dialogOpen = true;
+    renderStepper();
+  });
+  $("#inspection-dialog").addEventListener("close", () => {
+    dialogOpen = false;
+    renderStepper();
+  });
+
   $$('input[name="shipment-filter"]').forEach((input) => input.addEventListener("change", () => {
     shipmentFilter = input.value;
-    selectTruck(null);
+    renderShipments();
   }));
-  $("#clear-truck").addEventListener("click", () => selectTruck(null));
   document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-truck]");
-    if (!button) return;
-    selectTruck(selectedTruck === button.dataset.truck ? null : button.dataset.truck);
+    const truck = event.target.closest("[data-truck]");
+    if (truck) selectTruck(selectedTruck === truck.dataset.truck ? null : truck.dataset.truck);
+    const jump = event.target.closest("[data-incident]");
+    if (jump) jumpToIncident(jump.dataset.incident).catch(fail);
   });
 
   $("#play").addEventListener("click", () => setPlaying(!playing));
-  $("#report-close").addEventListener("click", closeReport);
-  $("#alert-bell").addEventListener("click", () => {
-    alertSeen = true;
-    renderMode();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-presenter]");
-    if (!button) return;
-    const run = { restart: restartMorning, incident: () => triggerIncident(button.dataset.variant), report: showReport }[button.dataset.presenter];
-    Promise.resolve(run()).catch((error) => console.error(error));
-  });
-  document.addEventListener("click", (event) => {
-    const watch = event.target.closest("[data-watch]");
-    if (watch) watchResponse(watch.dataset.watch);
-    const show = event.target.closest("[data-show]");
-    if (show && show.dataset.show !== plan.action) {
-      plan = { ...plan, action: show.dataset.show };
-      loadPlayback({ keepTime: true });
-    }
-  });
   $("#timeline").addEventListener("input", (event) => {
     currentTime = Number(event.target.value);
     updateFrame();
@@ -1180,22 +1254,13 @@ function bindEvents() {
   $("#playback-speed").addEventListener("change", (event) => {
     speed = Number(event.target.value);
   });
-  $("#playback-action").addEventListener("change", (event) => {
-    plan = { ...plan, action: event.target.value };
-    loadPlayback({ keepTime: true });
-  });
   $$('input[name="road"]').forEach((input) => input.addEventListener("change", () => {
     plan = { ...plan, road: input.value };
-    loadPlayback({ keepTime: true });
+    loadPlayback({ keepTime: true }).catch(fail);
   }));
   document.addEventListener("keydown", (event) => {
-    const typing = event.target.closest("input:not([type=range]), select, textarea");
-    if ((event.key === "p" || event.key === "P") && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-      $("#presenter").hidden = !$("#presenter").hidden;
-      return;
-    }
-    if (event.key !== " " || event.target.closest("input:not([type=range]), select, button, textarea")) return;
-    if (!event.target.closest(".map-block")) return;
+    if (event.key !== " " || dialogOpen || document.body.dataset.view !== "map") return;
+    if (event.target.closest("input:not([type=range]), select, button, textarea")) return;
     event.preventDefault();
     setPlaying(!playing);
   });
@@ -1203,28 +1268,37 @@ function bindEvents() {
 
 window.addEventListener("inspection-reviewed", ({ detail }) => {
   if (detail.review.scenario !== activeScenario) return;
-  showObservation(detail.analysis).catch((error) => {
-    $("#posterior").textContent += ` Playback could not update: ${error.message}`;
-  });
   const finding = { blocked: "road blocked", clear: "road clear", inconclusive: "inconclusive" };
   const cv = detail.review.cv_suggestion;
   const choice = detail.review.observation;
   const agreement = !cv ? "" : cv === choice ? ` (matches the CV suggestion)` : ` (CV suggested ${finding[cv]}; you overrode it)`;
-  $("#posterior").textContent = `Drone footage reviewed: ${finding[choice]}${agreement}. The chance CA-47 is blocked changes from ${pct(detail.analysis.prior_blocked_probability)} to ${pct(detail.analysis.posterior_blocked_probability)}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
+  const summary = `Drone footage reviewed: ${finding[choice]}${agreement}. The chance CA-47 is blocked changes from ${pct(detail.analysis.prior_blocked_probability)} to ${pct(detail.analysis.posterior_blocked_probability)}. Lowest expected loss: ${detail.analysis.after[0].label}.`;
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;
-  $("#inspect-button").textContent = "Review another clip";
+  $("#reinspect-button").textContent = "Review another clip";
+  showObservation(detail.analysis, summary).catch((error) => {
+    $("#posterior").textContent += ` Playback could not update: ${error.message}`;
+  });
 });
 
+// Title and prior for each incident variant, for the jump buttons.
+async function loadIncidents() {
+  const list = await fetch("/api/scenarios").then((response) => (response.ok ? response.json() : { scenarios: [] })).catch(() => ({ scenarios: [] }));
+  const found = await Promise.all(list.scenarios.filter((item) => item.id !== "normal").map(async (item) => {
+    const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(item.id)}`).catch(() => null);
+    if (!response?.ok) return null;
+    const d = (await response.json()).disruption;
+    return { id: item.id, title: d.title, prior: d.prior_blocked_probability };
+  }));
+  incidents = found.filter(Boolean);
+}
+
 bindEvents();
-if (new URLSearchParams(location.search).has("presenter")) $("#presenter").hidden = false;
-fetch("/api/scenarios")
-  .then((response) => (response.ok ? response.json() : { scenarios: [] }))
-  .then((data) => { incidentVariants = data.scenarios.filter((item) => item.id !== "normal"); })
-  .catch(() => {})
+setView("map");
+loadIncidents()
   .then(() => loadScenario("normal"))
+  .then(() => setStep("start"))
   .catch((error) => {
-  $("#disruption-title").textContent = "PigeonOps could not load";
-  $("#disruption-description").textContent = error.message;
-});
+    $("#start-note").textContent = `PigeonOps could not load: ${error.message}`;
+  });

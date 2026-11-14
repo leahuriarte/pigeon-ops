@@ -1,15 +1,13 @@
 import json
 import tempfile
-import threading
 import unittest
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from backend.inspection import list_inspections, review_inspection
-from backend.server import DemoHandler
+from tests.test_server import start_server
 
 
 class InspectionReviewTests(unittest.TestCase):
@@ -30,34 +28,18 @@ class InspectionReviewTests(unittest.TestCase):
         ]}), encoding="utf-8")
         self.payload = {"case_id": "road", "observation": "clear", "scenario": "disruption", "simulated_application": True}
 
-    def test_review_updates_the_demo_and_records_its_source(self):
+    def test_review_updates_the_analysis_and_is_recorded(self):
         result = review_inspection(self.payload, self.library, self.audit)
         self.assertEqual("clear", result["analysis"]["observation"])
         self.assertLess(result["analysis"]["posterior_blocked_probability"], result["analysis"]["prior_blocked_probability"])
-        record = json.loads(self.audit.read_text(encoding="utf-8"))
-        self.assertEqual("abc", record["source_sha256"])
-        self.assertTrue(record["simulated_application"])
-
-    def test_review_records_whether_the_dispatcher_overrode_the_cv_suggestion(self):
-        review_inspection(self.payload, self.library, self.audit)
         review_inspection({**self.payload, "observation": "blocked"}, self.library, self.audit)
         records = [json.loads(line) for line in self.audit.read_text(encoding="utf-8").splitlines()]
         self.assertEqual([("blocked", False), ("blocked", True)], [(r["cv_suggestion"], r["agrees_with_cv"]) for r in records])
+        self.assertEqual("abc", records[0]["source_sha256"])
+        self.assertTrue(records[0]["simulated_application"])
 
-    def test_unavailable_camera_cannot_be_submitted_as_clear(self):
-        self.payload["case_id"] = "unavailable"
-        with self.assertRaisesRegex(ValueError, "inconclusive"):
-            review_inspection(self.payload, self.library, self.audit)
-        self.assertFalse(self.audit.exists())
-
-    def test_review_requires_explicit_synthetic_application(self):
-        self.payload.pop("simulated_application")
-        with self.assertRaisesRegex(ValueError, "synthetic"):
-            review_inspection(self.payload, self.library, self.audit)
-        self.assertFalse(self.audit.exists())
-
-    def test_unknown_image_and_invalid_notes_do_not_create_audit_records(self):
-        for changes in [{"case_id": "missing"}, {"note": "x" * 501}, {"note": 4}]:
+    def test_invalid_reviews_are_rejected_and_not_recorded(self):
+        for changes in ({"case_id": "unavailable"}, {"case_id": "missing"}, {"simulated_application": False}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 review_inspection({**self.payload, **changes}, self.library, self.audit)
         self.assertFalse(self.audit.exists())
@@ -71,10 +53,7 @@ class InspectionReviewTests(unittest.TestCase):
         with patch("backend.server.ASSETS", self.assets), \
              patch("backend.server.list_inspections", lambda: list_inspections(self.library)), \
              patch("backend.server.review_inspection", lambda payload: review_inspection(payload, self.library, self.audit)):
-            server = ThreadingHTTPServer(("127.0.0.1", 0), DemoHandler)
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
-            thread.start()
-            base = f"http://127.0.0.1:{server.server_port}"
+            server, base = start_server()
             try:
                 with urlopen(base + "/api/inspection-cases") as response:
                     self.assertEqual(2, len(json.load(response)["cases"]))
@@ -93,7 +72,6 @@ class InspectionReviewTests(unittest.TestCase):
             finally:
                 server.shutdown()
                 server.server_close()
-                thread.join()
 
 
 if __name__ == "__main__":

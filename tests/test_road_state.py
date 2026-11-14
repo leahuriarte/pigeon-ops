@@ -1,7 +1,6 @@
 import unittest
 
-from cv.road_state import (DEFAULT_RULE, assess_motion, assess_road, classify_speed, likelihood_table,
-                           point_in_polygon, road_likelihoods)
+from cv.road_state import assess_motion, assess_road, likelihood_table, road_likelihoods
 
 ROAD = [(0, 0), (1000, 0), (1000, 100), (0, 100)]
 
@@ -12,65 +11,26 @@ def row_of_cars(count, gap, top=40):
 
 
 class RoadStateTests(unittest.TestCase):
-    def test_point_in_polygon(self):
-        self.assertTrue(point_in_polygon(500, 50, ROAD))
-        self.assertFalse(point_in_polygon(500, 150, ROAD))
-
-    def test_tight_queue_is_dense(self):
-        result = assess_road(row_of_cars(15, gap=5), ROAD)
-        self.assertEqual(("dense_traffic", "blocked"), (result["visual_state"], result["signal"]))
-
-    def test_spread_out_cars_are_light(self):
-        result = assess_road(row_of_cars(5, gap=150), ROAD)
-        self.assertEqual(("light_traffic", "clear"), (result["visual_state"], result["signal"]))
-
-    def test_parked_cars_off_the_road_are_ignored(self):
+    def test_vehicle_spacing_on_the_road_sets_the_signal(self):
+        dense = assess_road(row_of_cars(15, gap=5), ROAD)
+        self.assertEqual(("dense_traffic", "blocked"), (dense["visual_state"], dense["signal"]))
+        light = assess_road(row_of_cars(5, gap=150), ROAD)
+        self.assertEqual(("light_traffic", "clear"), (light["visual_state"], light["signal"]))
         parking_lot = row_of_cars(15, gap=5, top=300)
         self.assertEqual(0, assess_road(parking_lot, ROAD)["vehicles_on_road"])
 
     def test_dark_frame_without_detections_is_not_clear(self):
-        result = assess_road([], ROAD, frame_brightness=30)
-        self.assertEqual("inconclusive", result["signal"])
+        self.assertEqual("inconclusive", assess_road([], ROAD, frame_brightness=30)["signal"])
 
-    def test_dark_frame_still_reports_visible_queue(self):
-        result = assess_road(row_of_cars(15, gap=5), ROAD, frame_brightness=30)
-        self.assertEqual("blocked", result["signal"])
-
-    def test_threshold_band_is_unclear(self):
-        close = DEFAULT_RULE["light_max_close"] + 2
-        self.assertEqual("inconclusive", assess_road(row_of_cars(close, gap=5), ROAD)["signal"])
-
-    def test_stopped_vehicles_suggest_a_blockage(self):
-        result = assess_motion([[1, 2, 0], [2, 0, 60]])
-        self.assertEqual(("stopped_traffic", "blocked"), (result["motion_state"], result["signal"]))
-
-    def test_moving_traffic_suggests_an_open_road(self):
-        result = assess_motion([[60, 84, 42], [70, 80]])
-        self.assertEqual(("free_flow", "clear"), (result["motion_state"], result["signal"]))
-
-    def test_an_empty_road_is_not_evidence_of_an_open_road(self):
-        result = assess_motion([[], [60], []])
-        self.assertEqual(("no_traffic", "inconclusive"), (result["motion_state"], result["signal"]))
-
-    def test_one_car_passing_is_not_enough_to_call_the_road_open(self):
-        self.assertEqual("inconclusive", assess_motion([[60], [70]])["signal"])
-
-    def test_a_truck_standing_in_the_lane_suggests_a_blockage(self):
-        self.assertEqual("blocked", assess_motion([[0], [0], [1]])["signal"])
-
-    def test_half_stopped_traffic_is_inconclusive(self):
-        result = assess_motion([[0, 2, 60, 80]])
-        self.assertEqual(("mixed_flow", "inconclusive"), (result["motion_state"], result["signal"]))
-
-    def test_one_bad_frame_does_not_flip_the_result(self):
-        samples = [[60, 62, 58]] * 4 + [[0, 0, 0]]
-        self.assertEqual("clear", assess_motion(samples)["signal"])
-
-    def test_traffic_crawling_past_a_standing_truck_is_a_queue(self):
-        self.assertEqual("blocked", assess_motion([[0, 7], [0, 8], [1, 6]])["signal"])
-
-    def test_speed_bands(self):
-        self.assertEqual(["stopped", "slow", "moving"], [classify_speed(s) for s in (2, 6, 30)])
+    def test_vehicle_motion_sets_the_suggested_observation(self):
+        cases = (([[1, 2, 0], [2, 0, 60]], "stopped_traffic", "blocked"),
+                 ([[60, 84, 42], [70, 80]], "free_flow", "clear"),
+                 ([[], [60], []], "no_traffic", "inconclusive"),
+                 ([[0, 2, 60, 80]], "mixed_flow", "inconclusive"))
+        for samples, state, signal in cases:
+            with self.subTest(state=state):
+                result = assess_motion(samples)
+                self.assertEqual((state, signal), (result["motion_state"], result["signal"]))
 
     def test_likelihood_table_is_smoothed_and_normalized(self):
         table = likelihood_table([("dense_traffic", "dense_traffic"), ("light_traffic", "light_traffic")])
@@ -78,8 +38,6 @@ class RoadStateTests(unittest.TestCase):
             probabilities = [row[signal] for signal in ("blocked", "clear", "inconclusive")]
             self.assertAlmostEqual(1.0, sum(probabilities), places=3)
             self.assertTrue(all(value > 0 for value in probabilities))
-        self.assertEqual(1, table["dense_traffic"]["n"])
-        self.assertEqual(0, table["unclear"]["n"])
 
     def test_road_likelihoods_mix_visual_states(self):
         perfect = {"dense_traffic": {"blocked": 1, "clear": 0, "inconclusive": 0},

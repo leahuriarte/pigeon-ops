@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import mimetypes
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -49,7 +50,9 @@ class DemoHandler(BaseHTTPRequestHandler):
                 return self._json({"error": "observation must be blocked, clear, or inconclusive"}, 400)
             return self._json(analyze(scenario, observation))
         try:
-            return self._json(build_playback(scenario, action=params.get("action", "hold-course"), road=params.get("road", "open")))
+            return self._json(build_playback(
+                scenario, action=params.get("action", "hold-course"), road=params.get("road", "open"),
+                inspected=params.get("inspected") == "1"))
         except ValueError as error:
             return self._json({"error": str(error)}, 400)
 
@@ -84,9 +87,20 @@ class DemoHandler(BaseHTTPRequestHandler):
         print(f"[demo] {self.address_string()} {fmt % args}")
 
 
-def run(host="127.0.0.1", port=8000):
+class DemoServer(ThreadingHTTPServer):
+    # Windows lets a second server bind a port that is already in use when address reuse is on. Requests
+    # then reach either process, so a server left running from earlier can answer with old code.
+    allow_reuse_address = os.name != "nt"
+
+
+def run(host="127.0.0.1", port=None):
+    port = port or int(os.environ.get("PORT", 8000))  # preview tools assign a free port through PORT
+    try:
+        server = DemoServer((host, port), DemoHandler)
+    except OSError as error:
+        raise SystemExit(f"Port {port} is not available ({error}). Stop the PigeonOps server that is already running, then start again.")
     print(f"PigeonOps demo running at http://{host}:{port}")
-    ThreadingHTTPServer((host, port), DemoHandler).serve_forever()
+    server.serve_forever()
 
 
 if __name__ == "__main__":

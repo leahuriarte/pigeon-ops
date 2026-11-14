@@ -9,235 +9,119 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/arcgis.css">
   <link rel="stylesheet" href="/inspection.css">
+  <link rel="stylesheet" href="/insight.css">
 </head>
-<body>
+<body data-mode="monitoring" data-step="start" data-view="map">
   <header class="topbar">
-    <div class="brand"><strong>PigeonOps</strong><span>Harbor dispatch · Ports of Los Angeles and Long Beach</span></div>
-    <div class="topbar-controls">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <strong>PigeonOps</strong>
+      <span class="brand-sub">Harbor dispatch · Ports of Los Angeles and Long Beach</span>
+    </div>
+    <div class="topbar-right">
       <span id="ops-status" class="ops-status ok" role="status">Loading…</span>
-      <b id="ops-clock" class="ops-clock">—</b>
-      <button id="alert-bell" class="alert-bell" type="button" aria-label="Alerts">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4 4 0 0 0-4 4v2.6L2.8 10.5v1h10.4v-1L12 8.1V5.5a4 4 0 0 0-4-4zM6.3 12.5a1.8 1.8 0 0 0 3.4 0z"/></svg>
-        <span id="alert-count" class="alert-count" hidden>1</span>
-      </button>
-      <span class="data-pill" title="Shipments, trucks, appointments and incidents are fictional. Rates are assumed and outcomes are estimated.">Simulated data</span>
+      <span class="sim-tag" title="Shipments, trucks, appointments and incidents are fictional. Rates are assumed and outcomes are estimated.">Simulated data</span>
+      <button id="restart" class="btn small" type="button">Restart</button>
     </div>
   </header>
 
-  <main>
-    <!-- Shift report: shown when the morning has played out after an incident. -->
-    <section id="report" class="report" aria-labelledby="report-title" hidden>
-      <div class="report-head">
-        <div>
-          <p class="eyebrow">Shift report</p>
-          <h1 id="report-title">—</h1>
-          <p id="report-summary"></p>
+  <main class="app">
+    <!-- Left: the operating picture. One view at a time. -->
+    <section class="stage" aria-label="Operations">
+      <div class="stats-bar">
+        <ul id="indicators" class="stats" aria-label="Plan indicators"></ul>
+        <p id="indicators-note" class="stats-note"></p>
+      </div>
+
+      <div class="views" role="tablist" aria-label="Views">
+        <button class="view-tab" type="button" role="tab" data-view="map" aria-selected="true" aria-controls="view-map">Map</button>
+        <button class="view-tab" type="button" role="tab" data-view="shipments" aria-selected="false" aria-controls="view-shipments">Shipments <span id="shipment-count" class="count"></span></button>
+        <button class="view-tab" type="button" role="tab" data-view="trucks" aria-selected="false" aria-controls="view-trucks">Trucks <span id="fleet-count" class="count"></span></button>
+        <button class="view-tab" type="button" role="tab" data-view="method" aria-selected="false" aria-controls="view-method">Data and method</button>
+      </div>
+
+      <div id="view-map" class="view view-map" role="tabpanel" aria-label="Map">
+        <div class="map-shell">
+          <arcgis-map id="arcgis-map" class="arcgis-map" basemap="osm" center="-118.24, 33.80" zoom="12" popup-disabled aria-label="Map of port terminals, warehouses, trucks, and routes">
+            <arcgis-zoom slot="top-left"></arcgis-zoom>
+          </arcgis-map>
+          <svg id="map-fallback" class="hidden" viewBox="0 0 760 390" role="img" aria-label="Schematic map of Port of Los Angeles and Long Beach routes">
+            <rect width="760" height="390" fill="#f2f3f1"/>
+            <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#d6e3e8"/>
+            <text x="20" y="372" class="water-label">San Pedro Bay</text>
+            <g id="routes"></g><g id="markers"></g><g id="truck-marks"></g>
+          </svg>
+          <ul class="legend" aria-label="Map legend">
+            <li class="only-disruption"><i class="swatch primary"></i>Current route</li>
+            <li class="only-disruption"><i class="swatch detour"></i>Detour</li>
+            <li><i class="swatch fleet"></i>Route ahead</li>
+            <li><i class="swatch arrow"></i>Moving</li>
+            <li><i class="swatch stopped"></i>Stopped</li>
+            <li class="only-disruption"><i class="swatch stopped stuck"></i>Stuck</li>
+          </ul>
+          <div id="truck-card" class="truck-card" hidden aria-live="polite"></div>
+          <ol id="event-feed" class="event-feed" aria-live="polite"></ol>
         </div>
-        <button id="report-close" class="button secondary" type="button">Back to the map</button>
-      </div>
-      <div class="report-grid">
-        <section aria-labelledby="report-indicators-title">
-          <h2 id="report-indicators-title">Usual morning against today</h2>
-          <div class="table-wrap">
-            <table class="data">
-              <thead><tr><th>Indicator</th><th class="num">Usual morning</th><th class="num">Today</th><th>Change</th></tr></thead>
-              <tbody id="report-indicators"></tbody>
-            </table>
+        <div class="playback" aria-label="Playback">
+          <button id="play" class="play" type="button" aria-label="Play">
+            <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z"/></svg>
+            <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>
+          </button>
+          <b id="clock" class="clock" aria-label="Time of day">—</b>
+          <div class="timeline">
+            <input id="timeline" type="range" min="0" max="1" step="0.25" value="0" aria-label="Time of day">
+            <div id="timeline-ticks" class="ticks" aria-hidden="true"></div>
+            <div class="timeline-ends" aria-hidden="true"><span id="timeline-start">—</span><span id="timeline-end">—</span></div>
           </div>
-          <p class="note">Expected values for every shipment in the plan, under the top-ranked response before any inspection. All are estimated.</p>
-        </section>
-        <section aria-labelledby="report-tally-title">
-          <h2 id="report-tally-title">How the response played out</h2>
-          <p id="report-tally-scope" class="subhead"></p>
-          <dl id="report-tally" class="ledger"></dl>
-        </section>
-        <section aria-labelledby="report-log-title">
-          <h2 id="report-log-title">Decision log</h2>
-          <ol id="report-log" class="report-log"></ol>
-          <p class="note">PigeonOps did not contact any driver or warehouse. The dispatcher made every call.</p>
-        </section>
-      </div>
-    </section>
-
-    <!-- Level 1: what changed, and what the model suggests doing about it. -->
-    <section class="situation" aria-labelledby="disruption-title">
-      <div class="situation-main">
-        <p class="eyebrow"><span id="situation-eyebrow">Loading</span><span id="reported-at"></span></p>
-        <h1 id="disruption-title">Loading…</h1>
-        <p id="disruption-description"></p>
-        <ul id="constraints" class="constraints" aria-label="Constraints"></ul>
-      </div>
-      <div class="next-step">
-        <p class="next-step-label">Recommended next step</p>
-        <p id="recommendation-short" class="next-step-value">—</p>
-        <dl class="next-facts">
-          <div><dt>Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
-          <div class="only-disruption"><dt>Decide by</dt><dd id="deadline">—</dd></div>
-          <div><dt id="affected-label">Shipment</dt><dd id="affected">—</dd></div>
-        </dl>
-        <p class="advisory">The recommendation is advice. This page does not contact trucks or drivers.</p>
-      </div>
-    </section>
-
-    <!-- Level 2: the indicators the scenarios are compared on. -->
-    <section class="indicators" aria-labelledby="indicators-title">
-      <div class="section-head">
-        <h2 id="indicators-title">Indicators</h2>
-        <p id="indicators-note"></p>
-      </div>
-      <ul id="indicators" class="kpis"></ul>
-    </section>
-
-    <!-- Level 3: the map with the decision steps beside it.
-         Level 4: the shipment and truck records under each column. -->
-    <div class="workspace">
-      <div class="main-col">
-        <section class="block map-block" aria-labelledby="map-title">
-          <div class="block-head">
-            <h2 id="map-title">Map</h2>
-            <ul class="legend">
-              <li class="only-disruption"><i class="swatch primary"></i>Current route</li>
-              <li class="only-disruption"><i class="swatch detour"></i>Detour</li>
-              <li><i class="swatch fleet"></i>Route ahead</li>
-              <li><i class="swatch arrow"></i>Moving</li>
-              <li><i class="swatch stopped"></i>Stopped</li>
-              <li class="only-disruption"><i class="swatch stopped stuck"></i>Stuck</li>
-            </ul>
-          </div>
-          <div class="map-shell">
-            <arcgis-map id="arcgis-map" class="arcgis-map" basemap="osm" center="-118.24, 33.80" zoom="12" popup-disabled aria-label="Map of port terminals, warehouses, trucks, and routes">
-              <arcgis-zoom slot="top-left"></arcgis-zoom>
-            </arcgis-map>
-            <svg id="map-fallback" class="hidden" viewBox="0 0 760 390" role="img" aria-label="Schematic map of Port of Los Angeles and Long Beach routes">
-              <rect width="760" height="390" fill="#f2f3f1"/>
-              <path d="M0 330C120 285 175 365 285 318C390 270 480 355 760 290V390H0Z" fill="#d6e3e8"/>
-              <text x="20" y="372" class="water-label">San Pedro Bay</text>
-              <g id="routes"></g><g id="markers"></g><g id="truck-marks"></g>
-            </svg>
-            <div class="map-clock" aria-hidden="true"><b id="map-clock">—</b></div>
-            <div id="truck-card" class="truck-card" hidden aria-live="polite"></div>
-          </div>
-          <div class="playback" aria-label="Playback">
-            <div class="playback-main">
-              <button id="play" class="play" type="button" aria-label="Play">
-                <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z"/></svg>
-                <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>
-              </button>
-              <div class="timeline">
-                <input id="timeline" type="range" min="0" max="1" step="0.25" value="0" aria-label="Time of day">
-                <div id="timeline-ticks" class="ticks" aria-hidden="true"></div>
-                <div class="timeline-ends" aria-hidden="true"><span id="timeline-start">—</span><span id="timeline-end">—</span></div>
-              </div>
-              <label class="speed"><span class="visually-hidden">Playback speed</span>
-                <select id="playback-speed">
-                  <option value="1">1 min/s</option>
-                  <option value="5" selected>5 min/s</option>
-                  <option value="15">15 min/s</option>
-                </select>
-              </label>
-            </div>
-            <div class="plan only-disruption">
-              <label class="plan-action">Preview response
-                <select id="playback-action"></select>
-              </label>
-              <fieldset class="segmented" style="--n:2">
-                <legend class="visually-hidden">CA-47 road state</legend>
-                <input type="radio" name="road" id="road-open" value="open"><label for="road-open">If CA-47 is open</label>
-                <input type="radio" name="road" id="road-blocked" value="blocked"><label for="road-blocked">If CA-47 is blocked</label>
-                <span class="glider" aria-hidden="true"></span>
-              </fieldset>
-              <span id="plan-note" class="plan-note"></span>
-            </div>
-            <section id="tally-block" class="tally" aria-labelledby="tally-title" hidden>
-              <div class="tally-head">
-                <h3 id="tally-title">Running tally</h3>
-                <p id="tally-scope"></p>
-                <span class="basis estimated">Estimated</span>
-              </div>
-              <ul id="tally" class="tally-tiles"></ul>
-              <div class="tally-race only-disruption">
-                <p class="tally-race-title">Cost so far for each response <span id="tally-race-road"></span></p>
-                <ol id="tally-race" class="tally-race-list"></ol>
-              </div>
-              <p id="tally-note" class="note"></p>
-            </section>
-            <ol id="event-feed" class="event-feed" aria-live="polite"></ol>
-          </div>
-          <p class="note"><span id="map-provider">Loading map…</span> <span id="conditions"></span></p>
-        </section>
-
-        <section class="block" id="shipments" aria-labelledby="shipments-title">
-          <div class="block-head">
-            <h2 id="shipments-title">Shipments</h2>
-            <p id="shipment-count"></p>
-            <fieldset class="segmented" style="--n:2">
-              <legend class="visually-hidden">Shipment filter</legend>
-              <input type="radio" name="shipment-filter" id="filter-attention" value="attention" checked><label for="filter-attention">Needs attention</label>
-              <input type="radio" name="shipment-filter" id="filter-all" value="all"><label for="filter-all">All</label>
-              <span class="glider" aria-hidden="true"></span>
-            </fieldset>
-          </div>
-          <p id="truck-filter" class="filter-note" hidden>Showing shipments on <b id="truck-filter-id"></b>. <button class="link" type="button" id="clear-truck">Show all</button></p>
-          <div class="table-wrap">
-            <table class="data shipments">
-              <thead><tr><th>Shipment</th><th>Cargo</th><th>Priority</th><th>Truck</th><th>Appointment</th><th>ETA</th><th class="num">Slack</th><th>Status</th></tr></thead>
-              <tbody id="shipment-list"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="block trucks-block" aria-labelledby="trucks-title">
-          <div class="block-head"><h2 id="trucks-title">Trucks</h2><p id="fleet-count"></p></div>
-          <div class="table-wrap">
-            <table class="data trucks">
-              <thead><tr><th>Truck and load</th><th>Now</th><th class="num">Duty left</th></tr></thead>
-              <tbody id="fleet-list"></tbody>
-            </table>
-          </div>
-          <p class="note">Select a truck, here or on the map, to follow it and list only its shipments.</p>
-        </section>
+          <label class="speed"><span class="visually-hidden">Playback speed</span>
+            <select id="playback-speed">
+              <option value="1">1 min/s</option>
+              <option value="5" selected>5 min/s</option>
+              <option value="15">15 min/s</option>
+            </select>
+          </label>
+        </div>
+        <p id="map-provider" class="map-note">Loading map…</p>
       </div>
 
-      <div class="rail">
-        <section class="block" aria-labelledby="inspection-title">
-          <h2 id="inspection-title" class="step-title"><span class="step" aria-hidden="true">1</span>Inspect before acting?</h2>
-          <p id="recommendation" class="recommendation">Calculating…</p>
-          <dl class="ledger">
-            <div><dt>Expected loss if you act now</dt><dd id="act-loss">—</dd></div>
-            <div><dt>Expected loss if you inspect first</dt><dd id="evidence-loss">—</dd></div>
-            <div><dt>Cost of inspecting</dt><dd id="inspection-cost">—</dd></div>
-            <div class="total"><dt>Net value of inspecting</dt><dd id="net-value">—</dd></div>
-          </dl>
-          <p id="cv-only" class="note"></p>
-          <figure id="selected-evidence" class="selected-evidence" hidden><img id="selected-evidence-image" alt="Reviewed drone frame"><figcaption id="selected-evidence-title"></figcaption><small>Stock drone footage, not filmed at CA-47.</small></figure>
-          <button id="inspect-button" class="button" type="button">Review drone footage</button>
-          <div id="observation-buttons" class="choices" hidden>
-            <p>What did the inspection show?</p>
-            <div>
-              <button class="choice" type="button" data-observation="blocked">Road blocked</button>
-              <button class="choice" type="button" data-observation="clear">Road clear</button>
-              <button class="choice" type="button" data-observation="inconclusive">Inconclusive</button>
-            </div>
-          </div>
-          <p id="posterior" class="posterior" hidden></p>
-          <details><summary>Assumptions</summary><dl id="assumptions" class="ledger"></dl><p class="note" id="drone-note"></p></details>
-        </section>
-
-        <section class="block" aria-labelledby="options-title">
-          <h2 id="options-title" class="step-title"><span class="step" aria-hidden="true">2</span>Choose a response</h2>
-          <p id="ranking-state" class="subhead">Ranked by expected loss before inspection</p>
-          <ol id="rankings" class="options"></ol>
-          <p class="note">Delay, cost, CO₂ and breaches are averages of the open and blocked outcomes, weighted by the blockage probability.</p>
-        </section>
+      <div id="view-shipments" class="view" role="tabpanel" aria-label="Shipments" hidden>
+        <div class="view-head">
+          <p id="shipment-summary"></p>
+          <fieldset class="segmented" style="--n:2">
+            <legend class="visually-hidden">Shipment filter</legend>
+            <input type="radio" name="shipment-filter" id="filter-attention" value="attention" checked><label for="filter-attention">Needs attention</label>
+            <input type="radio" name="shipment-filter" id="filter-all" value="all"><label for="filter-all">All</label>
+            <span class="glider" aria-hidden="true"></span>
+          </fieldset>
+        </div>
+        <div class="table-wrap">
+          <table class="data shipments">
+            <thead><tr><th>Shipment</th><th>Cargo</th><th>Priority</th><th>Truck</th><th>Appointment</th><th>ETA</th><th class="num">Slack</th><th>Status</th></tr></thead>
+            <tbody id="shipment-list"></tbody>
+          </table>
+        </div>
       </div>
-    </div>
 
-    <!-- Level 5: reference material for anyone checking the numbers. -->
-    <details class="reference">
-      <summary class="reference-title">How the numbers work</summary>
-      <div class="row row-ref">
+      <div id="view-trucks" class="view" role="tabpanel" aria-label="Trucks" hidden>
+        <div class="view-head">
+          <p id="fleet-summary"></p>
+          <p class="hint">Select a truck to follow it on the map.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="data trucks">
+            <thead><tr><th>Truck and load</th><th>Now</th><th class="num">Duty left</th></tr></thead>
+            <tbody id="fleet-list"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="view-method" class="view view-method" role="tabpanel" aria-label="Data and method" hidden>
+        <section aria-labelledby="definitions-title">
+          <h2 id="definitions-title">How the recommendation is calculated</h2>
+          <dl id="definitions" class="definitions"></dl>
+        </section>
         <section aria-labelledby="sources-title">
-          <h3 id="sources-title">Data sources</h3>
+          <h2 id="sources-title">Data sources</h2>
           <div class="table-wrap">
             <table class="data">
               <thead><tr><th>Data</th><th>Type</th><th>Source</th></tr></thead>
@@ -245,45 +129,200 @@
             </table>
           </div>
           <p class="note">Shipments, trucks, appointments and the incident are fictional. Inspection clips are attributed stock drone footage, separate from that incident. DATA.md lists sources and assumptions.</p>
-        </section>
-        <section aria-labelledby="definitions-title">
-          <h3 id="definitions-title">Definitions</h3>
-          <dl id="definitions" class="definitions"></dl>
+          <p id="conditions" class="note"></p>
         </section>
       </div>
-    </details>
+    </section>
+
+    <!-- Right: the guide. One step at a time. -->
+    <aside class="panel" aria-label="Dispatcher guide">
+      <ol id="stepper" class="stepper" aria-label="Progress">
+        <li data-state="pending"><button type="button" data-goto="incident" disabled><span class="step-num">1</span><span class="step-name">Incident</span></button></li>
+        <li data-state="pending"><button type="button" data-goto="inspect" disabled><span class="step-num">2</span><span class="step-name">Drone check</span></button></li>
+        <li data-state="pending"><button type="button" data-goto="respond" disabled><span class="step-num">3</span><span class="step-name">Response</span></button></li>
+        <li data-state="pending"><button type="button" data-goto="outcome" disabled><span class="step-num">4</span><span class="step-name">Outcome</span></button></li>
+      </ol>
+
+      <div class="panel-body">
+        <section class="step step-start" data-step="start" aria-labelledby="start-title">
+          <h1 id="start-title">Is a drone check worth the wait?</h1>
+          <p class="lede">PigeonOps is a decision aid for a port dispatcher. When a road report comes in, it works out whether checking the road with a drone is worth the cost and the delay, then ranks the possible responses. The dispatcher makes every call.</p>
+          <ol class="howto">
+            <li><b>An incident report arrives.</b> A road on a critical delivery’s route may be blocked.</li>
+            <li><b>You decide whether to check by drone.</b> You see what the check costs and what it is expected to save.</li>
+            <li><b>You choose a response.</b> Keep the route, reroute, or swap trucks.</li>
+            <li><b>You watch it play out.</b> Cost, delay and CO₂ add up on the map, then a shift report.</li>
+          </ol>
+          <div class="actions">
+            <button id="start-button" class="btn primary big" type="button">Start the morning</button>
+          </div>
+          <p id="start-note" class="note"></p>
+          <div class="jump">
+            <p>Or jump straight to an incident report:</p>
+            <div id="incident-jumps" class="jump-list"></div>
+          </div>
+          <p class="fine-print">Every shipment, truck and incident is fictional. No drone is flown and no driver is contacted.</p>
+        </section>
+
+        <section class="step step-incident" data-step="incident" aria-labelledby="disruption-title" hidden>
+          <p class="tag-line"><span id="situation-eyebrow" class="tag risk">Incident</span><span id="reported-at"></span></p>
+          <h1 id="disruption-title">Loading…</h1>
+          <p id="disruption-description" class="lede"></p>
+          <dl class="facts">
+            <div><dt>Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
+            <div><dt id="affected-label">Shipment at risk</dt><dd id="affected">—</dd></div>
+            <div><dt>Decide by</dt><dd id="deadline">—</dd></div>
+          </dl>
+          <details class="more"><summary>Constraints</summary><ul id="constraints" class="constraints"></ul></details>
+
+          <div class="verdict">
+            <h2 id="inspection-title">Check the road with a drone first?</h2>
+            <p id="recommendation-short" class="verdict-answer">—</p>
+            <p id="recommendation" class="verdict-why">Calculating…</p>
+            <details class="more"><summary>Show the numbers</summary>
+              <dl class="ledger">
+                <div><dt>Expected loss if you act now</dt><dd id="act-loss">—</dd></div>
+                <div><dt>Expected loss if you inspect first</dt><dd id="evidence-loss">—</dd></div>
+                <div><dt>Cost of inspecting</dt><dd id="inspection-cost">—</dd></div>
+                <div class="total"><dt>Net value of inspecting</dt><dd id="net-value">—</dd></div>
+              </dl>
+              <dl id="assumptions" class="ledger"></dl>
+              <figure id="sensitivity" class="sensitivity" hidden></figure>
+              <p id="cv-only" class="note"></p>
+              <p id="drone-note" class="note"></p>
+            </details>
+          </div>
+
+          <div class="actions">
+            <button id="inspect-button" class="btn primary" type="button">Review drone footage</button>
+            <button id="skip-inspection" class="btn" type="button">Decide without a drone check</button>
+          </div>
+          <div id="observation-buttons" class="choices" hidden>
+            <p>No footage library is available, so pick a simulated result:</p>
+            <div>
+              <button class="choice" type="button" data-observation="blocked">Road blocked</button>
+              <button class="choice" type="button" data-observation="clear">Road clear</button>
+              <button class="choice" type="button" data-observation="inconclusive">Inconclusive</button>
+            </div>
+          </div>
+          <p class="fine-print">Advice only. This page does not contact trucks or drivers.</p>
+        </section>
+
+        <section class="step step-respond" data-step="respond" aria-labelledby="options-title" hidden>
+          <div class="evidence">
+            <figure id="selected-evidence" class="selected-evidence" hidden>
+              <img id="selected-evidence-image" alt="Reviewed drone frame">
+              <figcaption><span id="selected-evidence-title"></span> Stock drone footage, not filmed at CA-47.</figcaption>
+            </figure>
+            <p id="posterior" class="posterior"></p>
+            <button id="reinspect-button" class="link" type="button">Review drone footage</button>
+          </div>
+          <h1 id="options-title">Choose a response</h1>
+          <p id="ranking-state" class="subhead">Ranked by expected loss before inspection</p>
+          <ol id="rankings" class="options"></ol>
+          <div class="actions">
+            <button id="confirm-button" class="btn primary" type="button">Confirm</button>
+          </div>
+          <p class="fine-print">Expected loss is what a response costs on average, in dollars: delay, extra driving, CO₂ and missed appointments. It weights the open and blocked outcomes by the chance CA-47 is blocked. Confirming plays the plan out on the map. No driver is contacted.</p>
+        </section>
+
+        <section class="step step-outcome" data-step="outcome" aria-labelledby="outcome-title" hidden>
+          <h1 id="outcome-title">Playing out</h1>
+          <p id="outcome-sub" class="subhead"></p>
+          <div class="road-case only-disruption">
+            <span>Play it out as if CA-47 is</span>
+            <fieldset class="segmented" style="--n:2">
+              <legend class="visually-hidden">CA-47 road state</legend>
+              <input type="radio" name="road" id="road-open" value="open"><label for="road-open">open</label>
+              <input type="radio" name="road" id="road-blocked" value="blocked"><label for="road-blocked">blocked</label>
+              <span class="glider" aria-hidden="true"></span>
+            </fieldset>
+          </div>
+          <p id="plan-note" class="note"></p>
+
+          <section id="tally-block" class="tally" aria-labelledby="tally-title" hidden>
+            <div class="tally-head">
+              <h2 id="tally-title">Running tally</h2>
+              <span class="basis estimated">Estimated</span>
+            </div>
+            <p id="tally-scope" class="subhead"></p>
+            <ul id="tally" class="tally-tiles"></ul>
+            <h3 class="tally-race-title">Cost of each response <span id="tally-race-road"></span></h3>
+            <ol id="tally-race" class="tally-race-list"></ol>
+            <details class="more"><summary>What the cost includes</summary><p id="tally-note" class="note"></p></details>
+          </section>
+
+          <div id="report" class="report" hidden>
+            <h2 id="report-indicators-title">Usual morning against today</h2>
+            <div class="table-wrap">
+              <table class="data">
+                <thead><tr><th>Indicator</th><th class="num">Usual</th><th class="num">Today</th><th>Change</th></tr></thead>
+                <tbody id="report-indicators"></tbody>
+              </table>
+            </div>
+            <p class="note">Expected values for every shipment in the plan, under the top-ranked response before any inspection. All are estimated.</p>
+            <h2 id="report-log-title">Decision log</h2>
+            <ol id="report-log" class="report-log"></ol>
+            <p class="fine-print">PigeonOps did not contact any driver or warehouse. The dispatcher made every call.</p>
+          </div>
+
+          <div class="actions">
+            <button id="skip-end" class="btn" type="button">Skip to the shift report</button>
+            <button id="change-response" class="btn" type="button">Change the response</button>
+            <button id="report-restart" class="btn primary" type="button" hidden>Restart the morning</button>
+          </div>
+          <div id="next-incidents-wrap" class="jump" hidden>
+            <p>Or try the other incident report:</p>
+            <div id="next-incidents" class="jump-list"></div>
+          </div>
+        </section>
+      </div>
+    </aside>
   </main>
+
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">
-    <div class="inspection-header"><div><p class="eyebrow">DRONE INSPECTION · DISPATCHER REVIEW</p><h2 id="inspection-dialog-heading">Review drone footage</h2></div><button id="inspection-close" class="inspection-close">Close</button></div>
+    <header class="inspection-header">
+      <div>
+        <h2 id="inspection-dialog-heading">Drone check: what does the footage show?</h2>
+        <p class="inspection-scope">Pre-recorded top-down drone clips stand in for the inspection flight. None was filmed at CA-47. Applying an observation updates the fictional scenario; it does not report current conditions or fly a drone.</p>
+      </div>
+      <button id="inspection-close" class="btn small" type="button">Close</button>
+    </header>
     <div class="inspection-body">
-      <p class="inspection-scope">Pre-recorded top-down drone clips stand in for the inspection flight. None was filmed at CA-47. Applying an observation updates the fictional scenario; it does not report current conditions or fly a drone.</p>
-      <label class="inspection-picker">Inspection clip<select id="inspection-case"></select></label>
-      <video id="inspection-video" class="inspection-photo" autoplay loop muted playsinline aria-label="Annotated drone clip"></video>
-      <img id="inspection-photo" class="inspection-photo" alt="Unannotated source frame" hidden>
-      <div class="inspection-photo-caption"><span id="inspection-count"></span><button id="inspection-image-toggle">Show source frame</button></div>
-      <p class="inspection-legend"><span class="swatch road"></span>Marked road <span class="swatch stopped"></span>Standing <span class="swatch slow"></span>Slow <span class="swatch moving"></span>Moving <span class="swatch other"></span>Off road or not re-found</p>
-      <div id="inspection-cv" class="inspection-cv"><p class="eyebrow">CV SUGGESTION · UNVALIDATED</p><h3 id="inspection-cv-signal"></h3><p id="inspection-cv-reason"></p><p id="inspection-cv-basis" class="fine-print"></p></div>
-      <strong id="inspection-case-title"></strong><h3 id="inspection-finding" class="inspection-finding"></h3><p id="inspection-note" class="inspection-note"></p>
-      <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Road regions and visual notes are provisional annotations. Speeds are approximate.</span></div>
-      <fieldset class="inspection-choices"><legend>Your observation (the CV suggestion is preselected)</legend>
-        <label><input type="radio" name="inspection-observation" value="blocked">Road blocked</label>
-        <label><input type="radio" name="inspection-observation" value="clear">Road clear: traffic gets through</label>
-        <label><input type="radio" name="inspection-observation" value="inconclusive">Inconclusive</label>
-      </fieldset>
-      <p id="inspection-restriction" class="note"></p>
-      <label class="inspection-review-note">Review note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
-      <p id="inspection-error" class="inspection-error" role="alert"></p>
+      <div class="inspection-media">
+        <div id="inspection-clips" class="clip-tabs" role="tablist" aria-label="Inspection clip"></div>
+        <video id="inspection-video" class="inspection-photo" autoplay loop muted playsinline aria-label="Annotated drone clip"></video>
+        <img id="inspection-photo" class="inspection-photo" alt="Unannotated source frame" hidden>
+        <div class="inspection-photo-caption"><span id="inspection-count"></span><button id="inspection-image-toggle" class="link" type="button">Show source frame</button></div>
+        <p class="inspection-legend"><span><i class="swatch road"></i>Marked road</span><span><i class="swatch stopped"></i>Standing</span><span><i class="swatch slow"></i>Slow</span><span><i class="swatch moving"></i>Moving</span><span><i class="swatch other"></i>Off road or not re-found</span></p>
+      </div>
+      <div class="inspection-side">
+        <div id="inspection-cv" class="inspection-cv">
+          <span class="tag">CV suggestion · unvalidated</span>
+          <h3 id="inspection-cv-signal"></h3>
+          <p id="inspection-cv-reason"></p>
+        </div>
+        <fieldset class="inspection-choices">
+          <legend>What do you see? The CV suggestion is preselected.</legend>
+          <label><input type="radio" name="inspection-observation" value="blocked"><span>Road blocked</span></label>
+          <label><input type="radio" name="inspection-observation" value="clear"><span>Road clear: traffic gets through</span></label>
+          <label><input type="radio" name="inspection-observation" value="inconclusive"><span>Inconclusive</span></label>
+        </fieldset>
+        <p id="inspection-restriction" class="note"></p>
+        <details class="more inspection-about"><summary>About this clip</summary>
+          <strong id="inspection-case-title"></strong>
+          <p id="inspection-finding" class="inspection-finding"></p>
+          <p id="inspection-note" class="inspection-note"></p>
+          <p id="inspection-cv-basis" class="fine-print"></p>
+          <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Road regions and visual notes are provisional annotations. Speeds are approximate.</span></div>
+          <label class="inspection-review-note">Review note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
+        </details>
+        <p id="inspection-error" class="inspection-error" role="alert"></p>
+        <button id="inspection-apply" class="btn primary" type="button" disabled>Apply to scenario</button>
+        <p class="fine-print">The clip, CV suggestion, your observation and the time are saved locally. A dispatcher approves any logistics action.</p>
+      </div>
     </div>
-    <div class="inspection-footer"><p>The clip, CV suggestion, your observation and the time are saved locally. A dispatcher approves any logistics action.</p><button id="inspection-apply" class="button" disabled>Apply to scenario</button></div>
   </dialog>
-  <!-- Presenter controls: hidden from the product view. Press P, or open the page with ?presenter. -->
-  <aside id="presenter" class="presenter" hidden aria-labelledby="presenter-title">
-    <div class="presenter-head"><b id="presenter-title">Presenter</b><span>Press P to hide</span></div>
-    <button type="button" data-presenter="restart">Restart the morning</button>
-    <div id="presenter-incidents" class="presenter-group"></div>
-    <button type="button" data-presenter="report">Show the shift report</button>
-    <p id="presenter-note" class="presenter-note"></p>
-  </aside>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

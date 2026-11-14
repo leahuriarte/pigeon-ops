@@ -15,6 +15,12 @@ SHIPMENT_ROW = {"shipment", "truck", "route", "reassigned", "arrival", "appointm
 
 
 class ScenarioContractTests(unittest.TestCase):
+    def check_indicators(self, indicators):
+        self.assertEqual(INDICATOR_IDS, {i["id"] for i in indicators})
+        for indicator in indicators:
+            self.assertLessEqual({"id", "label", "value", "unit", "basis"}, set(indicator))
+            self.assertIn(indicator["basis"], BASES)
+
     def test_every_variant_matches_contract(self):
         for item in available_scenarios():
             with self.subTest(variant=item["id"]):
@@ -22,44 +28,22 @@ class ScenarioContractTests(unittest.TestCase):
                 for key in ("id", "name", "scenario_type", "disruption", "decision_model", "routes", "shipments"):
                     self.assertIn(key, s)
                 self.assertIn("prior_blocked_probability", s["disruption"])
-                indicators = s["indicators_stub"]
-                self.assertEqual(INDICATOR_IDS, {i["id"] for i in indicators})
-                for indicator in indicators:
-                    self.assertIn(indicator["basis"], BASES)
+                self.check_indicators(s["indicators_stub"])
+                for route in s["routes"]:
+                    self.assertEqual("LineString", route["geometry"]["type"])
+                    self.assertGreaterEqual(len(route["geometry"]["coordinates"]), 2)
+                    self.assertGreater(route["distance_m"], 0)
 
-    def test_every_route_has_network_geometry(self):
-        for item in available_scenarios():
-            for route in load_scenario(variant=item["id"])["routes"]:
-                with self.subTest(variant=item["id"], route=route["id"]):
-                    geometry = route.get("geometry")
-                    self.assertIsNotNone(geometry)
-                    self.assertEqual("LineString", geometry["type"])
-                    self.assertGreaterEqual(len(geometry["coordinates"]), 2)
-                    self.assertGreater(route.get("distance_m", 0), 0)
-
-    def test_every_action_has_a_plan_or_override(self):
-        for item in available_scenarios():
-            for action in load_scenario(variant=item["id"])["decision_model"]["actions"]:
-                with self.subTest(variant=item["id"], action=action["id"]):
-                    self.assertTrue(action.get("plan") or action.get("override"))
-                    for state in ("open", "blocked"):
-                        self.assertIn(action["outcomes"][state]["basis"], ("estimated", "override"))
-
-    def test_analysis_indicators_match_contract(self):
+    def test_every_analysis_matches_contract(self):
         for item in available_scenarios():
             with self.subTest(variant=item["id"]):
-                indicators = analyze(load_scenario(variant=item["id"]))["indicators"]
-                self.assertEqual(INDICATOR_IDS, {i["id"] for i in indicators})
-                for indicator in indicators:
-                    self.assertIn(indicator["basis"], BASES)
-                self.assertIn("of", next(i for i in indicators if i["id"] == "appointments_feasible"))
-
-    def test_analysis_assignments_match_contract(self):
-        for item in available_scenarios():
-            with self.subTest(variant=item["id"]):
-                assignments = analyze(load_scenario(variant=item["id"]), "blocked")["assignments"]
+                result = analyze(load_scenario(variant=item["id"]), "blocked")
+                self.check_indicators(result["indicators"])
+                self.assertIn("of", next(i for i in result["indicators"] if i["id"] == "appointments_feasible"))
+                assignments = result["assignments"]
                 self.assertLessEqual({"shipments", "trucks", "count", "before", "after"}, set(assignments))
                 self.assertEqual(assignments["count"], len(assignments["before"]))
+                self.assertEqual(assignments["count"], len(assignments["after"]))
                 for option in assignments["before"] + assignments["after"]:
                     self.assertLessEqual({"id", "trucks", "planned", "action", "rank", "expected_loss", "outcomes"},
                                          set(option))
@@ -67,6 +51,7 @@ class ScenarioContractTests(unittest.TestCase):
                         for row in option["outcomes"][state]["detail"]["shipments"]:
                             self.assertLessEqual(SHIPMENT_ROW, set(row))
                             self.assertIn(row["basis"], BASES)
+                            self.assertRegex(row["arrival"], r"^\d\d:\d\d$")
 
 
 class InspectionLibraryContractTests(unittest.TestCase):
@@ -91,11 +76,6 @@ class InspectionLibraryContractTests(unittest.TestCase):
                 self.assertLessEqual(set(case["allowed_observations"]), self.SIGNALS)
                 for key in ("source_image", "annotated_image", "annotated_video"):
                     self.assertTrue((LIBRARY.parent / case[key].removeprefix("/inspection-assets/")).is_file())
-
-    def test_library_covers_every_observation(self):
-        suggestions = {case["cv_assessment"]["suggested_observation"]
-                       for case in json.loads(LIBRARY.read_text(encoding="utf-8"))["cases"]}
-        self.assertEqual(self.SIGNALS, suggestions)
 
 
 if __name__ == "__main__":

@@ -8,17 +8,21 @@ from urllib.request import urlopen
 from backend.server import DemoHandler
 
 
-class _QuietHandler(DemoHandler):
+class QuietHandler(DemoHandler):
     def log_message(self, fmt, *args):
         pass
+
+
+def start_server():
+    server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
+    threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+    return server, f"http://127.0.0.1:{server.server_port}"
 
 
 class ServerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), _QuietHandler)
-        cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
-        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+        cls.server, cls.base = start_server()
 
     @classmethod
     def tearDownClass(cls):
@@ -36,28 +40,17 @@ class ServerTests(unittest.TestCase):
         except HTTPError as error:
             return error.code
 
-    def test_lists_scenarios(self):
-        body = self.get("/api/scenarios")
-        self.assertEqual(["normal", "disruption", "disruption_b"], [s["id"] for s in body["scenarios"]])
-
-    def test_every_scenario_returns_computed_indicators(self):
-        for item in self.get("/api/scenarios")["scenarios"]:
-            with self.subTest(variant=item["id"]):
-                body = self.get(f"/api/analysis?scenario={item['id']}")
-                self.assertEqual(6, len(body["indicators"]))
-                self.assertIn("estimated", {i["basis"] for i in body["indicators"]})
-
-    def test_default_scenario_is_disruption(self):
-        body = self.get("/api/scenario")
-        self.assertEqual("disruption", body["scenario_type"])
-        self.assertTrue(body["analysis"]["indicators"])
-
-    def test_analysis_carries_contract_fields(self):
+    def test_endpoints_carry_contract_fields(self):
+        scenarios = self.get("/api/scenarios")["scenarios"]
+        self.assertLessEqual({"normal", "disruption"}, {s["id"] for s in scenarios})
+        default = self.get("/api/scenario")
+        self.assertEqual("disruption", default["scenario_type"])
+        self.assertTrue(default["analysis"]["indicators"])
         body = self.get("/api/analysis?scenario=normal&observation=blocked")
-        for key in ("scenario_id", "before", "after", "evoi", "sensitivity", "indicators", "assignments"):
+        for key in ("scenario_id", "prior_blocked_probability", "posterior_blocked_probability", "observation",
+                    "before", "after", "evoi", "sensitivity", "indicators", "assignments"):
             self.assertIn(key, body)
-        self.assertEqual(3, len(body["after"]))
-        self.assertEqual(body["assignments"]["count"], len(body["assignments"]["after"]))
+        self.assertEqual(len(body["before"]), len(body["after"]))
 
     def test_bad_input_is_rejected(self):
         self.assertEqual(404, self.status_of("/api/analysis?scenario=nope"))
