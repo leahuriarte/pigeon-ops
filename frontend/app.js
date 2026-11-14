@@ -867,11 +867,11 @@ function renderDecision() {
   $("#reported-at").textContent = d.reported_at ? ` · ${when} ${d.reported_at}` : "";
   $("#disruption-title").textContent = d.title;
   $("#disruption-description").textContent = d.description;
-  $("#incident-place").textContent = `${incidentPlace()} · ${d.evidence_summary ?? "No incident reports"} · Synthetic scenario`;
-  $("#decision-context").textContent = d.decision_context ?? "";
+  $("#incident-place").textContent = `${d.evidence_summary ?? "No incident reports"} · Synthetic`;
   $("#inspection-limits").textContent = d.inspection_limits ?? "";
-  $("#response-context").textContent = d.decision_context ?? "";
-  $("#response-limits").textContent = d.inspection_limits ?? "";
+  $("#inspection-limits").hidden = !$("#inspection-limits").textContent;
+  $("#response-limits").textContent = check().type === "environment" ? d.inspection_limits ?? "" : "";
+  $("#response-limits").hidden = !$("#response-limits").textContent;
   $("#incident-stop-label").textContent = check().type === "congestion" ? "In queue" : check().type === "environment" ? "At water hazard" : "At closure";
   $("#road-case-label").textContent = `Simulate ${incidentPlace()} as`;
   $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
@@ -912,8 +912,8 @@ function renderIndicators(indicators) {
   const missing = indicators.filter((item) => item.value === null || item.value === undefined);
   const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
   $("#indicators-note").textContent = scenario.scenario_type === "normal"
-    ? `Estimated delay for modeled deliveries; CO₂ for the whole plan. Normal routes.${pending}`
-    : `Estimated delay for modeled deliveries; CO₂ for the whole plan. Recommended routes before drone review.${activeScenario === "congestion" ? " This case also starts with an earlier cargo release than the normal baseline." : ""}${pending}`;
+    ? `Estimates: delivery delay and whole-plan CO₂.${pending}`
+    : `Estimates before inspection.${activeScenario === "congestion" ? " Cargo released earlier than baseline." : ""}${pending}`;
   $("#comparison-caption").textContent = scenario.scenario_type === "normal"
     ? "Normal morning · baseline" : `Changed scenario · ${scenario.name}`;
   $("#scenario-comparison").innerHTML = indicators.filter((item) => comparisonIndicators.has(item.id)).map((item) => {
@@ -944,7 +944,7 @@ function renderIndicators(indicators) {
 }
 
 function renderRankings(items, observation = null, blocked = scenario.disruption.prior_blocked_probability) {
-  $("#ranking-state").textContent = `Lowest expected loss first · ${observation ? "After inspection" : "Before inspection"} · Estimated`;
+  $("#ranking-state").textContent = `${observation ? "After inspection" : "Before inspection"} · Estimated`;
   $("#response-why").textContent = responseExplanation(items);
   $("#rankings").innerHTML = items.map((item) => {
     const e = item.expected;
@@ -1238,7 +1238,7 @@ let step = "start";
 let furthest = 0; // Index in steps of the furthest step reached in this run.
 let story = "normal";
 const stories = [
-  { id: "normal", normal: true, title: "Normal morning", tag: "Baseline", mission: "Follow the planned routes with no incident or drone check" },
+  { id: "normal", normal: true, title: "Normal morning", tag: "Baseline", mission: "Follow the planned routes" },
   ...demoIncidents,
 ];
 let decisionLog = [];
@@ -1331,7 +1331,7 @@ function renderStart() {
   $("#start-button").disabled = false;
   $("#jump-button").disabled = false;
   $("#jump-button").hidden = story === "normal";
-  $("#start-note").textContent = "Start with normal operations, introduce an incident, then compare delay and CO₂ before choosing a response.";
+  $("#start-note").textContent = "";
 }
 
 // The regular morning: nothing to decide, so the guide shows what PigeonOps is watching.
@@ -1468,8 +1468,8 @@ function renderReport() {
   $("#report-today-head").textContent = routine ? "Planned day" : "Today";
   $("#report-change-head").textContent = routine ? "Basis" : "Change";
   $("#report-indicators-note").textContent = routine
-    ? "Whole-plan estimates for the planned routes. Response alternatives appear only when an incident is reported."
-    : `Whole-plan estimates for the top-ranked response before inspection.${activeScenario === "congestion" ? " This case also starts with an earlier cargo release than the normal baseline." : ""}`;
+    ? "Whole-plan estimates."
+    : `Estimates for the recommended response before inspection.${activeScenario === "congestion" ? " Cargo released earlier than baseline." : ""}`;
 
   $("#report-indicators").innerHTML = scenario.analysis.indicators.map((item) => {
     if (routine) return `<tr><td>${indicatorLabel(item)}</td><td class="num">${item.value == null ? "—" : indicatorText(item, item.value)}</td><td class="muted">${esc(basisLabel[item.basis] ?? item.basis)}</td></tr>`;

@@ -10,12 +10,10 @@ const esc = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", 
 // Why the page recommends inspecting or not, in one or two sentences.
 export function inspectionSentence(evoi) {
   const wait = evoi.assumptions.launch_and_review_minutes;
-  const gross = evoi.gross_value_of_information;
   const cost = evoi.inspection_cost;
   if (evoi.recommend_inspection) {
-    return `Estimated net saving: ${money(evoi.net_value_of_information)}, including the ${money(cost)} check and ${wait}-minute wait.`;
+    return `Estimated saving: ${money(evoi.net_value_of_information)} after the ${money(cost)} check and ${wait} min wait.`;
   }
-  if (gross > 0) return `Estimated saving: ${money(gross)}. Inspection cost: ${money(cost)}.`;
   return `Checking first adds an estimated ${money(-evoi.net_value_of_information)} in cost and delay.`;
 }
 
@@ -24,15 +22,15 @@ export function inspectionChoices(evoi, words) {
   const branches = (evoi.response_by_observation ?? []).filter((row) => row.observation !== "inconclusive");
   if (!branches.length) return "";
   if (new Set(branches.map((row) => row.action)).size === 1) {
-    return `Either drone finding still favors “${branches[0].label}”. The check would not change the preferred response.`;
+    return `Both findings favor: ${branches[0].label}.`;
   }
-  return branches.map((row) => `If ${row.observation === "blocked" ? words.bad : words.good}: ${row.label}`).join(". ") + ". These choices include the inspection wait.";
+  return branches.map((row) => `${row.observation === "blocked" ? words.bad : words.good}: ${row.label}`).join(". ") + ".";
 }
 
 export function responseExplanation(items) {
   const [best, next] = items;
   if (!best || !next) return "";
-  return `“${best.label}” has the lowest estimated loss: ${money(best.expected_loss)}, ${money(next.expected_loss - best.expected_loss)} less than “${next.label}”. The comparison includes delay, driving, CO₂ and missed appointment windows for both modeled loads.`;
+  return `${best.label}: ${money(best.expected_loss)} estimated loss, ${money(next.expected_loss - best.expected_loss)} less than ${next.label}.`;
 }
 
 // How accurate the inspection has to be, what the page assumes, and how automated CV alone compares.

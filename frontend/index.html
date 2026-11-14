@@ -155,10 +155,9 @@
 
       <div class="panel-body">
         <section class="step step-start" data-step="start" aria-labelledby="start-title">
-          <h1 id="start-title">Normal morning vs incident</h1>
-          <p class="lede">See the normal plan, introduce a road incident, then decide whether a drone check is worth its cost.</p>
+          <h1 id="start-title">Choose a scenario</h1>
           <fieldset class="story-picker">
-            <legend>Normal baseline + four incident decisions</legend>
+            <legend class="visually-hidden">Scenario</legend>
             <ul id="story-options" class="options"></ul>
           </fieldset>
           <div class="actions">
@@ -166,13 +165,12 @@
             <button id="jump-button" class="btn" type="button" hidden disabled>Watch from start</button>
           </div>
           <p id="start-note" class="note"></p>
-          <p class="fine-print">Simulation only. You approve each response. No drones or drivers are dispatched.</p>
+          <p class="fine-print">Simulation. You approve each response; no dispatch occurs.</p>
         </section>
 
         <section class="step step-monitor" data-step="monitor" aria-labelledby="monitor-title" hidden>
           <p class="tag-line"><span class="tag ok">No incident</span><span>Regular morning</span></p>
           <h1 id="monitor-title">Fleet and environment</h1>
-          <p class="lede">No incidents reported. Follow the simulated trucks and their estimated environmental impact as the shift runs.</p>
           <dl class="facts">
             <div><dt>Trucks moving now</dt><dd id="monitor-moving">—</dd></div>
             <div><dt>CO₂ emitted so far</dt><dd id="monitor-co2">—</dd></div>
@@ -183,7 +181,6 @@
           <p id="monitor-note" class="note"></p>
           <div class="jump">
             <h2>Introduce an incident</h2>
-            <p>Compare the changed plan with normal operations, then review one drone clip for that check.</p>
             <div id="monitor-incidents" class="jump-list"></div>
           </div>
           <div class="actions">
@@ -196,7 +193,6 @@
           <h1 id="disruption-title">Loading…</h1>
           <p id="incident-place" class="subhead"></p>
           <p id="disruption-description" class="lede"></p>
-          <p id="decision-context" class="decision-context"></p>
           <dl class="facts">
             <div><dt id="risk-label">Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
             <div><dt id="affected-label">Shipment at risk</dt><dd id="affected">—</dd></div>
@@ -210,7 +206,6 @@
             <p id="recommendation-short" class="verdict-answer">—</p>
             <p id="recommendation" class="verdict-why">Calculating…</p>
             <p id="inspection-choices" class="decision-context"></p>
-            <p id="inspection-limits" class="note"></p>
             <details class="more"><summary>Calculation</summary>
               <dl class="ledger">
                 <div><dt>Expected loss: act now</dt><dd id="act-loss">—</dd></div>
@@ -222,6 +217,7 @@
               <figure id="sensitivity" class="sensitivity" hidden></figure>
               <p id="cv-only" class="note"></p>
               <p id="drone-note" class="note"></p>
+              <p id="inspection-limits" class="note"></p>
               <div id="brief-incident" class="copilot-brief" aria-live="polite" hidden></div>
             </details>
           </div>
@@ -251,7 +247,6 @@
             <button id="reinspect-button" class="link" type="button">Review footage</button>
           </div>
           <h1 id="options-title">Choose a response</h1>
-          <p id="response-context" class="decision-context"></p>
           <p id="response-limits" class="note"></p>
           <p id="ranking-state" class="subhead">Lowest expected loss first. Estimates.</p>
           <p id="response-why" class="decision-context"></p>
@@ -262,7 +257,7 @@
           <div class="actions">
             <button id="confirm-button" class="btn primary" type="button">Confirm</button>
           </div>
-          <details class="more"><summary>What is expected loss?</summary><p>Average cost of driving, delay, CO₂, and missed appointments, weighted by the chance of each road condition. Rates are assumed. Confirming runs the simulation.</p></details>
+          <details class="more"><summary>Expected loss</summary><p>Probability-weighted cost of driving, delay, CO₂ and missed appointments for both loads. Rates are assumed. Confirming runs the simulation.</p></details>
         </section>
 
         <section class="step step-outcome" data-step="outcome" aria-labelledby="outcome-title" hidden>
