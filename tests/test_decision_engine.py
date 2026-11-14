@@ -17,10 +17,15 @@ class DecisionEngineTests(unittest.TestCase):
         self.assertEqual([1, 2, 3], [item["rank"] for item in ranked])
         self.assertEqual(sorted(x["expected_loss"] for x in ranked), [x["expected_loss"] for x in ranked])
 
-    def test_demo_recommends_inspection(self):
+    def test_disruption_a_recommends_inspection(self):
         result = analyze(self.scenario)
         self.assertTrue(result["evoi"]["recommend_inspection"])
         self.assertGreater(result["evoi"]["net_value_of_information"], 0)
+
+    def test_disruption_b_does_not_recommend_inspection(self):
+        result = analyze(load_scenario(variant="disruption_b"))
+        self.assertFalse(result["evoi"]["recommend_inspection"])
+        self.assertLess(result["evoi"]["net_value_of_information"], 0)
 
     def test_observation_produces_after_ranking(self):
         result = analyze(self.scenario, "clear")
@@ -31,8 +36,8 @@ class DecisionEngineTests(unittest.TestCase):
         result = analyze(load_scenario(variant="normal"))
         self.assertFalse(result["evoi"]["recommend_inspection"])
 
-    def test_scenario_catalog_contains_demo_pair(self):
-        self.assertEqual(["normal", "disruption"], [item["id"] for item in available_scenarios()])
+    def test_scenario_catalog(self):
+        self.assertEqual(["normal", "disruption", "disruption_b"], [item["id"] for item in available_scenarios()])
 
     def test_sensitivity_spans_zero_to_one(self):
         points = analyze(self.scenario)["sensitivity"]

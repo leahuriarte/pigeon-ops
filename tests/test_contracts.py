@@ -3,6 +3,7 @@ import json
 import unittest
 from pathlib import Path
 
+from backend.decision_engine import analyze
 from backend.scenario import available_scenarios, load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,23 @@ class ScenarioContractTests(unittest.TestCase):
                     self.assertEqual("LineString", geometry["type"])
                     self.assertGreaterEqual(len(geometry["coordinates"]), 2)
                     self.assertGreater(route.get("distance_m", 0), 0)
+
+    def test_every_action_has_a_plan_or_override(self):
+        for item in available_scenarios():
+            for action in load_scenario(variant=item["id"])["decision_model"]["actions"]:
+                with self.subTest(variant=item["id"], action=action["id"]):
+                    self.assertTrue(action.get("plan") or action.get("override"))
+                    for state in ("open", "blocked"):
+                        self.assertIn(action["outcomes"][state]["basis"], ("estimated", "override"))
+
+    def test_analysis_indicators_match_contract(self):
+        for item in available_scenarios():
+            with self.subTest(variant=item["id"]):
+                indicators = analyze(load_scenario(variant=item["id"]))["indicators"]
+                self.assertEqual(INDICATOR_IDS, {i["id"] for i in indicators})
+                for indicator in indicators:
+                    self.assertIn(indicator["basis"], BASES)
+                self.assertIn("of", next(i for i in indicators if i["id"] == "appointments_feasible"))
 
     def test_disruption_lists_evidence(self):
         self.assertTrue(load_scenario(variant="disruption")["disruption"]["evidence_clips"])

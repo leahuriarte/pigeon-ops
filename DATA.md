@@ -9,8 +9,8 @@ The shared operating picture in `config/port_scenario.json` contains:
 - 12 synthetic shipments across three port terminals and six destination facilities
 - 9 synthetic trucks with assignments, powertrains, status, duty time, and approximate simulated positions
 - 4 illustrative corridors, including a current route, candidate detour, and two fleet context routes
-- 2 scenario variants: routine morning operations and an unverified road disruption
-- 3 dispatcher actions with state-dependent delay, cost, emissions, and constraint outcomes
+- 3 scenario variants: routine morning operations, an unverified road disruption, and a corroborated one
+- 3 dispatcher actions whose delay, cost, emissions, and constraint outcomes are computed from route data (one still uses a hand-entered override); see [docs/METHODS.md](docs/METHODS.md)
 - 1 simulated observation with an explicit accuracy assumption
 
 Identifiers use the `SYN-` prefix so they cannot be mistaken for valid container, carrier, truck, or shipment identifiers.
@@ -69,11 +69,11 @@ The prototype currently uses a hand-curated, deterministic scenario so the hacka
 1. Select a terminal, destination, commodity class, truck, appointment, and readiness state.
 2. Assign a corridor and an ETA with appointment slack.
 3. Mark shipments as on time, watch, at risk, planned, or unassigned.
-4. In the disruption variant, introduce an uncertain road state with a 55% prior blockage probability.
-5. Calculate action loss under open and blocked states.
+4. In the disruption variant, introduce an uncertain road state with a 40% prior blockage probability.
+5. Compute each action's outcomes from route distance and duration, then its loss under open and blocked states.
 6. Calculate the value of an imperfect observation and update the probability with Bayes' rule after a simulated result.
 
-The normal scenario uses a 5% blockage prior and less severe blocked outcome. Inspection is intentionally not cost-effective there. The disruption scenario makes information valuable because the preferred action differs materially between road states.
+The normal scenario uses a 2% blockage prior, so inspection is not cost-effective. The disruption scenario makes information valuable because the preferred action differs materially between road states. The corroborated disruption (`disruption_b`, 80% prior) shows the opposite case: rerouting is best whatever the inspection says, so inspection is not worth its cost.
 
 ## Decision model
 
@@ -103,7 +103,7 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 - Observation accuracy is assumed rather than validated on labeled footage.
 - Driver hours are synthetic summaries and do not implement hours-of-service compliance.
 - Community exposure is described qualitatively; the demo does not yet calculate population-weighted pollution or noise exposure.
-- Action outcomes are curated point estimates rather than Monte Carlo distributions.
+- Action outcomes are point estimates from route data and assumed rates (see [docs/METHODS.md](docs/METHODS.md)) rather than Monte Carlo distributions.
 - Inspection delay is monetized as a configured cost; a future model should also propagate the six-minute wait through every shipment ETA and appointment constraint.
 
 ## Recommended next data step

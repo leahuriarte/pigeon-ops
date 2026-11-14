@@ -1,4 +1,5 @@
 """Small, auditable expected-value-of-information decision engine."""
+from backend.indicators import compute_indicators
 
 
 def _loss(metrics, weights):
@@ -90,14 +91,15 @@ def analyze(scenario, observation=None):
     model = scenario["decision_model"]
     prior = scenario["disruption"]["prior_blocked_probability"]
     posterior = posterior_blocked(prior, observation, model["drone"]["accuracy"])
+    before = rank_actions(model, prior)
     return {
         "scenario_id": scenario.get("id"),
         "prior_blocked_probability": round(prior, 4),
         "posterior_blocked_probability": round(posterior, 4) if observation else None,
         "observation": observation,
-        "before": rank_actions(model, prior),
+        "before": before,
         "after": rank_actions(model, posterior) if observation else [],
         "evoi": information_value(model, prior),
         "sensitivity": sensitivity(model),
-        "indicators": scenario.get("indicators_stub", []),
+        "indicators": compute_indicators(scenario, before),
     }

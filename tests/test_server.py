@@ -38,7 +38,14 @@ class ServerTests(unittest.TestCase):
 
     def test_lists_scenarios(self):
         body = self.get("/api/scenarios")
-        self.assertEqual(["normal", "disruption"], [s["id"] for s in body["scenarios"]])
+        self.assertEqual(["normal", "disruption", "disruption_b"], [s["id"] for s in body["scenarios"]])
+
+    def test_every_scenario_returns_computed_indicators(self):
+        for item in self.get("/api/scenarios")["scenarios"]:
+            with self.subTest(variant=item["id"]):
+                body = self.get(f"/api/analysis?scenario={item['id']}")
+                self.assertEqual(6, len(body["indicators"]))
+                self.assertIn("estimated", {i["basis"] for i in body["indicators"]})
 
     def test_default_scenario_is_disruption(self):
         body = self.get("/api/scenario")
