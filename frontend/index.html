@@ -146,15 +146,15 @@
 
       <div class="panel-body">
         <section class="step step-start" data-step="start" aria-labelledby="start-title">
-          <h1 id="start-title">Plan the morning</h1>
-          <p class="lede">Check a road report, compare the options, and choose a response.</p>
+          <h1 id="start-title">Is a drone check worth it?</h1>
+          <p class="lede">A delivery is at risk. Decide whether a drone view is worth the cost, review the footage, then approve a response.</p>
           <fieldset class="story-picker">
-            <legend>Scenario</legend>
+            <legend>Choose an incident</legend>
             <ul id="story-options" class="options"></ul>
           </fieldset>
           <div class="actions">
-            <button id="start-button" class="btn primary big" type="button">Start</button>
-            <button id="jump-button" class="btn" type="button">Skip to incident</button>
+            <button id="start-button" class="btn primary big" type="button">Open incident</button>
+            <button id="jump-button" class="btn" type="button">Watch from start</button>
           </div>
           <p id="start-note" class="note"></p>
           <p class="fine-print">Simulation only. You approve each response. No drones or drivers are dispatched.</p>
@@ -206,7 +206,7 @@
           </div>
 
           <div class="actions">
-            <button id="inspect-button" class="btn primary" type="button">Review footage</button>
+            <button id="inspect-button" class="btn primary" type="button">Run drone check</button>
             <button id="skip-inspection" class="btn" type="button">Skip inspection</button>
           </div>
           <div id="observation-buttons" class="choices" hidden>
@@ -314,13 +314,12 @@
     <header class="inspection-header">
       <div>
         <h2 id="inspection-dialog-heading">Review footage</h2>
-        <p class="inspection-scope">Stock footage from another location, used for this simulation.</p>
+        <p class="inspection-scope">Simulated drone check · pre-recorded stock footage from another location.</p>
       </div>
       <button id="inspection-close" class="btn small" type="button">Close</button>
     </header>
     <div class="inspection-body">
       <div class="inspection-media">
-        <div id="inspection-clips" class="clip-tabs" role="tablist" aria-label="Inspection clip"></div>
         <video id="inspection-video" class="inspection-photo" autoplay loop muted playsinline aria-label="Annotated drone clip"></video>
         <img id="inspection-photo" class="inspection-photo" alt="Unannotated source frame" hidden>
         <div class="inspection-photo-caption"><button id="inspection-image-toggle" class="link" type="button">Show source frame</button></div>
@@ -351,7 +350,7 @@
           <p class="fine-print">Reviews are saved locally.</p>
         </details>
         <p id="inspection-error" class="inspection-error" role="alert"></p>
-        <button id="inspection-apply" class="btn primary" type="button" disabled>Apply to scenario</button>
+        <button id="inspection-apply" class="btn primary" type="button" disabled>Confirm drone observation</button>
       </div>
     </div>
   </dialog>

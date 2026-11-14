@@ -40,33 +40,8 @@
   .inspection-body { grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); align-items: start; }
 }
 
-/* Left: clip picker, video, legend */
+/* Left: assigned video and legend */
 .inspection-media { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.clip-tabs { display: flex; gap: 10px; overflow-x: auto; padding: 4px 4px 6px; }
-.clip {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 5px;
-  width: 96px;
-  padding: 0;
-  border: 0;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-.clip img { display: block; width: 96px; height: 54px; object-fit: cover; border: var(--frame); background: #1b1f23; }
-.clip span {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 11.5px;
-  line-height: 1.25;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-.clip:hover span { text-decoration: underline; text-underline-offset: 2px; }
-.clip[aria-selected="true"] img { outline: 3px solid var(--signal); outline-offset: 1px; }
-.clip[aria-selected="true"] span { font-weight: 700; }
 
 .inspection-photo { display: block; width: 100%; max-height: 52vh; object-fit: contain; border: var(--frame); background: #1b1f23; }
 .inspection-photo[hidden] { display: none; }

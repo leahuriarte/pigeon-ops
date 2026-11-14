@@ -1,14 +1,12 @@
 import { clearFootageOpinion, renderFootageOpinion } from "./copilot.js";
+import { demoIncidents } from "./demo.js";
 
 const dialog = document.querySelector("#inspection-dialog");
-const clips = document.querySelector("#inspection-clips");
 const video = document.querySelector("#inspection-video");
 const photo = document.querySelector("#inspection-photo");
 const toggle = document.querySelector("#inspection-image-toggle");
 let libraryPromise;
-let cases = [];
 let selected;
-let selectedId = null;
 let scenarioId;
 let showSource = false;
 let submitting = false;
@@ -22,7 +20,6 @@ const labels = {
   insufficient_detail: "Insufficient detail",
   image_unavailable: "Footage unavailable",
 };
-const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 let signalLabels = {};
 
 function showMedia() {
@@ -34,9 +31,6 @@ function showMedia() {
 }
 
 function renderCase() {
-  selected = cases.find((item) => item.id === selectedId);
-  if (!selected) return;
-  clips.querySelectorAll(".clip").forEach((button) => button.setAttribute("aria-selected", String(button.dataset.case === selectedId)));
   showSource = false;
   video.src = selected.annotated_video;
   video.poster = selected.annotated_image;
@@ -74,8 +68,8 @@ function renderCase() {
   renderFootageOpinion(selected, signalLabels, scenarioId); // LLM second read; never changes the preselected radio.
 }
 
-// Opens the dialog with the clips that fit this kind of check (`words` is the scenario's disruption.check).
-// Returns false when the library has no clip showing that kind of hazard, so the page falls back to simulated results.
+// Each demo incident opens its assigned clip. Never substitute an unrelated view
+// when that clip is missing; the caller provides explicit simulated observations.
 export async function openInspection(id, words) {
   if (!libraryPromise) {
     libraryPromise = fetch("/api/inspection-cases").then((response) => {
@@ -84,17 +78,14 @@ export async function openInspection(id, words) {
     }).catch(() => ({ cases: [] }));
   }
   const library = await libraryPromise;
-  cases = (library.cases || []).filter((item) => !item.check_types || item.check_types.includes(words.type));
-  if (!cases.some((item) => item.visual_label !== "no_visible_obstruction")) return false;
+  const incident = demoIncidents.find((item) => item.id === id);
+  selected = (library.cases || []).find((item) => item.id === incident?.footageId
+    && (!item.check_types || item.check_types.includes(words.type)));
+  if (!selected) return false;
   scenarioId = id;
-  signalLabels = { blocked: `Road ${words.bad}`, clear: "Road clear: traffic gets through", inconclusive: "Inconclusive" };
-  document.querySelector("#inspection-dialog-heading").textContent = `${words.label}: what does the footage show?`;
+  signalLabels = { blocked: `Road ${words.bad}`, clear: `Road ${words.good}: traffic gets through`, inconclusive: "Inconclusive" };
+  document.querySelector("#inspection-dialog-heading").textContent = incident.mission;
   document.querySelectorAll("[name=inspection-observation]").forEach((radio) => { radio.nextElementSibling.textContent = signalLabels[radio.value]; });
-  clips.innerHTML = cases.map((item) => `<button class="clip" type="button" role="tab" data-case="${escapeHtml(item.id)}" aria-selected="false">
-    <img src="${escapeHtml(item.annotated_image)}" alt="">
-    <span>${escapeHtml(item.title)}</span>
-  </button>`).join("");
-  selectedId = cases[0].id;
   renderCase();
   dialog.showModal();
   window.dispatchEvent(new Event("inspection-dialog-open"));
@@ -107,12 +98,6 @@ export function resetInspection() {
   clearFootageOpinion();
 }
 
-clips.addEventListener("click", (event) => {
-  const button = event.target.closest(".clip");
-  if (!button || submitting) return;
-  selectedId = button.dataset.case;
-  renderCase();
-});
 toggle.addEventListener("click", () => {
   showSource = !showSource;
   showMedia();
@@ -131,7 +116,6 @@ document.querySelector("#inspection-apply").addEventListener("click", async () =
   submitting = true;
   button.disabled = true;
   button.textContent = "Applying…";
-  clips.querySelectorAll(".clip").forEach((clip) => { clip.disabled = true; });
   try {
     const response = await fetch("/api/inspection-review", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -148,7 +132,6 @@ document.querySelector("#inspection-apply").addEventListener("click", async () =
   } finally {
     submitting = false;
     button.disabled = false;
-    button.textContent = "Apply to scenario";
-    clips.querySelectorAll(".clip").forEach((clip) => { clip.disabled = false; });
+    button.textContent = "Confirm drone observation";
   }
 });

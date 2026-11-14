@@ -1,6 +1,7 @@
 import { openInspection, resetInspection } from "./inspection.js";
 import { clearBrief, initAsk, renderBrief, resetAsk } from "./copilot.js";
 import { inspectionSentence, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
+import { demoIncidents } from "./demo.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -57,10 +58,7 @@ const roadWord = (state) => (state === "blocked" ? check().bad : check().good);
 const findingText = (observation) => ({ blocked: `road ${check().bad}`, clear: "road clear", inconclusive: "inconclusive" })[observation];
 const scenarioCopy = {
   normal: { title: "Regular morning", description: "No incidents reported." },
-  disruption: { title: "Possible crash on CA-47", description: "Two drivers report a blockage. Neither report is confirmed." },
-  disruption_b: { title: "Crash reported on CA-47", description: "Four drivers and a simulated traffic alert report a full blockage." },
-  congestion: { title: "Heavy traffic on CA-47", description: "A driver reports a queue after a terminal slowdown. Its length and speed are unknown." },
-  flood: { title: "Possible flooding on CA-47", description: "A water main has burst beside the road. A driver reports water across the lanes. It's unclear whether trucks can pass." },
+  ...Object.fromEntries(demoIncidents.map((item) => [item.id, item])),
 };
 let baseline = null; // Indicators for the normal scenario, the comparison point.
 let activeScenario = "normal";
@@ -961,7 +959,7 @@ function renderEvoi(analysis) {
   $("#net-value").textContent = money(e.net_value_of_information);
   $("#inspect-button").classList.toggle("primary", e.recommend_inspection);
   $("#skip-inspection").classList.toggle("primary", !e.recommend_inspection);
-  $("#inspect-button").textContent = "Review footage";
+  $("#inspect-button").textContent = "Run drone check";
   $("#cv-only").textContent = accuracyNote(e);
   renderSensitivity($("#sensitivity"), analysis, check());
   const a = e.assumptions;
@@ -1136,17 +1134,10 @@ async function loadScenario(id, { keepTime = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Flow. The start step lets the dispatcher choose the morning (story): a
-// regular morning with no incident, or one of the incident reports. The
-// morning opens in monitoring on the usual plan. On a regular morning the
-// guide shows the monitor step until the shift report. Otherwise, while
-// it plays, the incident report arrives INCIDENT_DELAY_MIN after the start and
-// the page switches to the incident data at the same clock time (step
-// incident). The dispatcher decides on a drone check, chooses a response
-// (step respond) and watches it play out (step outcome). When the morning has
-// played out, the shift report compares today with the usual morning.
-// A normal morning skips the incident: the usual plan plays out
-// to the end and the shift report shows the indicators for an ordinary day.
+// Flow. Choose one of two incidents and open its report directly, or watch
+// the usual plan until the report arrives INCIDENT_DELAY_MIN after the start.
+// The dispatcher decides on a drone check, chooses a response and watches
+// it play out. The shift report compares today with the usual morning.
 // ---------------------------------------------------------------------------
 const INCIDENT_DELAY_MIN = 2;
 const steps = ["start", "incident", "respond", "outcome"]; // "monitor" is outside the stepper.
@@ -1154,7 +1145,9 @@ let mode = "monitoring";
 let step = "start";
 let furthest = 0; // Index in steps of the furthest step reached in this run.
 let story = "disruption"; // The chosen morning: "normal" or an incident variant id.
-let stories = []; // { id, normal, tag, title, prior, check, worth } for the regular morning and each incident.
+const stories = demoIncidents.map((item, index) => ({
+  ...item, tag: index === 0 ? "Main demo" : "Second incident",
+}));
 let decisionLog = [];
 let routine = false; // True for a normal morning with no incident report.
 
@@ -1229,9 +1222,7 @@ function renderStepper() {
   });
 }
 
-const storyDetail = (item) => item.normal
-  ? "Follow the planned routes"
-  : `${pct(item.prior)} assumed chance the road is ${item.check.bad}`;
+const storyDetail = (item) => `${item.mission}.`;
 const jumpButton = (item) => `<button class="btn jump-btn" type="button" data-jump="${esc(item.id)}"><b>${esc(item.tag)}: ${esc(item.title)}</b><small>${esc(storyDetail(item))}</small></button>`;
 
 function renderStart() {
@@ -1243,13 +1234,7 @@ function renderStart() {
       <span class="option-summary story-detail">${esc(storyDetail(item))}</span>
     </label>
   </li>`).join("");
-  const chosen = stories.find((item) => item.id === story);
-  $("#jump-button").hidden = !chosen || chosen.normal;
-  if (chosen?.normal) {
-    $("#start-note").textContent = `${clockLabel(span.start)} to ${clockLabel(span.end)} · No incidents`;
-  } else {
-    $("#start-note").textContent = `Starts ${clockLabel(span.start)} · Incident at ${clockLabel(span.start + INCIDENT_DELAY_MIN)}`;
-  }
+  $("#start-note").textContent = "Report → drone check → approve a response → see the simulated result.";
 }
 
 // The regular morning: nothing to decide, so the guide shows what PigeonOps is watching.
@@ -1382,8 +1367,8 @@ function skipToReport() {
 
 function bindEvents() {
   const fail = (error) => console.error(error);
-  $("#start-button").addEventListener("click", () => startMorning().catch(fail));
-  $("#jump-button").addEventListener("click", () => jumpToIncident(story).catch(fail));
+  $("#start-button").addEventListener("click", () => jumpToIncident(story).catch(fail));
+  $("#jump-button").addEventListener("click", () => startMorning().catch(fail));
   $("#story-options").addEventListener("change", (event) => {
     if (event.target.name !== "story") return;
     story = event.target.value;
@@ -1481,44 +1466,15 @@ window.addEventListener("inspection-reviewed", ({ detail }) => {
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;
-  $("#reinspect-button").textContent = "Review another clip";
+  $("#reinspect-button").textContent = "Review drone footage";
   showObservation(detail.analysis, summary).catch((error) => {
     $("#posterior").textContent += ` Playback could not update: ${error.message}`;
   });
 });
 
-// The mornings to choose from: the regular morning, then the incident reports
-// numbered by kind of check (the two crash reports share incident 1).
-const checkNames = { crash: "Crash", congestion: "Heavy traffic", environment: "Road damage" };
-async function loadStories() {
-  const list = await fetch("/api/scenarios").then((response) => (response.ok ? response.json() : { scenarios: [] })).catch(() => ({ scenarios: [] }));
-  const found = await Promise.all(list.scenarios.map(async (item) => {
-    const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(item.id)}`).catch(() => null);
-    if (!response?.ok) return null;
-    const data = await response.json();
-    const d = data.disruption;
-    const normal = data.scenario_type === "normal";
-    return {
-      id: item.id,
-      normal,
-      title: scenarioCopy[item.id]?.title ?? d.title,
-      prior: d.prior_blocked_probability,
-      check: { type: "crash", label: "Drone check", bad: "blocked", ...d.check },
-      worth: data.analysis.evoi.recommend_inspection,
-    };
-  }));
-  const types = [];
-  stories = found.filter(Boolean).map((item) => {
-    if (item.normal) return { ...item, tag: "No incident" };
-    if (!types.includes(item.check.type)) types.push(item.check.type);
-    return { ...item, tag: `Incident ${types.indexOf(item.check.type) + 1} · ${checkNames[item.check.type] ?? item.check.label}` };
-  }).sort((a, b) => b.normal - a.normal);
-}
-
 bindEvents();
 setView("map");
-loadStories()
-  .then(() => loadScenario("normal"))
+loadScenario("normal")
   .then(() => setStep("start"))
   .catch((error) => {
     $("#start-note").textContent = `PigeonOps could not load: ${error.message}`;
