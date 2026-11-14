@@ -1,16 +1,43 @@
 const $ = (selector) => document.querySelector(selector);
-const money = (value) => `${value < 0 ? "−" : ""}$${Math.abs(Math.round(value)).toLocaleString()}`;
+const $$ = (selector) => [...document.querySelectorAll(selector)];
+const money = (value) => `${value < 0 ? "−" : ""}$${Math.abs(Math.round(value)).toLocaleString("en-US")}`;
 const pct = (value) => `${Math.round(value * 100)}%`;
+const whole = (value) => Math.round(value).toLocaleString("en-US");
+const esc = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const svgNS = "http://www.w3.org/2000/svg";
+
+const colors = { ink: "#1b1f23", warehouse: "#5b6268", risk: "#b42318", amber: "#c27c0e" };
 const attentionStatuses = new Set(["at-risk", "watch", "unassigned"]);
+const shipmentStatus = {
+  "on-time": ["On time", "ok"],
+  planned: ["Planned", "planned"],
+  watch: ["Watch", "watch"],
+  "at-risk": ["At risk", "risk"],
+  unassigned: ["Unassigned", "risk"],
+};
+const truckStatus = {
+  "en-route": ["En route", "ok"],
+  "available-soon": ["Available soon", "watch"],
+  "at-terminal": ["At terminal", "planned"],
+  waiting: ["Waiting", "watch"],
+};
+const observationLabels = { blocked: "road blocked", clear: "road clear", inconclusive: "inconclusive" };
+const truckIsWaiting = (truck) => truck.status === "waiting" || truck.status === "available-soon";
+const tag = ([label, tone]) => `<span class="status ${tone}">${label}</span>`;
+
 let scenario;
 let activeScenario = "disruption";
 let shipmentFilter = "attention";
+let selectedTruck = null;
 let mapLayers = [];
 
 function project(lat, lon) {
   const b = scenario.map_bounds;
   return [30 + ((lon - b.west) / (b.east - b.west)) * 700, 25 + ((b.north - lat) / (b.north - b.south)) * 320];
+}
+
+function visibleLocations() {
+  return scenario.locations.filter((location) => location.kind !== "incident" || scenario.scenario_type === "disruption");
 }
 
 function drawSchematicMap() {
@@ -27,22 +54,20 @@ function drawSchematicMap() {
     routes.appendChild(line);
   });
 
-  scenario.locations
-    .filter((location) => location.kind !== "incident" || scenario.scenario_type === "disruption")
-    .forEach((location) => {
-      const [x, y] = project(location.lat, location.lon);
-      const group = document.createElementNS(svgNS, "g");
-      group.setAttribute("class", "marker");
-      const color = { terminal: "#087f75", warehouse: "#2e5868", incident: "#c94c4c" }[location.kind];
-      group.innerHTML = `<circle cx="${x}" cy="${y}" r="7" fill="${color}"/>${location.kind === "incident" ? `<circle class="incident-ring" cx="${x}" cy="${y}" r="9"/>` : ""}<text x="${x + 10}" y="${y - 9}">${location.name}</text>`;
-      markers.appendChild(group);
-    });
+  visibleLocations().forEach((location) => {
+    const [x, y] = project(location.lat, location.lon);
+    const group = document.createElementNS(svgNS, "g");
+    group.setAttribute("class", "marker");
+    const color = { terminal: colors.ink, warehouse: colors.warehouse, incident: colors.risk }[location.kind];
+    group.innerHTML = `<circle cx="${x}" cy="${y}" r="6" fill="${color}"/><text x="${x + 9}" y="${y - 8}">${esc(location.name)}</text>`;
+    markers.appendChild(group);
+  });
 
   scenario.trucks.forEach((truck) => {
     const [x, y] = project(truck.lat, truck.lon);
     const group = document.createElementNS(svgNS, "g");
-    group.setAttribute("class", "truck-marker");
-    group.innerHTML = `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" rx="3" transform="rotate(45 ${x} ${y})"/><text x="${x + 9}" y="${y + 4}">${truck.id.replace("SYN-TRK-", "T")}</text>`;
+    group.setAttribute("class", `truck-marker${truckIsWaiting(truck) ? " waiting" : ""}`);
+    group.innerHTML = `<rect x="${x - 5}" y="${y - 5}" width="10" height="10" transform="rotate(45 ${x} ${y})"/><text x="${x + 9}" y="${y + 4}">${esc(truck.id.replace("SYN-TRK-", "T"))}</text>`;
     markers.appendChild(group);
   });
 }
@@ -54,34 +79,32 @@ async function drawArcGISMap() {
     "@arcgis/core/layers/GraphicsLayer.js",
     "@arcgis/core/Graphic.js",
   ]);
-  const routeLayer = new GraphicsLayer({ title: "Dispatch routes" });
-  const markerLayer = new GraphicsLayer({ title: "Operations locations" });
-  const truckLayer = new GraphicsLayer({ title: "Synthetic truck positions" });
+  const routeLayer = new GraphicsLayer({ title: "Routes" });
+  const markerLayer = new GraphicsLayer({ title: "Terminals and warehouses" });
+  const truckLayer = new GraphicsLayer({ title: "Trucks" });
 
   scenario.routes.forEach((route) => {
     routeLayer.add(new Graphic({
       geometry: { type: "polyline", paths: [route.points.map(([lat, lon]) => [lon, lat])], spatialReference: { wkid: 4326 } },
-      symbol: { type: "simple-line", color: route.color, width: route.role === "fleet" ? 2 : 4.5, style: route.role === "detour" ? "short-dash" : "solid" },
+      symbol: { type: "simple-line", color: route.color, width: route.role === "fleet" ? 2 : 4, style: route.role === "detour" ? "short-dash" : "solid" },
       attributes: { name: route.name, role: route.role },
-      popupTemplate: { title: "{name}", content: "Route role: {role}" },
+      popupTemplate: { title: "{name}", content: "Route type: {role}" },
     }));
   });
 
-  const markerColors = { terminal: "#087f75", warehouse: "#2e5868", incident: "#c94c4c" };
-  scenario.locations
-    .filter((location) => location.kind !== "incident" || scenario.scenario_type === "disruption")
-    .forEach((location) => markerLayer.add(new Graphic({
-      geometry: { type: "point", longitude: location.lon, latitude: location.lat },
-      symbol: { type: "simple-marker", color: markerColors[location.kind], size: location.kind === "incident" ? 15 : 10, outline: { color: "white", width: 2 } },
-      attributes: { name: location.name, kind: location.kind },
-      popupTemplate: { title: "{name}", content: "Synthetic operations location · {kind}" },
-    })));
+  const markerColors = { terminal: colors.ink, warehouse: colors.warehouse, incident: colors.risk };
+  visibleLocations().forEach((location) => markerLayer.add(new Graphic({
+    geometry: { type: "point", longitude: location.lon, latitude: location.lat },
+    symbol: { type: "simple-marker", color: markerColors[location.kind], size: location.kind === "incident" ? 13 : 9, outline: { color: "white", width: 1.5 } },
+    attributes: { name: location.name, kind: location.kind },
+    popupTemplate: { title: "{name}", content: "Location type: {kind}" },
+  })));
 
   scenario.trucks.forEach((truck) => truckLayer.add(new Graphic({
     geometry: { type: "point", longitude: truck.lon, latitude: truck.lat },
-    symbol: { type: "simple-marker", style: "diamond", color: truck.status === "waiting" ? "#e89116" : "#132f3a", size: 11, outline: { color: "#ffffff", width: 1.5 } },
-    attributes: { id: truck.id, status: truck.status, assignment: truck.assignment, fuel: truck.fuel, duty: truck.duty_remaining_hr },
-    popupTemplate: { title: "{id}", content: "<b>{status}</b><br>Assignment: {assignment}<br>Powertrain: {fuel}<br>Duty remaining: {duty} hr<br><small>Synthetic record</small>" },
+    symbol: { type: "simple-marker", style: "diamond", color: truckIsWaiting(truck) ? colors.amber : colors.ink, size: 10, outline: { color: "#ffffff", width: 1.5 } },
+    attributes: { id: truck.id, status: truckStatus[truck.status]?.[0] ?? truck.status, assignment: truck.assignment, fuel: truck.fuel, duty: truck.duty_remaining_hr },
+    popupTemplate: { title: "{id}", content: "Status: {status}<br>Load: {assignment}<br>Fuel: {fuel}<br>Duty time left: {duty} h<br>Simulated record" },
   })));
 
   const viewElement = $("#arcgis-map");
@@ -89,148 +112,224 @@ async function drawArcGISMap() {
   if (mapLayers.length) viewElement.map.removeMany(mapLayers);
   mapLayers = [routeLayer, markerLayer, truckLayer];
   viewElement.map.addMany(mapLayers);
-  const visibleGraphics = [
-    ...routeLayer.graphics.toArray(),
-    ...markerLayer.graphics.toArray(),
-    ...truckLayer.graphics.toArray(),
-  ];
-  await viewElement.view.goTo(visibleGraphics, { animate: false, padding: 36 });
+  const visibleGraphics = [...routeLayer.graphics.toArray(), ...markerLayer.graphics.toArray(), ...truckLayer.graphics.toArray()];
+  await viewElement.view.goTo(visibleGraphics, { animate: false, padding: 32 });
   $("#arcgis-map").classList.remove("hidden");
   $("#map-fallback").classList.add("hidden");
-  $("#map-provider").textContent = "ArcGIS Maps SDK • OpenStreetMap • synthetic fleet positions";
+  $("#map-provider").textContent = "OpenStreetMap basemap. Truck positions are simulated.";
+}
+
+function showSchematic(message) {
+  $("#arcgis-map").classList.add("hidden");
+  $("#map-fallback").classList.remove("hidden");
+  $("#map-provider").textContent = message;
 }
 
 async function drawMap() {
   drawSchematicMap();
   if (window.innerWidth < 920) {
-    $("#arcgis-map").classList.add("hidden");
-    $("#map-fallback").classList.remove("hidden");
-    $("#map-provider").textContent = "Responsive operations schematic • synthetic fleet positions";
+    showSchematic("Schematic map on narrow screens. Truck positions are simulated.");
     return;
   }
   try {
     await drawArcGISMap();
   } catch (error) {
-    console.warn("Using offline map fallback:", error);
-    $("#arcgis-map").classList.add("hidden");
-    $("#map-fallback").classList.remove("hidden");
-    $("#map-provider").textContent = "Offline schematic • ArcGIS unavailable";
+    console.warn("Using the schematic map because ArcGIS failed to load:", error);
+    showSchematic("ArcGIS did not load, so this is a schematic. Truck positions are simulated.");
   }
 }
 
-function renderSummary() {
-  const attention = scenario.shipments.filter((item) => attentionStatuses.has(item.status)).length;
-  const assigned = scenario.shipments.filter((item) => item.truck !== "Unassigned").length;
-  const electric = scenario.trucks.filter((item) => item.fuel === "Battery electric").length;
-  const summary = [
-    [scenario.shipments.length, "active shipments", `${assigned} assigned to trucks`],
-    [attention, "need attention", attention ? "risk, watch, or unassigned" : "all within tolerance"],
-    [scenario.trucks.length, "trucks visible", `${electric} battery electric`],
-    [`${scenario.operations.network_speed_mph} mph`, "network speed", scenario.operations.weather],
-    [`${scenario.operations.terminal_turn_time_min} min`, "terminal turn time", "publicly calibrated estimate"],
-  ];
-  $("#ops-summary").innerHTML = summary.map(([value, label, note]) => `<div class="metric"><strong>${value}</strong><span>${label}</span><small>${note}</small></div>`).join("");
-  $("#map-truck-count").textContent = scenario.trucks.length;
-  $("#map-shipment-count").textContent = scenario.shipments.length;
-  $("#map-risk-count").textContent = attention;
+function affectedShipment() {
+  return scenario.shipments.find((item) => item.id === scenario.disruption.affected_shipment);
 }
 
-function renderShipments() {
-  const visible = shipmentFilter === "all" ? scenario.shipments : scenario.shipments.filter((item) => attentionStatuses.has(item.status));
-  $("#shipment-strip").innerHTML = visible.map((item) => `<article class="shipment ${item.status}" tabindex="0">
-    <div class="shipment-top"><b>${item.id}</b><span>${item.status.replace("-", " ")}</span></div>
-    <strong>${item.cargo}</strong>
-    <small>${item.truck} · ETA ${item.eta}</small>
-    <div class="shipment-meta"><span>${item.appointment}</span><span>${item.slack_min}m slack</span><span>${item.priority}</span></div>
-  </article>`).join("");
+function renderDecision() {
+  const d = scenario.disruption;
+  const affected = affectedShipment();
+  $("#scenario-time").textContent = scenario.generated_at.slice(11, 16);
+  $("#disruption-title").textContent = d.title;
+  $("#disruption-description").textContent = d.description;
+  $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
+  $("#risk-value").textContent = pct(d.prior_blocked_probability);
+  $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min of slack</small>`;
+  $("#deadline").innerHTML = `${esc(d.decision_deadline)}<small>Reported at ${esc(d.reported_at)}</small>`;
 }
 
-function renderFleet() {
-  $("#fleet-count").textContent = scenario.trucks.length;
-  $("#fleet-list").innerHTML = scenario.trucks.map((truck) => `<div class="fleet-row"><span class="fleet-dot ${truck.status}"></span><div><b>${truck.id}</b><small>${truck.assignment} · ${truck.fuel}</small></div><span>${truck.duty_remaining_hr}h</span></div>`).join("");
-}
-
-function renderProvenance() {
-  $("#provenance").innerHTML = scenario.data_provenance.map((item) => `<div><span class="provenance-kind ${item.kind.replaceAll(" ", "-")}">${item.kind}</span><p><b>${item.label}</b><small>${item.source}</small></p></div>`).join("");
-}
-
-function renderRankings(items, after = false) {
-  $("#ranking-title").textContent = after ? "Ranked after observation" : "Ranked before inspection";
-  $("#rankings").innerHTML = items.map((item) => `<div class="option-row ${item.rank === 1 ? "top" : ""}">
-    <div class="option-label"><span class="rank">${item.rank}</span><div><b>${item.label}</b><small>${item.summary}</small><em>${item.stakeholder_effect}</em></div></div>
-    <span>${item.expected.lateness_min} min</span><span>${money(item.expected.incremental_cost)}</span><span>${item.expected.emissions_kg} kg</span><span>${item.expected.constraint_breaches}</span><span>${money(item.expected_loss)}</span>
-  </div>`).join("");
+function renderRankings(items, observation = null) {
+  $("#ranking-state").textContent = observation
+    ? `Ranked by expected loss after a “${observationLabels[observation]}” result`
+    : "Ranked by expected loss before inspection";
+  $("#rankings").innerHTML = items.map((item) => {
+    const e = item.expected;
+    return `<tr class="${item.rank === 1 ? "top" : ""}">
+      <td class="num">${item.rank}</td>
+      <td><b>${esc(item.label)}</b><span class="detail">${esc(item.summary)}</span><span class="detail">${esc(item.stakeholder_effect)}</span></td>
+      <td class="num">${whole(e.lateness_min)}</td>
+      <td class="num">${money(e.incremental_cost)}</td>
+      <td class="num">${whole(e.emissions_kg)}</td>
+      <td class="num">${e.constraint_breaches.toFixed(1)}</td>
+      <td class="num"><b>${money(item.expected_loss)}</b></td>
+    </tr>`;
+  }).join("");
 }
 
 function renderEvoi(analysis) {
   const e = analysis.evoi;
-  const recommendation = $("#recommendation");
-  recommendation.textContent = e.recommend_inspection ? "Inspect first — evidence is expected to improve this decision." : "Act now — inspection is unlikely to change the best action enough to justify its cost.";
-  recommendation.classList.toggle("no", !e.recommend_inspection);
+  const best = analysis.before[0];
+  $("#recommendation").textContent = e.recommend_inspection
+    ? `Inspect before acting. Inspecting is expected to save ${money(e.gross_value_of_information)}, which is ${money(e.net_value_of_information)} more than it costs.`
+    : `Act now without inspecting. Inspecting costs ${money(e.inspection_cost)} and is expected to save ${money(e.gross_value_of_information)}.`;
+  $("#recommendation-short").innerHTML = e.recommend_inspection
+    ? `Inspect, then decide<small>Lowest expected loss now: ${esc(best.label)}</small>`
+    : `${esc(best.label)}<small>No inspection needed</small>`;
   $("#act-loss").textContent = money(e.best_act_now_loss);
   $("#evidence-loss").textContent = money(e.expected_loss_after_inspection);
   $("#inspection-cost").textContent = money(e.inspection_cost);
   $("#net-value").textContent = money(e.net_value_of_information);
-  $("#assumptions").innerHTML = `${e.formula}<br>Observation accuracy: ${pct(e.assumptions.inspection_accuracy)} (assumed)<br>Launch and review: ${e.assumptions.launch_and_review_minutes} min<br>Probability signal says blocked: ${pct(e.assumptions.signal_blocked_probability)}`;
+  const a = e.assumptions;
+  $("#assumptions").innerHTML = [
+    ["Feed accuracy (assumed)", pct(a.inspection_accuracy)],
+    ["Time to launch and review", `${a.launch_and_review_minutes} min`],
+    ["Chance the feed reports “blocked”", pct(a.signal_blocked_probability)],
+  ].map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("");
+}
+
+function renderShipments() {
+  const attention = scenario.shipments.filter((item) => attentionStatuses.has(item.status));
+  const visible = selectedTruck
+    ? scenario.shipments.filter((item) => item.truck === selectedTruck)
+    : shipmentFilter === "all" ? scenario.shipments : attention;
+  $("#shipment-count").textContent = `${scenario.shipments.length} active, ${attention.length} need attention`;
+  $("#truck-filter").hidden = !selectedTruck;
+  $("#shipments .segmented").classList.toggle("inactive", Boolean(selectedTruck));
+  $("#truck-filter-id").textContent = selectedTruck ?? "";
+  const affectedId = scenario.disruption.affected_shipment;
+  $("#shipment-list").innerHTML = visible.length ? visible.map((item) => {
+    const unassigned = item.truck === "Unassigned";
+    return `<tr class="${item.id === affectedId ? "affected" : ""}">
+      <td>${esc(item.id)}</td>
+      <td>${esc(item.cargo)}</td>
+      <td>${esc(item.priority[0].toUpperCase() + item.priority.slice(1))}</td>
+      <td>${unassigned ? '<span class="muted">None</span>' : `<button class="link" type="button" data-truck="${esc(item.truck)}">${esc(item.truck)}</button>`}</td>
+      <td>${esc(item.appointment)}</td>
+      <td>${esc(item.eta)}</td>
+      <td class="num">${unassigned ? "—" : `${item.slack_min} min`}</td>
+      <td>${tag(shipmentStatus[item.status] ?? [item.status, "planned"])}</td>
+    </tr>`;
+  }).join("") : '<tr><td colspan="8" class="muted">No shipments match this filter.</td></tr>';
+}
+
+function renderFleet() {
+  const electric = scenario.trucks.filter((item) => item.fuel === "Battery electric").length;
+  $("#fleet-count").textContent = `${scenario.trucks.length} trucks, ${electric} battery electric`;
+  $("#fleet-list").innerHTML = scenario.trucks.map((truck) => `<tr class="${truck.id === selectedTruck ? "selected" : ""}">
+    <td><button class="link" type="button" data-truck="${esc(truck.id)}" aria-pressed="${truck.id === selectedTruck}">${esc(truck.id)}</button><span class="detail">${esc(truck.assignment)}, ${esc(truck.fuel.toLowerCase())}</span></td>
+    <td>${tag(truckStatus[truck.status] ?? [truck.status, "planned"])}</td>
+    <td class="num">${truck.duty_remaining_hr} h</td>
+  </tr>`).join("");
+}
+
+function renderConditions() {
+  const o = scenario.operations;
+  $("#conditions").textContent = `Trucks are averaging ${o.network_speed_mph} mph across the network, and terminal turn time is ${o.terminal_turn_time_min} min. Weather: ${o.weather.replaceAll(" · ", ", ")}.`;
+}
+
+function renderProvenance() {
+  $("#provenance").innerHTML = scenario.data_provenance.map((item) => `<tr><td>${esc(item.label)}</td><td>${esc(item.kind[0].toUpperCase() + item.kind.slice(1))}</td><td>${esc(item.source)}</td></tr>`).join("");
+}
+
+function renderDefinitions() {
+  const m = scenario.decision_model;
+  const definitions = [
+    ["Needs attention", "A shipment with status at risk, watch, or unassigned."],
+    ["Slack", "Minutes between a shipment’s ETA and the start of its appointment window."],
+    ["Blockage probability", "The chance CA-47 is blocked, estimated from the incident reports. A simulated inspection result updates it with Bayes’ rule."],
+    ["Breach", "A hard rule an outcome violates, such as a missed appointment window."],
+    ["Expected loss", `Delay × ${money(m.lateness_cost_per_minute)} per minute, plus direct cost, plus CO₂ × $${m.emissions_cost_per_kg.toFixed(2)} per kg, plus breaches × ${money(m.hard_constraint_penalty)}. The blocked and open outcomes are averaged using the blockage probability.`],
+    ["Net value of inspecting", "Best expected loss when acting now, minus the expected loss after inspecting, minus the inspection cost. Inspection is recommended when this is above zero."],
+  ];
+  $("#definitions").innerHTML = definitions.map(([term, text]) => `<dt>${term}</dt><dd>${esc(text)}</dd>`).join("");
 }
 
 function resetObservation() {
-  $("#feed-label").textContent = "Awaiting simulated evidence";
-  $("#posterior").classList.add("hidden");
-  $("#observation-buttons").classList.add("hidden");
+  $("#posterior").hidden = true;
+  $("#observation-buttons").hidden = true;
+  $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", "false"));
   $("#inspect-button").disabled = false;
   $("#inspect-button").textContent = "Run simulated inspection";
 }
 
 async function observe(observation) {
   const response = await fetch(`/api/analysis?scenario=${encodeURIComponent(activeScenario)}&observation=${encodeURIComponent(observation)}`);
+  if (!response.ok) throw new Error("The analysis request failed");
   const analysis = await response.json();
-  renderRankings(analysis.after, true);
-  const labels = { blocked: "Obstruction detected", clear: "Route appears clear", inconclusive: "Image inconclusive" };
-  $("#feed-label").textContent = labels[observation];
-  $("#posterior").classList.remove("hidden");
-  $("#posterior").innerHTML = `<b>Updated blockage likelihood: ${pct(analysis.posterior_blocked_probability)}</b><br>Top option: ${analysis.after[0].label}. Dispatcher still makes the final call.`;
+  $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.observation === observation)));
+  renderRankings(analysis.after, observation);
+  const prior = pct(analysis.prior_blocked_probability);
+  const posterior = pct(analysis.posterior_blocked_probability);
+  const change = observation === "inconclusive"
+    ? `An inconclusive result leaves the blockage probability at ${prior}.`
+    : `After a “${observationLabels[observation]}” result, the blockage probability moves from ${prior} to ${posterior}.`;
+  $("#posterior").textContent = `${change} Lowest expected loss: ${analysis.after[0].label}. A dispatcher still approves the action.`;
+  $("#posterior").hidden = false;
 }
 
 async function loadScenario(id) {
   activeScenario = id;
+  selectedTruck = null;
   const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(id)}`);
-  if (!response.ok) throw new Error("Scenario failed to load");
+  if (!response.ok) throw new Error("The scenario failed to load");
   scenario = await response.json();
-  $("#scenario-eyebrow").textContent = scenario.disruption.eyebrow;
-  $("#disruption-id").textContent = scenario.disruption.id;
-  $("#disruption-title").textContent = scenario.disruption.title;
-  $("#disruption-description").textContent = scenario.disruption.description;
-  $("#risk-value").textContent = pct(scenario.disruption.prior_blocked_probability);
-  $("#drone-note").textContent = scenario.decision_model.drone.note;
-  $("#constraints").innerHTML = scenario.disruption.constraints.map((item) => `<li>${item}</li>`).join("");
-  document.querySelectorAll("[data-scenario]").forEach((button) => button.classList.toggle("active", button.dataset.scenario === id));
+  $(`#scenario-${id}`).checked = true;
   document.body.dataset.scenario = scenario.scenario_type;
+  $("#drone-note").textContent = scenario.decision_model.drone.note;
   resetObservation();
-  renderSummary();
-  renderShipments();
-  renderFleet();
-  renderProvenance();
+  renderDecision();
   renderRankings(scenario.analysis.before);
   renderEvoi(scenario.analysis);
+  renderShipments();
+  renderFleet();
+  renderConditions();
+  renderProvenance();
+  renderDefinitions();
   await drawMap();
 }
 
 function bindEvents() {
   $("#inspect-button").addEventListener("click", () => {
-    $("#observation-buttons").classList.remove("hidden");
-    $("#inspect-button").textContent = "Simulation ready — choose evidence";
+    $("#observation-buttons").hidden = false;
+    $("#inspect-button").textContent = "Waiting for a result";
     $("#inspect-button").disabled = true;
   });
-  document.querySelectorAll("[data-observation]").forEach((button) => button.addEventListener("click", () => observe(button.dataset.observation)));
-  document.querySelectorAll("[data-scenario]").forEach((button) => button.addEventListener("click", () => loadScenario(button.dataset.scenario)));
-  document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
-    shipmentFilter = button.dataset.filter;
-    document.querySelectorAll("[data-filter]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+  $$("[data-observation]").forEach((button) => button.addEventListener("click", () => observe(button.dataset.observation).catch((error) => {
+    $("#posterior").textContent = error.message;
+    $("#posterior").hidden = false;
+  })));
+  $$('input[name="scenario"]').forEach((input) => input.addEventListener("change", () => loadScenario(input.value)));
+  $$('input[name="shipment-filter"]').forEach((input) => input.addEventListener("change", () => {
+    shipmentFilter = input.value;
+    selectedTruck = null;
     renderShipments();
+    renderFleet();
   }));
+  $("#clear-truck").addEventListener("click", () => {
+    selectedTruck = null;
+    renderShipments();
+    renderFleet();
+  });
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-truck]");
+    if (!button) return;
+    const fromFleet = Boolean(button.closest("#fleet-list"));
+    selectedTruck = selectedTruck === button.dataset.truck ? null : button.dataset.truck;
+    renderShipments();
+    renderFleet();
+    if (fromFleet && selectedTruck) $("#shipments").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
-$("#clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 bindEvents();
-loadScenario(activeScenario).catch((error) => { $("#disruption-title").textContent = "Could not load demo"; $("#disruption-description").textContent = error.message; });
+loadScenario(activeScenario).catch((error) => {
+  $("#disruption-title").textContent = "The demo could not load";
+  $("#disruption-description").textContent = error.message;
+});
