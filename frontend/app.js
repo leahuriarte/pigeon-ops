@@ -147,9 +147,9 @@ function truckTone(state) {
 }
 
 const playbackCache = new Map();
-async function fetchPlayback(action, road) {
+async function fetchPlayback(action, road, scenarioId = activeScenario, inspected = Boolean(observed)) {
   // After a drone check the trucks start late, so the playback has to include the wait.
-  const params = new URLSearchParams({ scenario: activeScenario, action, road, ...(observed ? { inspected: "1" } : {}) });
+  const params = new URLSearchParams({ scenario: scenarioId, action, road, ...(inspected ? { inspected: "1" } : {}) });
   const key = params.toString();
   if (!playbackCache.has(key)) {
     const request = fetch(`/api/playback?${params}`).then((response) => {
@@ -162,9 +162,80 @@ async function fetchPlayback(action, road) {
   return playbackCache.get(key);
 }
 
+// ---------------------------------------------------------------------------
+// Incident runs. The backend plans every response from the start of the
+// morning, but the report only arrives at incidentAt(). So until then the map
+// plays the usual plan, and the response takes over at the report. A truck
+// whose response has already moved it by then (SYN-TRK-07) runs its first
+// leg slightly faster, so it still reaches its first stop at the computed time.
+// ---------------------------------------------------------------------------
+let usualAction = "hold-course"; // The top-ranked response on a normal morning.
+const incidentAt = () => span.start + INCIDENT_DELAY_MIN;
+
+function cutPath(path, from, to) {
+  if (path.length < 2 || (from <= 0 && to >= 1)) return path;
+  const lens = [0];
+  for (let i = 1; i < path.length; i += 1) lens.push(lens[i - 1] + metres(path[i - 1], path[i]));
+  const total = lens.at(-1) || 1;
+  const at = (share) => {
+    const d = share * total;
+    let i = 1;
+    while (i < lens.length - 1 && lens[i] < d) i += 1;
+    const f = clamp((d - lens[i - 1]) / ((lens[i] - lens[i - 1]) || 1), 0, 1);
+    return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * f, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * f];
+  };
+  const inside = path.filter((_, i) => lens[i] > from * total && lens[i] < to * total);
+  return [at(from), ...inside, at(to)];
+}
+
+// The parts of a track's segments between two times, cutting a drive where it crosses one.
+function clipSegments(segments, low, high) {
+  return segments.flatMap((segment) => {
+    if (segment.t1 <= low || segment.t0 >= high) return [];
+    if (segment.t0 >= low && segment.t1 <= high) return [segment];
+    const t0 = Math.max(segment.t0, low);
+    const t1 = Math.min(segment.t1, high);
+    const length = segment.t1 - segment.t0 || 1;
+    const [from, to] = [(t0 - segment.t0) / length, (t1 - segment.t0) / length];
+    const clipped = { ...segment, t0, t1, path: cutPath(segment.path, from, to) };
+    if (segment.distance_m) clipped.distance_m = Math.round(segment.distance_m * (to - from));
+    return [clipped];
+  });
+}
+
+function stitchPlayback(usual, response, at) {
+  const usualTracks = new Map(usual.tracks.map((track) => [track.id, track]));
+  const warps = new Map();
+  const tracks = response.tracks.map((track) => {
+    const before = usualTracks.get(track.id);
+    if (!before) return track;
+    const head = clipSegments(before.segments, -Infinity, at);
+    const gap = metres(stateAt(prepareTrack(before), at).pos, stateAt(prepareTrack(track), at).pos);
+    if (gap < 30) return { ...track, segments: [...head, ...clipSegments(track.segments, at, Infinity)] };
+    // The truck already reacted before the report: squeeze its response up to its first stop into the time after the report.
+    const until = track.segments.find((segment) => segment.t0 > at && segment.path.length < 2)?.t0 ?? response.end;
+    const warp = (t) => (t >= until ? t : at + ((t - response.start) * (until - at)) / (until - response.start));
+    warps.set(track.id, warp);
+    return { ...track, segments: [...head, ...track.segments.map((segment) => ({ ...segment, t0: warp(segment.t0), t1: warp(segment.t1) }))] };
+  });
+  const events = [
+    ...usual.events.filter((event) => event.t < at),
+    ...response.events.flatMap((event) => {
+      const warp = warps.get(event.truck);
+      if (warp) return [{ ...event, t: Math.round(warp(event.t) * 100) / 100 }];
+      return event.t >= at ? [event] : [];
+    }),
+  ].sort((a, b) => a.t - b.t);
+  return { ...response, tracks, events };
+}
+
 async function loadPlayback({ keepTime = false } = {}) {
   const actions = scenario.decision_model.actions.map((a) => a.id);
-  const all = await Promise.all(actions.map((id) => fetchPlayback(id, plan.road)));
+  let all = await Promise.all(actions.map((id) => fetchPlayback(id, plan.road)));
+  if (scenario.scenario_type === "disruption") {
+    const usual = await fetchPlayback(usualAction, "open", "normal", false);
+    all = all.map((response) => stitchPlayback(usual, response, usual.start + INCIDENT_DELAY_MIN));
+  }
   playback = all[actions.indexOf(plan.action)];
   tracks = playback.tracks.map(prepareTrack);
   buildTallies(Object.fromEntries(actions.map((id, i) => [id, all[i]])));
@@ -213,6 +284,11 @@ function updateFrame() {
   slider.style.setProperty("--p", `${((currentTime - span.start) / (span.end - span.start)) * 100}%`);
   slider.setAttribute("aria-valuetext", clockLabel(currentTime));
   $("#clock").textContent = clockLabel(currentTime);
+  // The CA-47 route options, the obstruction and their legend entries appear only once the report is in.
+  // (Not data-incident: that attribute marks the incident jump buttons.)
+  const live = scenario.scenario_type === "disruption" && currentTime >= incidentAt() - 0.01;
+  document.body.dataset.incidentShown = String(live);
+  renderer?.setIncidentVisible(live);
   const states = tracks.map((track) => stateAt(track, currentTime));
   renderer?.update(states);
   updateFleetLive(states);
@@ -227,9 +303,9 @@ function frame(now) {
   lastFrame = now;
   const before = currentTime;
   currentTime = Math.min(span.end, currentTime + elapsed * speed);
-  const incidentAt = span.start + INCIDENT_DELAY_MIN;
-  if (mode === "monitoring" && before < incidentAt && currentTime >= incidentAt) {
-    currentTime = incidentAt;
+  const reportAt = incidentAt();
+  if (mode === "monitoring" && before < reportAt && currentTime >= reportAt) {
+    currentTime = reportAt;
     updateFrame();
     setPlaying(false);
     triggerIncident();
@@ -241,7 +317,7 @@ function frame(now) {
     return;
   }
   setPlaying(false);
-  if (mode === "incident" && step === "outcome") showReport();
+  if ((mode === "incident" || mode === "routine") && step === "outcome") showReport();
 }
 
 function setPlaying(value) {
@@ -549,6 +625,7 @@ function createSchematicRenderer() {
         item.group.style.setProperty("--tone", truckTone(state));
       });
     },
+    setIncidentVisible() {}, // CSS hides .alt and .place.incident until body[data-incident-shown="true"].
   };
 }
 
@@ -572,6 +649,7 @@ async function createArcGISRenderer() {
     alternatives: new GraphicsLayer({ title: "Route options" }),
     trails: new GraphicsLayer({ title: "Truck routes" }),
     places: new GraphicsLayer({ title: "Terminals and warehouses" }),
+    incident: new GraphicsLayer({ title: "Reported incident", visible: false }),
     trucks: new GraphicsLayer({ title: "Trucks" }),
   };
   viewElement.map.addMany(Object.values(layers));
@@ -607,8 +685,13 @@ async function createArcGISRenderer() {
   });
 
   return {
+    setIncidentVisible(visible) {
+      if (layers.alternatives.visible !== visible) layers.alternatives.visible = visible;
+      if (layers.incident.visible !== visible) layers.incident.visible = visible;
+    },
     setScenario() {
       layers.places.removeAll();
+      layers.incident.removeAll();
       const style = {
         terminal: { type: "simple-marker", style: "square", size: 11, color: colors.ink, outline: { color: "#ffffff", width: 2 } },
         warehouse: { type: "simple-marker", style: "circle", size: 11, color: "#ffffff", outline: { color: colors.muted, width: 2.5 } },
@@ -616,11 +699,12 @@ async function createArcGISRenderer() {
       };
       visibleLocations().forEach((location) => {
         const geometry = { type: "point", longitude: location.lon, latitude: location.lat };
-        layers.places.add(new Graphic({ geometry, symbol: style[location.kind] }));
+        const layer = location.kind === "incident" ? layers.incident : layers.places;
+        layer.add(new Graphic({ geometry, symbol: style[location.kind] }));
         if (location.kind === "incident") {
-          layers.places.add(new Graphic({ geometry, symbol: { type: "text", text: "!", color: "#ffffff", yoffset: -4, font: { size: 12, weight: "bold" } } }));
+          layer.add(new Graphic({ geometry, symbol: { type: "text", text: "!", color: "#ffffff", yoffset: -4, font: { size: 12, weight: "bold" } } }));
         }
-        layers.places.add(new Graphic({
+        layer.add(new Graphic({
           geometry,
           symbol: {
             type: "text", text: location.name, color: location.kind === "incident" ? colors.risk : "#2f353a",
@@ -1018,6 +1102,7 @@ async function loadScenario(id, { keepTime = false } = {}) {
   const response = await fetch(`/api/scenario?scenario=${encodeURIComponent(id)}`);
   if (!response.ok) throw new Error("The scenario failed to load");
   scenario = await response.json();
+  if (scenario.scenario_type === "normal") usualAction = scenario.analysis.before[0].id;
   if (!baseline) {
     const base = await fetch("/api/analysis?scenario=normal&observation=inconclusive");
     baseline = base.ok ? (await base.json()).indicators : null;
@@ -1052,6 +1137,8 @@ async function loadScenario(id, { keepTime = false } = {}) {
 // incident). The dispatcher decides on a drone check, chooses a response
 // (step respond) and watches it play out (step outcome). When the morning has
 // played out, the shift report compares today with the usual morning.
+// A normal morning (mode routine) skips the incident: the usual plan plays out
+// to the end and the shift report shows the indicators for an ordinary day.
 // ---------------------------------------------------------------------------
 const INCIDENT_DELAY_MIN = 2;
 const steps = ["start", "incident", "respond", "outcome"];
@@ -1061,6 +1148,7 @@ let furthest = 0; // Index in steps of the furthest step reached in this run.
 let incidentVariant = "disruption";
 let incidents = []; // { id, title, prior } for each incident variant.
 let decisionLog = [];
+let routine = false; // True for a normal morning with no incident report.
 
 function logDecision(text) {
   decisionLog.push({ t: currentTime, text });
@@ -1121,11 +1209,12 @@ function renderStepper() {
     respond: at === 2 ? "current" : at > 2 ? "done" : "pending",
     outcome: at === 3 ? (mode === "report" ? "done" : "current") : "pending",
   };
+  if (routine) Object.assign(states, { incident: "skipped", inspect: "skipped", respond: "skipped" });
   const reached = { incident: furthest >= 1, inspect: furthest >= 1, respond: furthest >= 2, outcome: furthest >= 3 };
   $$("#stepper [data-goto]").forEach((button) => {
     const key = button.dataset.goto;
     button.closest("li").dataset.state = states[key];
-    button.disabled = step === "start" || !reached[key];
+    button.disabled = step === "start" || !reached[key] || (routine && key !== "outcome");
     if (states[key] === "current") button.setAttribute("aria-current", "step");
     else button.removeAttribute("aria-current");
   });
@@ -1138,17 +1227,17 @@ function renderStart() {
   const verdict = usual && !usual.evoi.recommend_inspection
     ? ` With no report, the chance CA-47 is blocked is ${pct(usual.prior_blocked_probability)} and a drone check would lose ${money(-usual.evoi.net_value_of_information)}, so PigeonOps does not suggest one.`
     : "";
-  $("#start-note").textContent = `The morning starts at ${clockLabel(span.start)} on the usual plan.${verdict} The incident report arrives at ${clockLabel(span.start + INCIDENT_DELAY_MIN)}.`;
+  $("#start-note").textContent = `The morning starts at ${clockLabel(span.start)} on the usual plan.${verdict} Start the morning and an incident report arrives at ${clockLabel(incidentAt())}. A normal morning plays the usual plan to the end with no report.`;
   $("#incident-jumps").innerHTML = incidents.map(jumpButton).join("");
 }
 
 function renderOutcome() {
   const report = mode === "report";
   $("#report").hidden = !report;
-  $("#outcome-title").textContent = report ? "Shift report" : `Playing out: ${actionLabel(plan.action)}`;
-  if (!report) $("#outcome-sub").textContent = "";
+  $("#outcome-title").textContent = report ? "Shift report" : routine ? "Normal morning" : `Playing out: ${actionLabel(plan.action)}`;
+  if (!report) $("#outcome-sub").textContent = routine ? "No incident report. Every truck runs the usual plan." : "";
   $("#skip-end").hidden = report;
-  $("#change-response").hidden = report;
+  $("#change-response").hidden = report || routine;
   $("#report-restart").hidden = !report;
   const others = incidents.filter((item) => item.id !== activeScenario);
   $("#next-incidents").innerHTML = others.map(jumpButton).join("");
@@ -1157,6 +1246,7 @@ function renderOutcome() {
 
 async function triggerIncident(variant = incidentVariant) {
   incidentVariant = variant;
+  routine = false;
   mode = "incident";
   await loadScenario(variant, { keepTime: true });
   const d = scenario.disruption;
@@ -1175,11 +1265,28 @@ async function jumpToIncident(variant) {
 
 async function restartMorning() {
   mode = "monitoring";
+  routine = false;
   decisionLog = [];
   setSpeed(5);
   await loadScenario("normal");
   setStep("start");
   setView("map");
+}
+
+// The normal scenario: the usual plan plays out with no incident, ending in a shift report.
+async function startRoutine() {
+  setPlaying(false);
+  routine = true;
+  mode = "routine";
+  decisionLog = [];
+  if (activeScenario !== "normal") await loadScenario("normal");
+  currentTime = span.start;
+  logDecision("Normal morning started on the usual plan. No incident report.");
+  setStep("outcome");
+  setView("map");
+  showMap();
+  setSpeed(15);
+  setPlaying(true);
 }
 
 function confirmResponse() {
@@ -1206,7 +1313,9 @@ function showReport() {
 function renderReport() {
   const d = scenario.disruption;
   const day = new Date(scenario.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  $("#outcome-sub").textContent = `${day}, ${clockLabel(span.start)} to ${clockLabel(currentTime)}. One incident: ${d.title}. Every figure is estimated from simulated data.`;
+  const incidentLine = routine ? "No incident report; every truck ran the usual plan." : `One incident: ${d.title}.`;
+  $("#outcome-sub").textContent = `${day}, ${clockLabel(span.start)} to ${clockLabel(currentTime)}. ${incidentLine} Every figure is estimated from simulated data.`;
+  $("#report-indicators-title").textContent = routine ? "Indicators for a normal morning" : "Usual morning against today";
 
   $("#report-indicators").innerHTML = scenario.analysis.indicators.map((item) => {
     const base = baseline?.find((b) => b.id === item.id);
@@ -1219,7 +1328,8 @@ function renderReport() {
   }).join("");
 
   const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
-  const closing = plan.action === modelPick?.id
+  const closing = routine ? "Shift ended with every truck on the usual plan."
+    : plan.action === modelPick?.id
     ? `At the end of the shift the map showed ${action.label}, the model’s pick.`
     : `At the end of the shift the map showed ${action.label}. The model ranked ${modelPick.label} first.`;
   $("#report-log").innerHTML = [...decisionLog, { t: currentTime, text: closing }]
@@ -1228,6 +1338,7 @@ function renderReport() {
 
 function bindEvents() {
   const fail = (error) => console.error(error);
+  $("#routine-button").addEventListener("click", () => startRoutine().catch(fail));
   $("#start-button").addEventListener("click", () => {
     setView("map");
     showMap();

@@ -65,6 +65,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   white-space: nowrap;
 }
 body:not([data-scenario="disruption"]) .only-disruption { display: none !important; }
+/* The CA-47 route options and the obstruction appear only once the incident report is in. */
+body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #map-fallback .place.incident) { display: none !important; }
 
 /* Text */
 .lede { font-size: 14.5px; }

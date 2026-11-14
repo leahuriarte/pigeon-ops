@@ -53,12 +53,12 @@
             <g id="routes"></g><g id="markers"></g><g id="truck-marks"></g>
           </svg>
           <ul class="legend" aria-label="Map legend">
-            <li class="only-disruption"><i class="swatch primary"></i>Current route</li>
-            <li class="only-disruption"><i class="swatch detour"></i>Detour</li>
+            <li class="only-incident"><i class="swatch primary"></i>Current route</li>
+            <li class="only-incident"><i class="swatch detour"></i>Detour</li>
             <li><i class="swatch fleet"></i>Route ahead</li>
             <li><i class="swatch arrow"></i>Moving</li>
             <li><i class="swatch stopped"></i>Stopped</li>
-            <li class="only-disruption"><i class="swatch stopped stuck"></i>Stuck</li>
+            <li class="only-incident"><i class="swatch stopped stuck"></i>Stuck</li>
           </ul>
           <div id="truck-card" class="truck-card" hidden aria-live="polite"></div>
           <ol id="event-feed" class="event-feed" aria-live="polite"></ol>
@@ -156,6 +156,7 @@
           </ol>
           <div class="actions">
             <button id="start-button" class="btn primary big" type="button">Start the morning</button>
+            <button id="routine-button" class="btn" type="button">Play a normal morning, no incident</button>
           </div>
           <p id="start-note" class="note"></p>
           <div class="jump">
@@ -278,7 +279,7 @@
             <button id="report-restart" class="btn primary" type="button" hidden>Restart the morning</button>
           </div>
           <div id="next-incidents-wrap" class="jump" hidden>
-            <p>Or try the other incident report:</p>
+            <p>Or try an incident report:</p>
             <div id="next-incidents" class="jump-list"></div>
           </div>
         </section>
