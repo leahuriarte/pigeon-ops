@@ -17,6 +17,8 @@ const labels = {
   visible_obstruction: "Wreck and debris across the travel lanes",
   no_visible_obstruction: "No visible obstruction in this view",
   dense_slow_traffic: "Dense, slow traffic · cause not visible",
+  standing_queue: "Standing queue · cause not visible",
+  flooded_road: "Water across the road · depth not visible",
   insufficient_detail: "Insufficient detail",
   image_unavailable: "Footage unavailable",
 };

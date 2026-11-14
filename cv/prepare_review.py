@@ -32,7 +32,7 @@ SAMPLE_FPS = 8
 SPEED_GAP_SECONDS = 0.25
 OUTPUT_WIDTH = 960
 # Visual labels for which a reviewer would expect a "blocked" suggestion.
-BLOCKED_LABELS = {"visible_obstruction", "standing_queue"}
+BLOCKED_LABELS = {"visible_obstruction", "standing_queue", "flooded_road"}
 # BGR colours: standing, slow, moving, outside the road or not re-found.
 COLOURS = {"stopped": (40, 40, 230), "slow": (0, 170, 250), "moving": (90, 210, 60), "other": (190, 190, 190)}
 

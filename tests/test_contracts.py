@@ -81,6 +81,8 @@ class InspectionLibraryContractTests(unittest.TestCase):
                 self.assertIn(case["cv_assessment"]["suggested_observation"], self.SIGNALS)
                 self.assertTrue(case["allowed_observations"])
                 self.assertLessEqual(set(case["allowed_observations"]), self.SIGNALS)
+                self.assertTrue(case["check_types"])
+                self.assertLessEqual(set(case["check_types"]), CHECK_TYPES)
                 for key in ("source_image", "annotated_image", "annotated_video"):
                     self.assertTrue((LIBRARY.parent / case[key].removeprefix("/inspection-assets/")).is_file())
 

@@ -130,6 +130,70 @@
       "note": "Cars, a van and a tractor-trailer fill all four lanes and keep rolling in the same direction, at roughly 10 to 25 km/h if the footage plays at real speed. Nothing stands still and no obstruction is visible, but this is far below highway speed. The CV calls the road clear because every vehicle is above its 10 km/h moving threshold; whether heavy, slow traffic counts as clear is the dispatcher's call. Vehicles fill so much of this close view that the camera-motion estimate follows the traffic instead of the ground, so this clip treats the hovering camera as still."
     },
     {
+      "id": "flooded-lane",
+      "file": "flooded_road_topdown_4945596.mp4",
+      "title": "Floodwater across a lane",
+      "source_url": "https://www.pexels.com/video/drone-footage-of-a-flooded-area-4945596/",
+      "credit": "Shubh Haque on Pexels",
+      "start_seconds": 1.0,
+      "visual_label": "flooded_road",
+      "check_types": [
+        "environment"
+      ],
+      "camera": "hover",
+      "road": [
+        [
+          0.0,
+          0.47
+        ],
+        [
+          0.12,
+          0.53
+        ],
+        [
+          0.25,
+          0.65
+        ],
+        [
+          0.36,
+          0.8
+        ],
+        [
+          0.5,
+          0.86
+        ],
+        [
+          0.7,
+          0.9
+        ],
+        [
+          0.7,
+          0.99
+        ],
+        [
+          0.48,
+          0.96
+        ],
+        [
+          0.32,
+          0.9
+        ],
+        [
+          0.2,
+          0.75
+        ],
+        [
+          0.08,
+          0.62
+        ],
+        [
+          0.0,
+          0.56
+        ]
+      ],
+      "note": "A narrow lane runs from the left edge to the bottom of the frame, where floodwater pours across it and covers the rest of its length. Fields and buildings on both sides are under water. No vehicle is in view, so the CV, which only tracks vehicles, has nothing to measure and stays inconclusive; the dispatcher can see the water and decide. This is a village lane, not a highway, and the depth of the water cannot be read from above."
+    },
+    {
       "id": "highway-free-flow",
       "file": "clear_topdown_13376785.mp4",
       "title": "Divided highway, light traffic",
