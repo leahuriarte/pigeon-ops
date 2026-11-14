@@ -8,6 +8,7 @@
   <script type="module" src="https://js.arcgis.com/5.2/"></script>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/arcgis.css">
+  <link rel="stylesheet" href="/inspection.css">
 </head>
 <body>
   <header class="topbar">
@@ -64,18 +65,39 @@
           <details><summary>Show assumptions & formula</summary><div id="assumptions"></div></details>
         </section>
         <section class="panel observation-panel">
-          <p class="eyebrow">SIMULATED OBSERVATION</p><h2>Inspection review</h2>
-          <div class="feed"><div class="scanline"></div><span>PRERECORDED / CV STUB</span><strong id="feed-label">Awaiting simulated evidence</strong></div>
-          <p class="fine-print" id="drone-note"></p><button id="inspect-button" class="primary">Run simulated inspection</button>
+          <p class="eyebrow">VISUAL EVIDENCE · DEMO</p><h2>Inspection review</h2>
+          <div class="feed" id="inspection-placeholder"><div class="scanline"></div><span>CALIFORNIA IMAGE LIBRARY</span><strong id="feed-label">Choose an image to review</strong></div>
+          <div id="selected-evidence" class="selected-evidence hidden"><img id="selected-evidence-image" alt="Reviewed road image"><p id="selected-evidence-title"></p><small>Reviewed external illustration applied to this fictional scenario.</small></div>
+          <p class="fine-print" id="drone-note"></p><button id="inspect-button" class="primary">Review California images</button>
           <div id="observation-buttons" class="observation-buttons hidden"><p>Choose the observation returned by the stub:</p><button data-observation="blocked">Road blocked</button><button data-observation="clear">Road clear</button><button data-observation="inconclusive">Inconclusive</button></div>
           <div id="posterior" class="posterior hidden"></div>
         </section>
         <section class="panel constraints"><p class="eyebrow">KNOWN CONSTRAINTS</p><ul id="constraints"></ul></section>
         <section class="panel"><div class="panel-heading"><div><p class="eyebrow">FLEET CAPACITY</p><h2>Truck availability</h2></div><span id="fleet-count" class="count-badge">—</span></div><div id="fleet-list" class="fleet-list"></div></section>
-        <section class="panel"><p class="eyebrow">DATA CONFIDENCE</p><h2>What is real vs simulated?</h2><div id="provenance" class="provenance"></div><p class="fine-print">All shipment, truck, appointment, incident, and inspection records are fictional. See DATA.md for methodology and sources.</p></section>
+        <section class="panel"><p class="eyebrow">DATA CONFIDENCE</p><h2>What is real vs simulated?</h2><div id="provenance" class="provenance"></div><p class="fine-print">Shipment, truck, appointment and incident records are fictional. Inspection images are attributed external examples; they do not document the fictional incident. See DATA.md for sources.</p></section>
       </aside>
     </section>
   </main>
+  <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">
+    <div class="inspection-header"><div><p class="eyebrow">EXTERNAL IMAGE · DISPATCHER REVIEW</p><h2 id="inspection-dialog-heading">Review visual evidence</h2></div><button id="inspection-close" class="inspection-close">Close</button></div>
+    <div class="inspection-body">
+      <p class="inspection-scope">These California images illustrate the demo. Applying an observation updates the fictional logistics scenario; it does not report current conditions or dispatch a vehicle.</p>
+      <label class="inspection-picker">Inspection image<select id="inspection-case"></select></label>
+      <img id="inspection-photo" class="inspection-photo" alt="Road inspection image">
+      <div class="inspection-photo-caption"><span id="inspection-count"></span><button id="inspection-image-toggle">Show source image</button></div>
+      <strong id="inspection-title"></strong><h3 id="inspection-finding" class="inspection-finding"></h3><p id="inspection-note" class="inspection-note"></p>
+      <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Road and debris markings are provisional visual annotations. Green boxes are vehicle detections.</span></div>
+      <fieldset class="inspection-choices"><legend>Observation to use in the demo</legend>
+        <label><input type="radio" name="inspection-observation" value="blocked">Visible obstruction</label>
+        <label><input type="radio" name="inspection-observation" value="clear">No visible obstruction in this view</label>
+        <label><input type="radio" name="inspection-observation" value="inconclusive">Insufficient evidence</label>
+      </fieldset>
+      <p id="inspection-restriction" class="fine-print"></p>
+      <label class="inspection-review-note">Review note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
+      <p id="inspection-error" class="inspection-error" role="alert"></p>
+    </div>
+    <div class="inspection-footer"><p>The source, observation and review time are saved locally. A dispatcher approves any logistics action.</p><button id="inspection-apply" class="primary" disabled>Use for demo</button></div>
+  </dialog>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

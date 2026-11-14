@@ -15,7 +15,7 @@
     {"file": "i710264willowst.jpg", "visual_label": "traffic_present", "road": [[0.27,0.10],[0.53,0.10],[0.98,0.62],[0.98,0.77],[0.36,0.77],[0.07,0.43]], "note": "This region follows the near carriageway and excludes the provider logo."},
     {"file": "i710954northofsr47.jpg", "visual_label": "insufficient_detail", "road": [[0.49,0.16],[0.62,0.16],[0.89,0.75],[0.48,0.77],[0.34,0.56]], "note": "Vehicles are visible but distant. Zero model detections must not be interpreted as an empty or clear road."},
     {"file": "i710955picoave.jpg", "visual_label": "traffic_present", "road": [[0.45,0.20],[0.56,0.19],[0.97,0.68],[0.97,0.77],[0.66,0.77]], "note": "Trucks are visible on the near bridge carriageway. The opposing direction is outside the selected region."},
-    {"file": "sr47953eastofferry.jpg", "visual_label": "construction_visible", "road": [[0.04,0.20],[0.25,0.13],[0.80,0.70],[0.70,0.78],[0.48,0.78]], "note": "Construction equipment is visible. This view does not establish which travel lanes are legally open."},
+    {"file": "sr47953eastofferry.jpg", "visual_label": "construction_visible", "road": [], "note": "Construction equipment obscures the area. No road region is marked because this view does not establish the usable carriageway or which travel lanes are legally open."},
     {"file": "i405330atlanticave.jpg", "visual_label": "image_unavailable", "road": [], "note": "Provider displays Temporarily Unavailable. No road-condition conclusion is supported."},
     {"file": "sr91252eastofavalonblvd.jpg", "visual_label": "image_unavailable", "road": [], "note": "Provider displays Temporarily Unavailable despite the catalog's in-service flag."}
   ],

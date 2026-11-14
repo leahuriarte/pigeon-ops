@@ -3,9 +3,10 @@ import json
 import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from backend.decision_engine import analyze
+from backend.inspection import ASSETS, list_inspections, review_inspection
 from backend.scenario import available_scenarios, load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,10 @@ class DemoHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/health":
             return self._json({"status": "ok"})
+        if parsed.path == "/api/inspection-cases":
+            return self._json(list_inspections())
+        if parsed.path.startswith("/inspection-assets/"):
+            return self._file(ASSETS, unquote(parsed.path.removeprefix("/inspection-assets/")))
         if parsed.path == "/api/scenarios":
             return self._json({"scenarios": available_scenarios()})
         if parsed.path == "/api/scenario":
@@ -48,10 +53,25 @@ class DemoHandler(BaseHTTPRequestHandler):
             return self._json(analyze(scenario, observation))
         return self._static(parsed.path)
 
+    def do_POST(self):
+        if urlparse(self.path).path != "/api/inspection-review":
+            return self._json({"error": "not found"}, 404)
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 16384:
+                raise ValueError("Review body must be between 1 and 16384 bytes")
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            return self._json(review_inspection(payload))
+        except (ValueError, UnicodeDecodeError) as error:
+            return self._json({"error": str(error)}, 400)
+
     def _static(self, request_path):
         relative = "index.html" if request_path == "/" else request_path.lstrip("/")
-        candidate = (FRONTEND / relative).resolve()
-        if FRONTEND not in candidate.parents or not candidate.is_file():
+        return self._file(FRONTEND, relative)
+
+    def _file(self, root, relative):
+        candidate = (root / relative).resolve()
+        if root.resolve() not in candidate.parents or not candidate.is_file():
             return self._json({"error": "not found"}, 404)
         body = candidate.read_bytes()
         self.send_response(200)

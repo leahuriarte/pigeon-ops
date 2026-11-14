@@ -1,3 +1,5 @@
+import { openInspection, resetInspection } from "./inspection.js";
+
 const $ = (selector) => document.querySelector(selector);
 const money = (value) => `${value < 0 ? "−" : ""}$${Math.abs(Math.round(value)).toLocaleString()}`;
 const pct = (value) => `${Math.round(value * 100)}%`;
@@ -181,11 +183,14 @@ function renderEvoi(analysis) {
 }
 
 function resetObservation() {
-  $("#feed-label").textContent = "Awaiting simulated evidence";
+  resetInspection();
+  $("#feed-label").textContent = "Choose an image to review";
+  $("#inspection-placeholder").classList.remove("hidden");
+  $("#selected-evidence").classList.add("hidden");
   $("#posterior").classList.add("hidden");
   $("#observation-buttons").classList.add("hidden");
   $("#inspect-button").disabled = false;
-  $("#inspect-button").textContent = "Run simulated inspection";
+  $("#inspect-button").textContent = "Review California images";
 }
 
 async function observe(observation) {
@@ -223,8 +228,10 @@ async function loadScenario(id) {
 }
 
 function bindEvents() {
-  $("#inspect-button").addEventListener("click", () => {
+  $("#inspect-button").addEventListener("click", async () => {
+    if (await openInspection(activeScenario)) return;
     $("#observation-buttons").classList.remove("hidden");
+    $("#feed-label").textContent = "Image library unavailable — using simulated evidence";
     $("#inspect-button").textContent = "Simulation ready — choose evidence";
     $("#inspect-button").disabled = true;
   });
@@ -236,6 +243,24 @@ function bindEvents() {
     renderShipments();
   }));
 }
+
+window.addEventListener("inspection-reviewed", ({ detail }) => {
+  if (detail.review.scenario !== activeScenario) return;
+  const analysis = detail.analysis;
+  renderRankings(analysis.after, true);
+  $("#posterior").classList.remove("hidden");
+  $("#posterior").replaceChildren();
+  const summary = document.createElement("strong");
+  summary.textContent = `Demo blockage likelihood: ${pct(analysis.posterior_blocked_probability)}`;
+  const note = document.createElement("p");
+  note.textContent = `Top option: ${analysis.after[0].label}. Based on the reviewed illustration and the scenario's assumed evidence model.`;
+  $("#posterior").append(summary, note);
+  $("#inspection-placeholder").classList.add("hidden");
+  $("#selected-evidence").classList.remove("hidden");
+  $("#selected-evidence-image").src = detail.caseItem.annotated_image;
+  $("#selected-evidence-title").textContent = detail.caseItem.title;
+  $("#inspect-button").textContent = "Review another image";
+});
 
 $("#clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 bindEvents();
