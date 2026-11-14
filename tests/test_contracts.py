@@ -7,7 +7,7 @@ from backend.decision_engine import analyze
 from backend.scenario import available_scenarios, load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
-EVIDENCE_DIR = ROOT / "frontend" / "evidence"
+LIBRARY = ROOT / "cv" / "outputs" / "review-cases" / "library.json"
 INDICATOR_IDS = {"shipments_at_risk", "appointments_feasible", "expected_delay_min", "added_miles", "co2_kg", "community_exposure"}
 BASES = {"stub", "estimated", "simulated", "measured"}
 SHIPMENT_ROW = {"shipment", "truck", "route", "reassigned", "arrival", "appointment", "slack_min", "lateness_min",
@@ -26,8 +26,6 @@ class ScenarioContractTests(unittest.TestCase):
                 self.assertEqual(INDICATOR_IDS, {i["id"] for i in indicators})
                 for indicator in indicators:
                     self.assertIn(indicator["basis"], BASES)
-                for clip_id in s["disruption"].get("evidence_clips", []):
-                    self.assertTrue((EVIDENCE_DIR / f"{clip_id}.json").is_file(), clip_id)
 
     def test_every_route_has_network_geometry(self):
         for item in available_scenarios():
@@ -70,27 +68,22 @@ class ScenarioContractTests(unittest.TestCase):
                             self.assertLessEqual(SHIPMENT_ROW, set(row))
                             self.assertIn(row["basis"], BASES)
 
-    def test_disruption_lists_evidence(self):
-        self.assertTrue(load_scenario(variant="disruption")["disruption"]["evidence_clips"])
 
+class InspectionLibraryContractTests(unittest.TestCase):
+    CASE = {"id", "title", "visual_label", "review_note", "image_quality", "annotated_image", "source_image",
+            "vehicle_detections", "excluded_detections", "allowed_observations", "source"}
+    SOURCE = {"source_url", "sha256", "credit", "license", "location", "historical"}
 
-class EvidenceContractTests(unittest.TestCase):
-    REQUIRED = {"clip_id", "basis", "label", "confidence", "vehicle_count", "stationary_count", "flow_per_min",
-                "frames_analyzed", "model", "video", "location", "location_simulated", "source", "license"}
-
-    def test_every_evidence_file_matches_contract(self):
-        files = sorted(EVIDENCE_DIR.glob("*.json"))
-        self.assertTrue(files)
-        for path in files:
-            with self.subTest(file=path.name):
-                evidence = json.loads(path.read_text(encoding="utf-8"))
-                self.assertLessEqual(self.REQUIRED, set(evidence))
-                self.assertEqual(path.stem, evidence["clip_id"])
-                self.assertIn(evidence["label"], ("blocked", "clear", "inconclusive"))
-                self.assertTrue(0 <= evidence["confidence"] <= 1)
-                self.assertIn(evidence["basis"], BASES)
-                if evidence["video"] is not None:
-                    self.assertTrue((ROOT / "frontend" / evidence["video"]).is_file(), evidence["video"])
+    @unittest.skipUnless(LIBRARY.is_file(), "build it with python -m cv.prepare_review")
+    def test_prepared_library_matches_contract(self):
+        library = json.loads(LIBRARY.read_text(encoding="utf-8"))
+        self.assertTrue(library["available"])
+        for case in library["cases"]:
+            with self.subTest(case=case["id"]):
+                self.assertLessEqual(self.CASE, set(case))
+                self.assertLessEqual(self.SOURCE, set(case["source"]))
+                self.assertTrue(case["allowed_observations"])
+                self.assertLessEqual(set(case["allowed_observations"]), {"blocked", "clear", "inconclusive"})
 
 
 if __name__ == "__main__":

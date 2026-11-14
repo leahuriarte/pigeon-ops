@@ -12,8 +12,8 @@ PigeonOps is a one-day hackathon prototype (GeoAI track, perspective 3: resilien
 | Track | Owns |
 | --- | --- |
 | A: decision engine, route data, indicators | `backend/`, `config/`, `tests/`, `scripts/`, `DATA.md`, `docs/METHODS.md` |
-| B: map and dispatcher UI | `frontend/` except `frontend/evidence/` |
-| C: drone footage and computer vision | `cv/`, `frontend/evidence/` |
+| B: map and dispatcher UI | `frontend/` except `frontend/inspection.*` |
+| C: drone footage and computer vision | `cv/`, `frontend/inspection.*`, `backend/inspection.py` |
 | Shared, change only with team agreement | `AGENTS.md`, `CLAUDE.md`, `README.md`, `run.py`, `.gitignore` |
 
 Never edit files another track owns. If you need a change there, say so in your final message instead.
@@ -36,7 +36,7 @@ One shared operating picture plus named variants:
 
 - Base fields: `map_bounds`, `locations[]`, `shipments[]`, `trucks[]`, `routes[]` (`id`, `name`, `role`, `color`, `points` as `[lat, lon]` pairs), `operations`, `data_provenance[]`, `decision_model` (weights, `drone` settings, `actions` with `open` and `blocked` outcomes and a `stakeholder_effect`).
 - `scenario_variants`: currently `normal` (inspection not worth it) and `disruption` (inspection worth it). `backend/scenario.py` deep-merges the chosen variant over the base; `shipment_overrides` and `truck_overrides` patch records by id.
-- Each variant sets `id`, `name`, `scenario_type`, a `disruption` (with `prior_blocked_probability`; the disruption variant also lists `evidence_clips`, clip ids in `frontend/evidence/`), and `indicators_stub`, the indicator list from contract 2, used until Track A calculates indicators.
+- Each variant sets `id`, `name`, `scenario_type`, a `disruption` (with `prior_blocked_probability`), and `indicators_stub`, the indicator list from contract 2, used until Track A calculates indicators.
 - Planned (Track A, A1): each route gains a GeoJSON LineString `geometry` with `[lon, lat]` coordinates, plus `distance_m` and `duration_s`.
 
 ### 2. API
@@ -47,14 +47,16 @@ One shared operating picture plus named variants:
 - `assignments` is `{shipments[], trucks[], count, before[], after[]}`: every assignment of the `decision_model.assignment_pool` trucks to its shipments, ranked by expected loss (`after` is empty without an observation). Each option has `id`, `trucks` (shipment id to truck id), `planned`, `action` (matching action id or `null`), `rank`, `expected_loss` and `outcomes`. Every computed outcome, for options and for actions, carries `detail.shipments[]`, one row per pool shipment with at least `shipment`, `truck`, `route`, `reassigned`, `arrival` (HH:MM), `appointment`, `slack_min`, `lateness_min`, `constraint_breaches` and `basis`.
 - `indicators` is a list of `{id, label, value, unit, basis}`, plus `of` for `appointments_feasible`. Ids: `shipments_at_risk`, `appointments_feasible`, `expected_delay_min`, `added_miles`, `co2_kg`, `community_exposure`. `basis` is `stub`, `estimated`, `simulated` or `measured`. `value` may be `null` while not yet computed. Indicators describe the whole plan under the top-ranked option before any inspection.
 
-### 3. Inspection evidence: `frontend/evidence/<clip_id>.json`
+### 3. Inspection images: `cv/outputs/review-cases/library.json`
 
-Served at `/evidence/<clip_id>.json`. Fields: `clip_id`, `basis`, `label` (`blocked`, `clear` or `inconclusive`), `confidence` (0 to 1), `vehicle_count`, `stationary_count`, `flow_per_min`, `frames_analyzed`, `model`, `video` (path relative to `frontend/`, such as `evidence/<clip_id>.mp4`, or `null` until a clip exists), `location` (`{lat, lon}`), `location_simulated`, `source`, `license`.
+Built offline by `python -m cv.prepare_review` (gitignored) and served without CV dependencies:
 
-`confidence` is the classifier's own score, not the probability that the road is blocked. The engine's Bayes update uses the inspection accuracy in `decision_model.drone`.
+- `GET /api/inspection-cases` returns `{available, cases[]}`; `available` is false and `cases` empty when the library has not been built, and the page falls back to simulated observation buttons.
+- Each case has `id`, `title`, `visual_label`, `review_note`, `image_quality`, `annotated_image` and `source_image` (served under `/inspection-assets/`), `vehicle_detections`, `excluded_detections`, `allowed_observations` (a subset of `blocked`, `clear`, `inconclusive`) and `source` (`source_url`, `sha256`, `credit`, `license`, `location`, `historical`).
+- `POST /api/inspection-review` takes `{case_id, scenario, observation, note, simulated_application: true}`, appends the review to `cv/outputs/inspection-reviews.jsonl` and returns `{analysis, review}`. An observation outside the case's `allowed_observations` returns 400.
+
+A reviewed image is an illustration applied to the fictional scenario. The Bayes update uses `decision_model.drone.accuracy` (assumed, for reviewed imagery); `decision_model.drone.cv_only` holds the measured table for automated CV alone, shown for comparison only.
 
 ## Gotchas
 
 - Coordinate order: GeoJSON, OSRM and ArcGIS `paths` use `[lon, lat]`. The scenario's `points` use `[lat, lon]`.
-- Browsers refuse OpenCV's default mp4 codec. Re-encode clips with `ffmpeg -i in.mp4 -c:v libx264 -pix_fmt yuv420p -movflags +faststart out.mp4`.
-- The built-in Python server does not support HTTP range requests, so keep clips short; they play but may not seek.

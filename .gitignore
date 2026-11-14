@@ -10,5 +10,4 @@ venv/
 cv/data/
 cv/models/
 cv/outputs/
-cv/clips/raw/
 cv/out/

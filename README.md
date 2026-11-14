@@ -76,7 +76,6 @@ frontend/styles.css           Responsive visual design
 frontend/arcgis.css           ArcGIS map styles
 frontend/app.js               Map rendering and interaction
 frontend/inspection.js        Image review dialog (library served by backend/inspection.py)
-frontend/evidence/            Planned per-clip evidence files (contract 3); only a stub so far
 cv/                           Offline CV pipeline with its own environment; see cv/README.md
 tests/                        Decision-model, contract, and server tests
 run.py                        One-command entry point
@@ -98,7 +97,6 @@ Useful endpoints:
 - Add actions or tune weights in `config/port_scenario.json`; no UI code changes are needed.
 - After moving locations or trucks, or adding shipments, run `python3 scripts/build_road_geometry.py` to fetch road paths for the new legs. It calls the public OSRM demo server about once per second; the app itself reads only the saved file.
 - Add an ArcGIS Location Platform API key only if Esri-hosted basemaps, routing, geocoding, or other metered services are needed. Review current quotas before enabling them.
-- Produce `frontend/evidence/<clip>.json` from the planned Pexels clips (see cv/SOURCES.md) if video evidence is wanted alongside the image review library.
 - Add a `ScenarioRepository` behind `scenario.py` for SQLite, Postgres, or a logistics API.
 - Add authentication, audit logs, geofencing, aviation checks, and explicit authorization before considering any real-world field integration.
 

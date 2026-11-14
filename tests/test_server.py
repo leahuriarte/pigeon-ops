@@ -63,9 +63,6 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(404, self.status_of("/api/analysis?scenario=nope"))
         self.assertEqual(400, self.status_of("/api/analysis?observation=maybe"))
 
-    def test_serves_evidence_stub(self):
-        self.assertEqual("stub", self.get("/evidence/stub.json")["clip_id"])
-
 
 if __name__ == "__main__":
     unittest.main()
