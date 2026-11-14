@@ -225,8 +225,9 @@ body:not([data-scenario="disruption"]) .only-disruption { display: none !importa
   padding: 12px 16px;
 }
 
-/* Indicator strip: one ink-bordered strip, hairlines between cells (the 1px gap shows the hair background). */
-.stats-bar { display: flex; flex-direction: column; gap: 4px; flex: none; }
+/* Indicator strip: one ink-bordered strip, hairlines between cells (the 1px gap shows the hair background).
+   It comes first in the markup but sits under the map, so the map is the first thing on the page. */
+.stats-bar { display: flex; flex-direction: column; gap: 4px; flex: none; order: 1; }
 .stats {
   display: grid;
   grid-auto-flow: column;
@@ -650,10 +651,10 @@ details.more > :not(summary) { margin-top: 8px; }
   .view-method { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
 }
 
-/* Narrower: a normal scrolling page, guide first. */
+/* Narrower: a normal scrolling page, map first and the guide under it. */
 @media (max-width: 999.98px) {
   .app { display: flex; flex-direction: column; }
-  .panel { order: -1; border-left: 0; border-bottom: var(--frame); }
+  .panel { border-left: 0; border-top: var(--frame); }
   .stepper { position: sticky; top: 0; z-index: 5; }
   .panel-body { overflow: visible; }
   .view { flex: none; }

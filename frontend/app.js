@@ -451,7 +451,10 @@ function bump(node) {
 
 function selectTruck(id) {
   selectedTruck = id;
-  if (id) setView("map");
+  if (id) {
+    setView("map");
+    showMap();
+  }
   renderFleet();
   renderTicks();
   renderer?.setSelected(id);
@@ -1083,6 +1086,15 @@ function renderMode() {
   renderOutcome();
 }
 
+// Below 1000px the page scrolls, with the map on top and the guide under it.
+const stacked = () => window.matchMedia("(max-width: 999.98px)").matches;
+function showMap() {
+  if (stacked()) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function showGuide() {
+  if (stacked()) $(".panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function setStep(name) {
   step = name;
   furthest = Math.max(furthest, steps.indexOf(name));
@@ -1091,6 +1103,7 @@ function setStep(name) {
   $(".panel-body").scrollTop = 0;
   if (name === "start") renderStart();
   if (name === "respond") renderConfirm();
+  if (name === "incident" || name === "respond") showGuide();
   renderMode();
 }
 
@@ -1182,6 +1195,7 @@ function confirmResponse() {
   mode = "incident";
   setStep("outcome");
   setView("map");
+  showMap();
   setSpeed(15);
   setPlaying(true);
 }
@@ -1221,6 +1235,7 @@ function bindEvents() {
   const fail = (error) => console.error(error);
   $("#start-button").addEventListener("click", () => {
     setView("map");
+    showMap();
     setPlaying(true);
   });
   $("#inspect-button").addEventListener("click", () => startInspection().catch(fail));
