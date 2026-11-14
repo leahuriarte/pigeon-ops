@@ -54,6 +54,19 @@ class PlaybackTests(unittest.TestCase):
         missing = set(required_legs(scenarios)) - set(geometry)
         self.assertEqual(set(), missing, "run scripts/build_road_geometry.py")
 
+    def test_every_normal_load_has_a_truck_and_the_second_delivery_fits(self):
+        scenario = load_scenario(variant="normal")
+        self.assertFalse(any(item["truck"] == "Unassigned" for item in scenario["shipments"]))
+        load = next(item for item in scenario["shipments"] if item["id"] == "SYN-SHP-1077")
+        self.assertEqual("SYN-TRK-41", load["truck"])
+        playback = build_playback(scenario, "hold-course", "open")
+        events = [item for item in playback["events"] if item["truck"] == load["truck"]
+                  and item["text"].startswith("Checks in")]
+        first = next(item for item in events if "SYN-SHP-1064" in item["text"])
+        second = next(item for item in events if load["id"] in item["text"])
+        self.assertLess(first["t"], second["t"])
+        self.assertLessEqual(second["t"], clock(load["appointment"].split("–")[1]))
+
     def test_each_incident_playback_agrees_with_its_model_and_location(self):
         for variant in ("disruption", "disruption_b", "congestion", "flood"):
             scenario = load_scenario(variant=variant)

@@ -12,7 +12,7 @@ The shared operating picture in `config/port_scenario.json` contains:
 
 - 12 synthetic shipments across three port terminals and six destination facilities
 - 9 synthetic trucks with assignments, powertrains, status, duty time, approximate simulated positions, and availability times for the two trucks the swap option exchanges
-- 4 illustrative corridors, including a current route, candidate detour, and two fleet context routes
+- 5 illustrative corridors, including a current route, candidate detour, two fleet context routes, and a route for SYN-SHP-1077
 - A playback schedule for every truck, built from the shipment ETAs, appointments, and release holds, with road-following paths in `config/road_geometry.json`
 - 5 scenario variants: routine morning operations and four incident reports, each calling for a kind of drone check: an unverified crash, a corroborated crash, heavy traffic, and road damage from a burst water main
 - 3 dispatcher actions whose delay, cost, emissions, and constraint outcomes are computed from route data; see [docs/METHODS.md](docs/METHODS.md)

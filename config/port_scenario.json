@@ -24,7 +24,7 @@
     {"id": "SYN-SHP-1068", "container": "SYN-C-1068", "cargo": "Furniture", "commodity_code": "SCTG 39", "origin": "terminal-b", "destination": "warehouse-4", "truck": "SYN-TRK-44", "appointment": "13:00–13:30", "readiness": "Ready 09:07", "eta": "12:21", "slack_min": 39, "priority": "standard", "status": "on-time", "route": "northbound"},
     {"id": "SYN-SHP-1071", "container": "SYN-C-1071", "cargo": "Pharmaceutical products", "commodity_code": "SCTG 21", "origin": "terminal-a", "destination": "warehouse-3", "truck": "SYN-TRK-52", "appointment": "11:45–12:15", "readiness": "Ready 09:01", "eta": "11:29", "slack_min": 16, "priority": "critical", "status": "watch", "route": "northbound"},
     {"id": "SYN-SHP-1074", "container": "SYN-C-1074", "cargo": "Food preparations", "commodity_code": "SCTG 20", "origin": "terminal-c", "destination": "warehouse-5", "truck": "SYN-TRK-22", "appointment": "14:00–14:30", "readiness": "Hold until 10:10", "eta": "13:26", "slack_min": 34, "priority": "high", "status": "planned", "route": "westbound"},
-    {"id": "SYN-SHP-1077", "container": "SYN-C-1077", "cargo": "Printed products", "commodity_code": "SCTG 29", "origin": "terminal-b", "destination": "warehouse-2", "truck": "Unassigned", "appointment": "13:30–14:00", "readiness": "Ready 09:11", "eta": "—", "slack_min": 0, "priority": "standard", "status": "unassigned", "route": "primary"},
+    {"id": "SYN-SHP-1077", "container": "SYN-C-1077", "cargo": "Printed products", "commodity_code": "SCTG 29", "origin": "terminal-b", "destination": "warehouse-2", "truck": "SYN-TRK-41", "appointment": "13:30–14:00", "readiness": "Ready 09:11", "eta": "13:15", "slack_min": 15, "priority": "standard", "status": "watch", "route": "SYN-ROUTE-TB-WLB"},
     {"id": "SYN-SHP-1082", "container": "SYN-C-1082", "cargo": "Precision instruments", "commodity_code": "SCTG 38", "origin": "terminal-a", "destination": "warehouse-1", "truck": "SYN-TRK-19", "appointment": "15:00–15:30", "readiness": "Hold until 10:40", "eta": "14:18", "slack_min": 42, "priority": "high", "status": "planned", "route": "northbound"}
   ],
   "trucks": [
@@ -86,6 +86,18 @@
       "duration_s": 1556,
       "routing_basis": "estimated",
       "routing_source": "OSRM demo server (router.project-osrm.org), OpenStreetMap data, fetched 2026-11-14"
+    },
+    {
+      "id": "SYN-ROUTE-TB-WLB",
+      "name": "Terminal B to West Long Beach DC",
+      "role": "fleet",
+      "color": "#567ca0",
+      "points": [[33.754,-118.216],[33.789,-118.197]],
+      "geometry": {"type":"LineString","coordinates":[[-118.21894,33.75373],[-118.22216,33.75281],[-118.22258,33.75289],[-118.22323,33.7532],[-118.22327,33.75327],[-118.22173,33.75375],[-118.22235,33.75523],[-118.22235,33.75535],[-118.22223,33.75556],[-118.22215,33.75583],[-118.22214,33.75603],[-118.22239,33.75689],[-118.22158,33.75712],[-118.22161,33.75846],[-118.22177,33.75882],[-118.22316,33.76133],[-118.22387,33.76206],[-118.22429,33.76231],[-118.22485,33.76241],[-118.22564,33.76231],[-118.23022,33.76081],[-118.23046,33.76078],[-118.23136,33.76049],[-118.23162,33.76046],[-118.23281,33.76068],[-118.23315,33.76069],[-118.23357,33.76054],[-118.23488,33.7599],[-118.23794,33.75886],[-118.23807,33.75875],[-118.2381,33.75868],[-118.238,33.7585],[-118.23775,33.75845],[-118.23719,33.75858],[-118.23639,33.75885],[-118.23617,33.75887],[-118.23498,33.75925],[-118.23355,33.75981],[-118.23244,33.76044],[-118.23126,33.76096],[-118.23117,33.76105],[-118.22767,33.76226],[-118.21629,33.76661],[-118.21529,33.76683],[-118.2144,33.76693],[-118.21007,33.76692],[-118.20913,33.76712],[-118.20869,33.7673],[-118.20818,33.76761],[-118.20776,33.76796],[-118.2073,33.76856],[-118.20699,33.76938],[-118.20691,33.77009],[-118.2069,33.77202],[-118.207,33.77592],[-118.20682,33.77756],[-118.20683,33.77834],[-118.20702,33.77904],[-118.20737,33.78002],[-118.20748,33.78093],[-118.20752,33.78287],[-118.20749,33.78738],[-118.20754,33.78801],[-118.20748,33.78835],[-118.20739,33.78848],[-118.20694,33.78875],[-118.20672,33.78898],[-118.20667,33.78914],[-118.20671,33.78975],[-118.2066,33.78994],[-118.20621,33.79007],[-118.20558,33.79015],[-118.20435,33.79015],[-118.20255,33.78992],[-118.20242,33.78996],[-118.20188,33.78988],[-118.19701,33.78987],[-118.19702,33.789]]},
+      "distance_m": 9618,
+      "duration_s": 938,
+      "routing_basis": "estimated",
+      "routing_source": "OSRM demo server (router.project-osrm.org), OpenStreetMap data, fetched 2026-11-14; driving profile, not truck-validated"
     }
   ],
   "operations": {"window": "09:12–13:30", "terminal_turn_time_min": 47, "network_speed_mph": 31, "appointments_next_90_min": 4, "weather": "Clear · 64°F · visibility 9 mi"},
