@@ -49,7 +49,7 @@ const activity = {
   blocked: ["Stuck", "risk", false],
   idle: ["Done", "planned", false],
 };
-const tag = ([label, tone]) => `<span class="status ${tone}">${label}</span>`;
+const tag = ([label, tone]) => `<span class="status ${esc(tone)}">${esc(label)}</span>`;
 
 let scenario;
 // Wording for the kind of drone check the incident calls for (disruption.check): a crash check asks
@@ -655,7 +655,11 @@ async function createArcGISRenderer() {
     "@arcgis/core/geometry/Extent.js",
   ]);
   const viewElement = $("#arcgis-map");
-  await viewElement.viewOnReady();
+  let timer;
+  await Promise.race([
+    viewElement.viewOnReady(),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("ArcGIS view did not load in 10 s")), 10000); }),
+  ]).finally(() => clearTimeout(timer));
   // Mute the OpenStreetMap tiles so routes and trucks stand out.
   viewElement.map.basemap?.baseLayers.forEach((layer) => {
     layer.effect = "grayscale(0.85) brightness(1.06) contrast(0.82)";
@@ -861,7 +865,7 @@ function renderDecision() {
   $("#disruption-description").textContent = scenarioCopy[activeScenario]?.description ?? d.description;
   $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
   $("#risk-value").innerHTML = d.web_evidence
-    ? `${pct(d.prior_blocked_probability)}<small>was ${pct(d.web_evidence.prior_before)} before the web check</small>`
+    ? `${pct(d.prior_blocked_probability)}<small>estimated · was ${pct(d.web_evidence.prior_before)} (assumed) before the web check</small>`
     : `${pct(d.prior_blocked_probability)}<small>assumed</small>`;
   $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
   $("#deadline").textContent = d.decision_deadline;
@@ -991,7 +995,7 @@ function renderEvoi(analysis) {
   $("#assumptions").innerHTML = [
     ["Assumed accuracy", `${pct(a.inspection_accuracy)} (${esc(a.accuracy_basis)})`],
     ["Assumed check time", `${a.launch_and_review_minutes} min`],
-    [`Estimated chance of a “${check().bad}” result`, pct(a.signal_blocked_probability)],
+    [`Estimated chance of a “${esc(check().bad)}” result`, pct(a.signal_blocked_probability)],
   ].map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("");
   // LLM-written brief from the engine's numbers; the normal morning has no incident step.
   if (activeScenario === "normal") clearBrief($("#brief-incident"));
@@ -1113,7 +1117,7 @@ async function showObservation(analysis, summary = null) {
     inconclusive: `Inconclusive. Assumed chance CA-47 is ${bad}: ${prior}, unchanged.`,
   }[observation];
   $("#risk-value").innerHTML = `${posterior}<small>estimated · ${posterior === prior ? "unchanged" : `was ${prior}`}</small>`;
-  $("#recommendation-short").innerHTML = `${finding}<small>Recommended: ${esc(best)}</small>`;
+  $("#recommendation-short").innerHTML = `${esc(finding)}<small>Recommended: ${esc(best)}</small>`;
   renderSensitivity($("#sensitivity"), analysis, check());
   renderBrief($("#brief-respond"), activeScenario, observation);
   // Play the map out with the new best option and the now more likely road state.
@@ -1123,17 +1127,28 @@ async function showObservation(analysis, summary = null) {
   await loadPlayback({ keepTime: true });
 }
 
+// Overlapping loads (a fast scenario switch, or a web finding applied mid-switch) must not mix
+// variants, so each load gets a number and only the latest one renders. Returns false when superseded.
+let scenarioRequest = 0;
+
 async function loadScenario(id, { keepTime = false } = {}) {
+  const mine = ++scenarioRequest;
+  const stale = () => mine !== scenarioRequest;
   activeScenario = id;
   selectedTruck = null;
   setPlaying(false);
   const response = await fetch(`/api/scenario?${withWeb(new URLSearchParams({ scenario: id }))}`);
+  if (stale()) return false;
   if (!response.ok) throw new Error("The scenario failed to load");
-  scenario = await response.json();
+  const data = await response.json();
+  if (stale()) return false;
+  scenario = data;
   if (scenario.scenario_type === "normal") usualAction = scenario.analysis.before[0].id;
   if (!baseline) {
     const base = await fetch("/api/analysis?scenario=normal&observation=inconclusive");
-    baseline = base.ok ? (await base.json()).indicators : null;
+    const indicators = base.ok ? (await base.json()).indicators : null;
+    baseline ??= indicators;
+    if (stale()) return false;
   }
   document.body.dataset.scenario = scenario.scenario_type;
   $("#drone-note").textContent = "Stock footage. Inspection accuracy and review time are assumed.";
@@ -1154,8 +1169,11 @@ async function loadScenario(id, { keepTime = false } = {}) {
   renderProvenance();
   renderDefinitions();
   await loadPlayback({ keepTime });
+  if (stale()) return false;
   await drawMap();
+  if (stale()) return false;
   renderMode();
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1308,7 +1326,7 @@ async function triggerIncident(variant = story) {
   routine = false;
   mode = "incident";
   setAppliedWeb(null);
-  await loadScenario(variant, { keepTime: true });
+  if (!(await loadScenario(variant, { keepTime: true }))) return;
   const d = scenario.disruption;
   logDecision(`${scenarioCopy[variant]?.title ?? d.title}. Reported ${d.reported_at}.`);
   setStep("incident");
@@ -1318,7 +1336,7 @@ async function triggerIncident(variant = story) {
 // The dispatcher used (or stopped using) the web check's finding: reload the incident from the new chance.
 async function applyWebFinding(finding, result) {
   setAppliedWeb(finding);
-  await loadScenario(activeScenario, { keepTime: true });
+  if (!(await loadScenario(activeScenario, { keepTime: true }))) return;
   const cited = result.cited_ids.length ? ` (${result.cited_ids.join(", ")})` : "";
   logDecision(finding
     ? `Web check used: ${result.finding.replace("_", " ")}${cited}. Chance CA-47 is ${check().bad} now ${pct(scenario.disruption.prior_blocked_probability)}.`
@@ -1358,7 +1376,7 @@ async function restartMorning() {
   setSpeed(5);
   setAppliedWeb(null);
   clearTriage($("#web-triage"));
-  await loadScenario("normal");
+  if (!(await loadScenario("normal"))) return;
   setStep("start");
   setView("map");
 }

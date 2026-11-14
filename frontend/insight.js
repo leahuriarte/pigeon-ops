@@ -180,7 +180,7 @@ export function outcomeCases(option, blockedProbability, affectedId, words = { b
   const open = caseFor(option.outcomes?.open, affectedId);
   const blocked = caseFor(option.outcomes?.blocked, affectedId);
   if (!open || !blocked) return "";
-  const row = (label, share, item) => `<li class="${item.tone}"><span class="case">${label}${share === null ? "" : ` <small>${pct(share)} estimated chance</small>`}</span><span>${item.text}.</span></li>`;
+  const row = (label, share, item) => `<li class="${item.tone}"><span class="case">${esc(label)}${share === null ? "" : ` <small>${pct(share)} estimated chance</small>`}</span><span>${item.text}.</span></li>`;
   if (open.text === blocked.text) return `<ul class="option-cases">${row(`Road ${words.good} or ${words.bad}`, null, open)}</ul>`;
   return `<ul class="option-cases">${row(`Road ${words.good}`, 1 - blockedProbability, open)}${row(`Road ${words.bad}`, blockedProbability, blocked)}</ul>`;
 }

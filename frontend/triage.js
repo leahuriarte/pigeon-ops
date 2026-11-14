@@ -5,12 +5,16 @@
 // Feed text and agent text come from outside, so they are always set with textContent.
 
 let applied = null; // The finding the dispatcher applied, or null.
+let appliedMode = null; // The feed ("live" or "demo") the applied finding came from.
 let token = 0;
 let mode = "live";
 const results = new Map(); // One run per incident and feed while the page is open; cleared by clearTriage.
 
 export const appliedWeb = () => applied;
-export const setAppliedWeb = (finding) => { applied = finding; };
+export const setAppliedWeb = (finding) => {
+  applied = finding;
+  if (!finding) appliedMode = null;
+};
 
 // Adds the applied finding to a URLSearchParams or a request body object.
 export function withWeb(target) {
@@ -102,10 +106,10 @@ function effectLine(result) {
   const e = result.effect;
   const bad = result.check.bad;
   const drone = e.inspection_after.recommend
-    ? `a drone check would still be worth it (${money(e.inspection_after.net_value)} net)`
-    : `a drone check would not be worth it (${money(e.inspection_after.net_value)} net)`;
-  if (e.prior_after === e.prior_before) return `Using it leaves the chance CA-47 is ${bad} at ${pct(e.prior_before)}.`;
-  return `Using it moves the chance CA-47 is ${bad} from ${pct(e.prior_before)} to ${pct(e.prior_after)}, and ${drone}.`;
+    ? `a drone check would still be worth it (${money(e.inspection_after.net_value)} estimated net)`
+    : `a drone check would not be worth it (${money(e.inspection_after.net_value)} estimated net)`;
+  if (e.prior_after === e.prior_before) return `Using it leaves the assumed chance CA-47 is ${bad} at ${pct(e.prior_before)}.`;
+  return `Using it moves the chance CA-47 is ${bad} from ${pct(e.prior_before)} (assumed) to ${pct(e.prior_after)} (estimated), and ${drone}.`;
 }
 
 // Runs the web check for an incident and renders the card. `onApply(finding | null, result)` is called
@@ -113,6 +117,7 @@ function effectLine(result) {
 export async function renderTriage(container, scenarioId, options = {}) {
   const mine = ++token;
   const stale = () => mine !== token;
+  const feed = mode;
   container.hidden = false;
   container.replaceChildren(header(container, scenarioId, options),
     el("p", "note", `Searching the CHP incident log, Caltrans message signs and NWS alerts near the reported spot${mode === "demo" ? " (demo feed)" : ""}…`));
@@ -143,22 +148,36 @@ export async function renderTriage(container, scenarioId, options = {}) {
     : `Demo feed: synthetic records written for this incident, not real reports.${result.fallback_reason ? " Shown because every live feed failed." : ""}`;
 
   const parts = [header(container, scenarioId, options), by, el("h3", null, headline[result.finding]), el("p", "web-summary", result.summary)];
-  const isApplied = applied === result.finding;
+  const isApplied = applied === result.finding && appliedMode === feed;
   if (isApplied) {
-    parts.push(el("p", "web-effect applied", `Applied. The chance CA-47 is ${result.check.bad} is now ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}).`));
+    parts.push(el("p", "web-effect applied", `Applied. The estimated chance CA-47 is ${result.check.bad} is now ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}, assumed).`));
   } else {
     parts.push(el("p", "web-effect", effectLine(result)));
   }
   const actions = el("div", "web-actions");
   const use = el("button", `btn small${isApplied ? "" : " primary"}`, isApplied ? "Stop using it" : "Use this finding");
   use.type = "button";
+  const error = el("p", "note");
+  error.hidden = true;
   use.addEventListener("click", async () => {
     use.disabled = true;
+    error.hidden = true;
+    const previous = [applied, appliedMode];
     applied = isApplied ? null : result.finding;
-    await options.onApply?.(applied, result);
+    appliedMode = applied ? feed : null;
+    try {
+      await options.onApply?.(applied, result);
+    } catch (failure) {
+      console.error(failure);
+      [applied, appliedMode] = previous;
+      use.disabled = false;
+      error.textContent = isApplied ? "Could not stop using the finding. Try again." : "Could not apply the finding. Try again.";
+      error.hidden = false;
+      return;
+    }
     if (!stale()) renderTriage(container, scenarioId, options);
   });
-  actions.append(use);
+  actions.append(use, error);
   parts.push(actions, evidenceList(result));
   const notes = [source, `The update uses an assumed reliability for web reports (${result.effect.likelihoods_basis}).`];
   if (result.agent_note) notes.push(result.agent_note.startsWith("LLM unavailable")
