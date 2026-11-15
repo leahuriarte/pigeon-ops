@@ -265,12 +265,6 @@ export function rememberDecision(key, decision, meta) {
   decisions.set(key, { body: { run_id: runId, ...decision }, meta });
 }
 
-// The dispatcher changed the simulated road state after confirming.
-export function setRememberedRoad(key, road) {
-  const entry = decisions.get(key);
-  if (entry && !entry.request) entry.body.road = road;
-}
-
 async function save(entry) {
   try {
     const response = await fetch("/api/history", {
@@ -285,53 +279,11 @@ async function save(entry) {
   }
 }
 
-// Saves this run's decisions and fills `section` (its `.history-results-body`) with estimate against
-// result per incident. The section stays hidden when no response was confirmed.
-export async function renderHistoryResults(section) {
-  const body = section.querySelector(".history-results-body");
-  const run = runId;
-  const entries = [...decisions.entries()].sort(([a], [b]) => a - b).map(([, entry]) => entry);
-  section.hidden = !entries.length;
-  if (!entries.length) return;
-  body.replaceChildren(el("p", "note", "Saving to decision history…"));
-  entries.forEach((entry) => { entry.request ??= save(entry); });
-  const records = await Promise.all(entries.map((entry) => entry.request));
-  if (run !== runId) return;
-  const parts = [];
-  records.forEach((record, i) => {
-    if (!record) return;
-    try {
-      parts.push(...resultTable(record, entries[i].meta));
-    } catch (error) {
-      console.error(error);
-    }
-  });
-  parts.push(el("p", "fine-print", records.every(Boolean) ? "Saved to decision history." : "Could not save to history."));
-  body.replaceChildren(...parts);
-}
-
-function resultTable(record, meta) {
-  const w = words(meta?.check);
-  const wrap = el("div", "table-wrap");
-  const table = el("table", "data history-result");
-  const road = record.actual_road_state ? ` · road ${roadWord(record.actual_road_state, w)}` : "";
-  table.append(el("caption", null, `${meta?.label ?? record.title} · ${record.action_label ?? record.action}${road}`));
-  const head = el("tr");
-  const happened = el("th", "num", "Simulated result");
-  head.append(el("th", null, "Indicator"), el("th", "num", "Estimate"), happened);
-  const thead = el("thead");
-  thead.append(head);
-  const tbody = el("tbody");
-  const show = (value, m) => (value == null ? "—" : `${m.format(value)}${m.unit ? ` ${m.unit}` : ""}`);
-  metrics.forEach((m) => {
-    const row = el("tr");
-    row.append(el("td", null, m.label), el("td", "num", show(record.estimate?.[m.key], m)), el("td", "num", show(record.actual?.[m.key], m)));
-    tbody.append(row);
-  });
-  table.append(thead, tbody);
-  wrap.append(table);
-  const parts = [wrap];
-  if (record.actual_note) parts.push(el("p", "note", record.actual_note));
-  if (record.lesson) parts.push(el("p", "history-lesson", record.lesson));
-  return parts;
+// Saves this run's decisions (once each) and resolves to a Map of report index -> saved record, or
+// null where the save failed. The shift report shows each record's estimate against its result.
+export async function saveRunDecisions() {
+  const entries = [...decisions.entries()];
+  entries.forEach(([, entry]) => { entry.request ??= save(entry); });
+  const records = await Promise.all(entries.map(([, entry]) => entry.request));
+  return new Map(entries.map(([key], i) => [key, records[i]]));
 }

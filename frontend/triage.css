@@ -9,9 +9,25 @@
 .web-triage h3 { font-family: var(--font-display); font-size: 16px; }
 .web-summary { font-size: 13.5px; }
 .web-history { padding-left: 8px; border-left: 3px solid var(--hair); font-size: 13px; }
-.web-effect { padding: 6px 8px; border-left: 3px solid var(--signal); background: var(--checked); font-size: 13px; }
-.web-effect.applied { border-left-color: var(--ink); background: var(--card); }
-.web-actions { display: flex; gap: 8px; }
+/* How the finding would move the estimate: a 0-100% track with the current chance as a tick and the
+   chance with the finding as the fill, then the two numbers and one sentence on why. */
+.web-effect { display: grid; gap: 6px; align-self: stretch; padding: 8px 10px 9px; border-left: 3px solid var(--signal); background: var(--checked); font-size: 13px; }
+.web-effect.applied { border-left-color: var(--sheen); }
+.web-effect-label { color: var(--ink-2); font-size: 12px; font-weight: 600; }
+.web-meter { position: relative; height: 10px; border: 1px solid var(--ink); background: var(--white); }
+.web-meter-after { position: absolute; inset: 0 auto 0 0; background: var(--signal); transition: width .3s ease; }
+.web-effect.applied .web-meter-after { background: var(--sheen); }
+.web-meter-before { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); }
+.web-effect-values { display: flex; align-items: end; gap: 10px; }
+.web-effect-values span:not(.arrow) { display: grid; }
+.web-effect-values small { color: var(--ink-2); font-size: 11px; }
+.web-effect-values b { font: 700 18px/1.1 var(--font-mono); }
+.web-effect-values .with b { color: var(--signal); }
+.web-effect.applied .web-effect-values .with b { color: var(--sheen); }
+.web-effect-values .arrow { padding-bottom: 1px; color: var(--ink-2); font-size: 15px; }
+.web-effect-why { font-size: 12.5px; }
+.web-actions { display: grid; gap: 4px; justify-items: start; }
+.web-hint { color: var(--ink-2); font-size: 12px; }
 .web-evidence { align-self: stretch; }
 .web-evidence ul { display: grid; gap: 8px; margin: 6px 0; padding: 0; list-style: none; }
 .web-evidence li { padding: 6px 8px; border: var(--rule); background: var(--card); }

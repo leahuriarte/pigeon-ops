@@ -429,7 +429,7 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
 
 .decision-context { margin: 10px 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 /* Before the first report there are no incident steps, so the stepper is hidden. */
-body[data-step="monitor"] .stepper { display: none; }
+body:is([data-step="monitor"], [data-step="arrival"]) .stepper { display: none; }
 
 .tag-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .tag-line > span:not(.tag) { color: var(--ink-2); font-family: var(--font-mono); font-size: 12.5px; }
@@ -574,9 +574,6 @@ details.more > :not(summary) { margin-top: 8px; }
 .option-metrics > span { display: grid; min-width: 0; font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
 .option-metrics small { color: var(--ink-2); font-family: var(--font-body); font-size: 11px; }
 
-/* Outcome step */
-.road-case { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; font-size: 13.5px; }
-
 /* Segmented control adapted from Uiverse.io (MIT): Pradeepsaranbishnoi/heavy-dragonfly-92.
    Changes from the original: the radios stay keyboard-focusable, the glider position comes
    from :has() so any option count works, and it is restyled as an ink-bordered switch. */
@@ -623,14 +620,67 @@ details.more > :not(summary) { margin-top: 8px; }
 .segmented:has(input:nth-of-type(2):checked) { --i: 1; }
 .segmented:has(input:nth-of-type(3):checked) { --i: 2; }
 
-/* Shift report */
-.report { display: flex; flex-direction: column; gap: 10px; }
-.report h2 { margin-top: 4px; padding-top: 10px; border-top: var(--frame); font-size: 16px; }
-.report .data { font-size: 12.5px; }
-.report .data th, .report .data td { padding: 5px 6px; }
-.report-log { padding: 0; border-top: var(--rule); list-style: none; font-size: 13px; }
-.report-log li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: var(--rule); }
-.report-log time { color: var(--ink-2); font-family: var(--font-mono); font-size: 12.5px; }
+/* Shift wrap-up in the guide; the full report is the dialog in shift-report.css. */
+.report { display: flex; flex-direction: column; gap: 8px; }
+.shift-summary { display: grid; padding: 0; border: var(--frame); background: var(--white); list-style: none; }
+.shift-summary li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; padding: 8px 10px; }
+.shift-summary li + li { border-top: var(--rule); }
+.shift-summary time { padding-top: 1px; color: var(--ink-2); font-family: var(--font-mono); font-size: 12.5px; }
+.shift-summary b { display: block; font-size: 13.5px; }
+.shift-summary small { color: var(--ink-2); font-size: 12px; }
+/* Once the shift is over, the wrap-up and the report button come first; the trip totals follow. */
+body[data-mode="report"] .step-outcome > :is(h1, .subhead) { order: -3; }
+body[data-mode="report"] .step-outcome > :is(.report, .actions) { order: -2; }
+#view-report { animation: invite 1.6s ease-in-out 2; }
+@keyframes invite { 50% { box-shadow: 3px 3px 0 var(--ink), 0 0 0 5px color-mix(in srgb, var(--signal) 30%, transparent); } }
+
+/* Waiting for reports, and a report coming in. */
+.watching { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; }
+.watching i { width: 8px; height: 8px; border-radius: 50%; background: var(--sheen); animation: breathe 2.4s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .25; } }
+.arrival-pulse { position: relative; display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--risk); }
+.arrival-pulse::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--risk); animation: ping 1.2s cubic-bezier(0, 0, .2, 1) infinite; }
+@keyframes ping { 75%, 100% { transform: scale(2.6); opacity: 0; } }
+.arrival-card { display: grid; gap: 10px; padding: 16px 16px 18px; border: var(--frame); border-left: 6px solid var(--risk); background: var(--white); box-shadow: 4px 4px 0 var(--ink); animation: drop-in .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.arrival-kicker { display: flex; align-items: center; gap: 9px; color: var(--risk); font: 700 12px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.arrival-loading { color: var(--ink-2); font-size: 12.5px; }
+.arrival-loading::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
+@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+@keyframes drop-in { from { transform: translateY(-14px); opacity: 0; } }
+.step-incident.arriving > * { animation: rise .5s ease-out both; }
+.step-incident.arriving > :nth-child(2) { animation-delay: .05s; }
+.step-incident.arriving > :nth-child(3) { animation-delay: .1s; }
+.step-incident.arriving > :nth-child(n+4) { animation-delay: .16s; }
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+
+/* The same alert on the map, top centre, until the incident opens. */
+.incoming {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 120px);
+  padding: 8px 14px 9px 12px;
+  border: var(--frame);
+  border-left: 5px solid var(--risk);
+  background: var(--white);
+  box-shadow: 4px 4px 0 var(--ink);
+  transform: translateX(-50%);
+  animation: toast-in .4s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+.incoming span { display: grid; min-width: 0; }
+.incoming small { color: var(--risk); font: 700 11px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; }
+.incoming b { overflow: hidden; font-family: var(--font-display); font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.incoming.leaving { animation: toast-out .4s ease-in both; }
+@keyframes toast-in { from { transform: translate(-50%, -16px); opacity: 0; } }
+@keyframes toast-out { to { transform: translate(-50%, -10px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .arrival-card, .step-incident.arriving > *, .incoming, .incoming.leaving, #view-report { animation: none; }
+  .arrival-pulse::after, .watching i { animation: none; }
+}
 
 #affected { font-size: 17px; white-space: nowrap; }
 #affected small { white-space: normal; }

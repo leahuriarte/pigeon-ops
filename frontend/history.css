@@ -1,5 +1,5 @@
-/* Past decisions card (incident step, under the web check), history lines on the response cards and
-   the shift report's estimate and result tables, all from frontend/history.js.
+/* Past decisions card (incident step, under the web check) and history lines on the response cards,
+   both from frontend/history.js. The shift report has its own styles in shift-report.css.
    Colours and fonts come from the :root tokens in styles.css; .web-head comes from triage.css. */
 .history-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: var(--frame); background: var(--white); }
 .history-card[hidden] { display: none; }
@@ -24,9 +24,3 @@
 
 /* One muted line per response card in the respond step. */
 .option-history { display: block; margin-top: 4px; color: var(--ink-2); font-size: 12px; }
-
-/* Shift report: one table per incident. */
-.history-results { display: flex; flex-direction: column; gap: 10px; }
-.history-results-body { display: flex; flex-direction: column; gap: 8px; }
-.history-result caption { padding-bottom: 4px; font-weight: 600; text-align: left; }
-.history-result th .detail { margin-top: 0; font-family: var(--font-body); font-size: 11px; font-weight: 400; }

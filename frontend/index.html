@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/triage.css">
   <link rel="stylesheet" href="/history.css">
   <link rel="stylesheet" href="/response-comparison.css">
+  <link rel="stylesheet" href="/shift-report.css">
 </head>
 <body data-mode="monitoring" data-step="start" data-view="map">
   <header class="topbar">
@@ -74,6 +75,10 @@
           </ul>
           <div id="truck-card" class="truck-card" hidden aria-live="polite"></div>
           <ol id="event-feed" class="event-feed" aria-live="polite"></ol>
+          <div id="incoming" class="incoming" hidden>
+            <i class="arrival-pulse" aria-hidden="true"></i>
+            <span><small>New report · <time id="incoming-time"></time></small><b id="incoming-title"></b></span>
+          </div>
         </div>
         <div class="playback" aria-label="Playback">
           <button id="play" class="play" type="button" aria-label="Play">
@@ -180,8 +185,16 @@
           <p id="monitor-environment" class="note"></p>
           <div id="monitor-alerts" class="monitor-alerts" aria-live="polite"></div>
           <p id="monitor-note" class="note"></p>
-          <div class="actions">
-            <button id="monitor-skip" class="btn" type="button">Skip to next report</button>
+          <p class="watching"><i aria-hidden="true"></i>Watching for incident reports</p>
+        </section>
+
+        <section class="step step-arrival" data-step="arrival" aria-labelledby="arrival-title" aria-live="assertive" hidden>
+          <div class="arrival-card">
+            <p class="arrival-kicker"><i class="arrival-pulse" aria-hidden="true"></i>New report · <time id="arrival-time"></time></p>
+            <h1 id="arrival-title"></h1>
+            <p><span id="arrival-tag" class="tag risk"></span></p>
+            <p id="arrival-mission" class="note"></p>
+            <p class="arrival-loading">Pulling up affected loads and public reports</p>
           </div>
         </section>
 
@@ -262,15 +275,6 @@
         <section class="step step-outcome" data-step="outcome" aria-labelledby="outcome-title" hidden>
           <h1 id="outcome-title">Outcome</h1>
           <p id="outcome-sub" class="subhead"></p>
-          <div class="road-case only-disruption">
-            <span id="road-case-label">Road state</span>
-            <fieldset class="segmented" style="--n:2">
-              <legend class="visually-hidden">Incident road state</legend>
-              <input type="radio" name="road" id="road-open" value="open"><label for="road-open">open</label>
-              <input type="radio" name="road" id="road-blocked" value="blocked"><label for="road-blocked">blocked</label>
-              <span class="glider" aria-hidden="true"></span>
-            </fieldset>
-          </div>
           <p id="plan-note" class="note"></p>
 
           <section id="tally-block" class="tally" aria-labelledby="tally-title" hidden>
@@ -285,26 +289,14 @@
           </section>
 
           <div id="report" class="report" hidden>
-            <h2 id="report-indicators-title">Plan comparison</h2>
-            <div class="table-wrap">
-              <table class="data">
-                <thead><tr id="report-head"><th>Indicator</th><th class="num">Usual</th></tr></thead>
-                <tbody id="report-indicators"></tbody>
-              </table>
-            </div>
-            <p id="report-indicators-note" class="note"></p>
-            <section id="report-outcomes" class="history-results" aria-labelledby="report-outcomes-title" hidden>
-              <h2 id="report-outcomes-title">Estimate and result</h2>
-              <div id="report-outcomes-body" class="history-results-body"></div>
-            </section>
-            <h2 id="report-log-title">Decision log</h2>
-            <ol id="report-log" class="report-log"></ol>
+            <p id="shift-summary-line"></p>
+            <ol id="shift-summary" class="shift-summary"></ol>
           </div>
 
           <div class="actions">
-            <button id="skip-end" class="btn" type="button">View shift report</button>
+            <button id="view-report" class="btn primary big" type="button" hidden>View shift report</button>
             <button id="change-response" class="btn" type="button">Change response</button>
-            <button id="report-restart" class="btn primary" type="button" hidden>Restart morning</button>
+            <button id="report-restart" class="btn" type="button" hidden>Restart morning</button>
           </div>
         </section>
 
@@ -333,6 +325,27 @@
       <button id="close-response-comparison" class="btn small" type="button">Close</button>
     </header>
     <div id="response-comparison-body" class="response-comparison-body"></div>
+  </dialog>
+
+  <dialog id="shift-report" class="shift-report" aria-labelledby="shift-report-title">
+    <header class="sr-header">
+      <div class="sr-brand">
+        <img src="/pigeon.svg" alt="" width="40" height="40">
+        <div>
+          <p class="sr-kicker">Shift report · Simulation</p>
+          <h2 id="shift-report-title">Morning shift</h2>
+          <p id="sr-sub" class="sr-sub"></p>
+        </div>
+      </div>
+      <div class="sr-header-actions">
+        <button id="sr-print" class="btn small" type="button">Print</button>
+        <button id="sr-close" class="btn small" type="button">Close</button>
+      </div>
+    </header>
+    <div class="sr-layout">
+      <nav id="sr-nav" class="sr-nav" aria-label="Report sections"></nav>
+      <div id="sr-body" class="sr-body"></div>
+    </div>
   </dialog>
 
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">

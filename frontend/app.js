@@ -1,7 +1,9 @@
 import { openInspection, resetInspection } from "./inspection.js";
 import { clearBrief, initAsk, renderBrief, resetAsk } from "./copilot.js";
 import { appliedWeb, clearTriage, renderTriage, setAppliedWeb, withWeb } from "./triage.js";
-import { annotateRankings, clearHistory, newHistoryRun, rememberDecision, renderHistory, renderHistoryResults, setRememberedRoad } from "./history.js";
+import { annotateRankings, clearHistory, newHistoryRun, rememberDecision, renderHistory, saveRunDecisions } from "./history.js";
+import { openShiftReport } from "./shift-report.js";
+import { demoIncidents } from "./demo.js";
 import { inspectionSentence, inspectionChoices, responseExplanation, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
 import { renderResponseComparison } from "./response-comparison.js";
 
@@ -59,6 +61,8 @@ let scenario;
 // whether the road is blocked, a traffic check whether it is jammed, a road damage check whether it is impassable.
 const check = () => ({ type: "crash", label: "Drone check", ...scenario?.disruption?.check, bad: "blocked", good: "open" });
 const roadWord = (state) => (state === "blocked" ? check().bad : check().good);
+// What the road is really like in the simulation (frontend/demo.js). Hidden until a response is confirmed.
+const trueRoad = () => demoIncidents.find((item) => item.id === activeScenario)?.road ?? "open";
 const findingText = (observation) => ({ blocked: `road ${check().bad}`, clear: `road ${check().good}`, inconclusive: "inconclusive" })[observation];
 const incidentPlace = () => scenario.disruption.location_label ?? "CA-47 connector";
 const riskText = () => `Chance the road is ${check().bad}`;
@@ -414,15 +418,13 @@ function renderPlanNote() {
     $("#plan-note").textContent = "";
     return;
   }
-  $(`#road-${plan.road}`).checked = true;
-  $$('input[name="road"]').forEach((input) => { $(`label[for="${input.id}"]`).textContent = roadWord(input.value); });
   const outcome = scenario.decision_model.actions.find((a) => a.id === plan.action)[outcomesKey()][plan.road];
   const row = tallies[plan.action]?.find((item) => item.shipment === affectedShipment().id);
   const late = row ? row.lateness_min : outcome.lateness_min;
   const later = row && row.moved > 0.5
     ? ` It checks in ${Math.round(row.moved)} min later than a response starting at ${clockLabel(span.start)}: from the ${clockLabel(incidentAt())} report the truck first drives back or waits to rejoin it.`
     : "";
-  $("#plan-note").textContent = `${affectedShipment().id} arrives ${late > 0 ? `about ${Math.round(late)} min late` : "on time"} in this case.${later}`;
+  $("#plan-note").textContent = `The road at ${incidentPlace()} turned out ${roadWord(plan.road)}. ${affectedShipment().id} arrives ${late > 0 ? `about ${Math.round(late)} min late` : "on time"}.${later}`;
 }
 
 function updateFrame() {
@@ -447,15 +449,22 @@ function updateFrame() {
   if (step === "monitor") updateMonitorLive(states);
 }
 
+// While the dispatcher decides, the map stops at the report (or the drone result) so it can't show the road ahead.
+function decisionLimit() {
+  if (mode !== "incident" || !["incident", "respond"].includes(step)) return Infinity;
+  return incidentAt() + (observed ? scenario.decision_model.drone.launch_and_review_minutes : 0);
+}
+
 function frame(now) {
   if (!playing) return;
   const elapsed = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
-  currentTime = Math.min(span.end, currentTime + elapsed * speed);
+  currentTime = Math.min(span.end, decisionLimit(), currentTime + elapsed * speed);
   if (awaitingReport() && currentTime >= reportTime(reportIndex + 1)) {
-    nextReport();
+    nextReport().catch((error) => console.error(error));
     return;
   }
+  pace();
   updateFrame();
   if (currentTime < span.end) {
     requestAnimationFrame(frame);
@@ -1026,7 +1035,6 @@ function renderDecision() {
   $("#response-limits").textContent = check().type === "environment" ? d.inspection_limits ?? "" : "";
   $("#response-limits").hidden = !$("#response-limits").textContent;
   $("#incident-stop-label").textContent = check().type === "congestion" ? "In queue" : check().type === "environment" ? "At water hazard" : "At closure";
-  $("#road-case-label").textContent = `${incidentPlace()} road state`;
   $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item.replace("synthetic planned arrival", "planned arrival").replace(" (assumed)", "").replace("Assumed visual-check accuracy", "Visual-check accuracy"))}</li>`).join("");
   $("#risk-value").innerHTML = d.web_evidence
     ? `${pct(d.prior_blocked_probability)}<small>was ${pct(d.web_evidence.prior_before)} before the web check</small>`
@@ -1349,11 +1357,13 @@ function renderDefinitions() {
 // Drone check. The simulated buttons and a reviewed clip share showObservation.
 // ---------------------------------------------------------------------------
 let observed = null; // The applied observation, or null without a drone check.
+let observedAnalysis = null; // The analysis returned with that observation.
 let dialogOpen = false;
 
 function resetObservation() {
   resetInspection();
   observed = null;
+  observedAnalysis = null;
   $("#selected-evidence").hidden = true;
   $("#observation-buttons").hidden = true;
   $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", "false"));
@@ -1383,6 +1393,7 @@ async function observe(observation) {
 async function showObservation(analysis, summary = null) {
   const observation = analysis.observation;
   observed = observation;
+  observedAnalysis = analysis;
   $$("[data-observation]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.observation === observation)));
   const prior = pct(analysis.prior_blocked_probability);
   const posterior = pct(analysis.posterior_blocked_probability);
@@ -1403,7 +1414,7 @@ async function showObservation(analysis, summary = null) {
   renderSensitivity($("#sensitivity"), analysis, check());
   renderBrief($("#brief-respond"), activeScenario, observation);
   // Play the map out with the new best option and the now more likely road state.
-  plan = { action: analysis.after[0].id, road: analysis.posterior_blocked_probability >= 0.5 ? "blocked" : "open" };
+  plan = { action: analysis.after[0].id, road: trueRoad() };
   renderRankings(analysis.after, observation, analysis.posterior_blocked_probability);
   setStep("respond");
   await loadPlayback({ keepTime: true });
@@ -1435,7 +1446,7 @@ async function loadScenario(id, { keepTime = false } = {}) {
   $("#drone-note").textContent = "";
   plan = {
     action: scenario.analysis.before[0].id,
-    road: scenario.disruption.prior_blocked_probability >= 0.5 ? "blocked" : "open",
+    road: trueRoad(),
   };
   modelPick = scenario.analysis.before[0];
   if (scenario.scenario_type === "disruption" && reports[reportIndex]?.id === id) {
@@ -1477,10 +1488,29 @@ let furthest = 0; // Index in steps of the furthest step reached for this report
 let reportIndex = -1; // Index in reports of the incident on screen; -1 before the first report.
 let lead = null; // From the latest report: { shown, raw }, the playback on the map then, stitched and as planned.
 let incidentPlans = []; // Per report reached: its whole-plan indicators before inspection, for the shift report.
+let shiftRecords = []; // Per report: how the estimate moved, the response chosen and its simulated result.
 let decisionLog = [];
+// Playback speed follows the shift (slow as a response starts and as a report nears, faster in between)
+// until the dispatcher picks a speed themselves.
+let autoPace = true;
+let pacedFrom = 0; // When the current stretch of playback started.
 
 function logDecision(text) {
-  decisionLog.push({ t: currentTime, text });
+  decisionLog.push({ t: currentTime, text, report: reportIndex });
+}
+
+function pace() {
+  if (!autoPace || !(step === "monitor" || (mode === "incident" && step === "outcome"))) return;
+  const next = reports[reportIndex + 1];
+  const settling = currentTime - pacedFrom < 3;
+  const want = settling ? 1 : next ? (reportTime(reportIndex + 1) - currentTime <= 4 ? 1 : 5) : 15;
+  if (want !== speed) setSpeed(want);
+}
+
+function startPacing() {
+  autoPace = true;
+  pacedFrom = currentTime;
+  setSpeed(1);
 }
 
 function renderMode() {
@@ -1579,10 +1609,9 @@ function updateMonitorLive(states) {
 function renderOutcome() {
   const report = mode === "report";
   $("#report").hidden = !report;
-  $("#outcome-title").textContent = report ? "Shift report" : actionLabel(plan.action);
+  $("#outcome-title").textContent = report ? "Shift complete" : actionLabel(plan.action);
   if (!report) $("#outcome-sub").textContent = "";
-  $("#skip-end").hidden = report;
-  $("#skip-end").textContent = reports[reportIndex + 1] ? "Skip to next report" : "View shift report";
+  $("#view-report").hidden = !report;
   $("#change-response").hidden = report;
   $("#report-restart").hidden = !report;
 }
@@ -1590,14 +1619,43 @@ function renderOutcome() {
 // True while the map plays toward the next report: before the first one, or after a confirmed response.
 const awaitingReport = () => Boolean(reports[reportIndex + 1]) && (step === "monitor" || (mode === "incident" && step === "outcome"));
 
-function nextReport() {
+// A report comes in the way a call would: the map stops where it is, an alert lands on the map and in
+// the guide, and the incident opens a moment later once its numbers are in.
+async function nextReport() {
   setPlaying(false);
   currentTime = reportTime(reportIndex + 1);
   updateFrame();
-  triggerIncident().catch((error) => console.error(error));
+  closeResults();
+  const incoming = demoIncidents.find((item) => item.id === reports[reportIndex + 1].id);
+  const title = incoming?.title ?? reports[reportIndex + 1].label;
+  $("#arrival-time").textContent = clockLabel(currentTime);
+  $("#arrival-title").textContent = title;
+  $("#arrival-tag").textContent = incoming?.tag ?? "New";
+  $("#arrival-mission").textContent = incoming?.mission ? `Drone mission if needed: ${incoming.mission.toLowerCase()}.` : "";
+  $("#incoming-time").textContent = clockLabel(currentTime);
+  $("#incoming-title").textContent = title;
+  const toast = $("#incoming");
+  toast.hidden = false;
+  toast.classList.remove("leaving");
+  setStep("arrival");
+  const beat = new Promise((resolve) => setTimeout(resolve, 1600));
+  await triggerIncident(beat);
+  setTimeout(() => toast.classList.add("leaving"), 1800);
+  setTimeout(() => { if (toast.classList.contains("leaving")) toast.hidden = true; }, 2300);
 }
 
-async function triggerIncident() {
+// Records the simulated result of the response on screen before the next report or the shift report.
+function closeResults() {
+  const record = shiftRecords[reportIndex];
+  if (!record || !tallies[plan.action]) return;
+  record.result = totalsAt(tallies[plan.action], Infinity);
+  record.shipments = [...new Set(tallies[plan.action].map((row) => row.shipment))].join(" and ");
+  record.planned = planTotals;
+  record.costs = scenario.decision_model.actions.filter((a) => tallies[a.id])
+    .map((a) => ({ id: a.id, label: a.label, cost: totalsAt(tallies[a.id], Infinity).cost }));
+}
+
+async function triggerIncident(beat = Promise.resolve()) {
   reportIndex += 1;
   // Each report starts from what the map shows now, so the trucks stay in place up to the report.
   lead = { shown: playback, raw: rawPlayback };
@@ -1609,7 +1667,13 @@ async function triggerIncident() {
   const d = scenario.disruption;
   logDecision(`${d.title}. Reported ${clockLabel(incidentAt())}. ${d.evidence_summary}.`);
   logDecision(`${inspectionSentence(scenario.analysis.evoi)} ${inspectionChoices(scenario.analysis.evoi, check())}`);
+  await beat;
+  if (reports[reportIndex].id !== activeScenario) return;
   setStep("incident");
+  const section = $(".step-incident");
+  section.classList.remove("arriving");
+  void section.offsetWidth;
+  section.classList.add("arriving");
   renderTriage($("#web-triage"), activeScenario, { onApply: applyWebFinding });
   loadHistory();
 }
@@ -1638,7 +1702,7 @@ function startMorning() {
   setStep("monitor");
   setView("map");
   showMap();
-  setSpeed(1);
+  startPacing();
   setPlaying(true);
 }
 
@@ -1647,7 +1711,11 @@ async function restartMorning() {
   reportIndex = -1;
   lead = null;
   incidentPlans = [];
+  shiftRecords = [];
+  savedRun = null;
   decisionLog = [];
+  $("#incoming").hidden = true;
+  if ($("#shift-report").open) $("#shift-report").close();
   setSpeed(5);
   setAppliedWeb(null);
   clearTriage($("#web-triage"));
@@ -1670,33 +1738,95 @@ function confirmResponse() {
     rememberDecision(reportIndex, {
       scenario: activeScenario, action: plan.action, road: plan.road, observation: observed, web: appliedWeb(), override_reason: reason,
     }, { label: reports[reportIndex].label, check: check() });
+    const web = scenario.analysis.web_evidence;
+    const pick = modelPick ?? scenario.analysis.before[0];
+    shiftRecords[reportIndex] = {
+      index: reportIndex,
+      label: reports[reportIndex].label,
+      title: scenario.disruption.title,
+      place: incidentPlace(),
+      at: incidentAt(),
+      decidedAt: currentTime,
+      check: check(),
+      start: web?.prior_before ?? scenario.disruption.prior_blocked_probability,
+      droneAdvice: scenario.analysis.evoi.recommend_inspection,
+      web: web ? { finding: web.finding, after: web.prior_after } : null,
+      drone: observed ? { observation: observed, finding: findingText(observed), after: observedAnalysis?.posterior_blocked_probability ?? null } : null,
+      action: plan.action,
+      actionLabel: label,
+      recommended: pick?.id,
+      recommendedLabel: pick?.label,
+      reason,
+      road: plan.road,
+      roadWord: roadWord(plan.road),
+    };
   }
   mode = "incident";
   setStep("outcome");
   setView("map");
   showMap();
-  // Slow enough to watch the response start before the next report arrives.
-  setSpeed(reports[reportIndex + 1] ? 1 : 15);
+  // Slow enough to watch the response start, then faster until the next report or the end of the shift.
+  startPacing();
   setPlaying(true);
 }
 
+let savedRun = null; // This run's decisions posted to the decision history, once per shift report.
+
 function showReport() {
   setPlaying(false);
+  closeResults();
   mode = "report";
+  savedRun ??= saveRunDecisions();
   renderReport();
   renderMode();
   updateTally();
 }
 
-function renderReport() {
-  const day = new Date(scenario.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  const count = reportIndex + 1;
-  $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${count} incident report${count === 1 ? "" : "s"}.`;
+function shiftDay() {
+  return new Date(scenario.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
 
+// The short wrap-up in the guide; the full report opens in its own dialog.
+function renderReport() {
+  const records = shiftRecords.filter(Boolean);
+  const followed = records.filter((r) => r.action === r.recommended).length;
+  $("#outcome-sub").textContent = `${shiftDay()} · ${clockLabel(span.start)} to ${clockLabel(currentTime)}.`;
+  $("#shift-summary").innerHTML = records.map((r) => `<li>
+      <time>${clockLabel(r.at)}</time>
+      <span><b>${esc(r.title)}</b><small>${esc(r.actionLabel)}${r.action === r.recommended ? " · recommended" : " · override"} · road ${esc(r.roadWord)}</small></span>
+    </li>`).join("");
+  $("#shift-summary-line").textContent = records.length
+    ? `${records.length} report${records.length === 1 ? "" : "s"} handled. Recommendation followed ${followed} of ${records.length}.`
+    : "No reports handled.";
+}
+
+function closingEntry() {
+  const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
+  const text = plan.action === modelPick?.id
+    ? `Completed: ${action.label} (recommended).`
+    : `Completed: ${action.label}. Recommended: ${modelPick.label}.`;
+  return { t: currentTime, text, report: reportIndex };
+}
+
+function openReport() {
+  openShiftReport({
+    day: shiftDay(),
+    start: span.start,
+    end: currentTime,
+    reports: reports.map((r) => r.label),
+    incidents: shiftRecords.filter(Boolean),
+    log: [...decisionLog, closingEntry()],
+    indicators: indicatorTable(),
+    saved: savedRun ?? Promise.resolve(new Map()),
+    clock: clockLabel,
+  });
+}
+
+// Whole-plan indicators per report against a morning without incidents, as table HTML.
+function indicatorTable() {
   const plans = incidentPlans.filter(Boolean);
-  $("#report-head").innerHTML = `<th>Indicator</th><th class="num">Usual</th>${plans.map((p) => `<th class="num">${esc(p.label)}<span class="detail">${clockLabel(p.at)}</span></th>`).join("")}`;
-  $("#report-indicators-note").textContent = "Whole-plan estimates before inspection, calculated separately for each report. Columns do not add up. Small figures show the change from a shift without incidents.";
-  $("#report-indicators").innerHTML = (baseline ?? plans[0]?.indicators ?? []).map((base) => {
+  const head = `<th>Indicator</th><th class="num">Usual</th>${plans.map((p) => `<th class="num">${esc(p.label)}<span class="detail">${clockLabel(p.at)}</span></th>`).join("")}`;
+  const rows = (baseline ?? plans[0]?.indicators ?? []).map((base) => {
     const items = plans.map((p) => p.indicators.find((item) => item.id === base.id));
     const cells = items.map((item) => {
       if (item?.value == null) return '<td class="num">—</td>';
@@ -1708,32 +1838,13 @@ function renderReport() {
     }).join("");
     return `<tr><td>${shortLabels[base.id] ?? indicatorLabel(base)}</td><td class="num">${base.value == null ? "—" : indicatorText(base, base.value)}</td>${cells}</tr>`;
   }).join("");
-
-  const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
-  const closing = plan.action === modelPick?.id
-    ? `Completed: ${action.label} (recommended).`
-    : `Completed: ${action.label}. Recommended: ${modelPick.label}.`;
-  $("#report-log").innerHTML = [...decisionLog, { t: currentTime, text: closing }]
-    .map((entry) => `<li><time>${clockLabel(entry.t)}</time><span>${esc(entry.text)}</span></li>`).join("");
-  renderHistoryResults($("#report-outcomes")).catch((error) => console.error(error));
-}
-
-// Skips to the next report while one is still due, otherwise to the end of the morning.
-function skipToReport() {
-  if (reports[reportIndex + 1]) {
-    nextReport();
-    return;
-  }
-  setPlaying(false);
-  currentTime = span.end;
-  updateFrame();
-  showReport();
+  return { head, rows };
 }
 
 function bindEvents() {
   const fail = (error) => console.error(error);
   $("#start-button").addEventListener("click", startMorning);
-  $("#monitor-skip").addEventListener("click", skipToReport);
+  $("#view-report").addEventListener("click", openReport);
   $("#inspect-button").addEventListener("click", () => startInspection().catch(fail));
   $("#reinspect-button").addEventListener("click", () => startInspection().catch(fail));
   $("#skip-inspection").addEventListener("click", () => {
@@ -1766,7 +1877,6 @@ function bindEvents() {
   });
   $("#confirm-button").addEventListener("click", confirmResponse);
   $("#override-reason").addEventListener("input", renderConfirm);
-  $("#skip-end").addEventListener("click", skipToReport);
   $("#change-response").addEventListener("click", () => {
     setPlaying(false);
     setStep("respond");
@@ -1801,17 +1911,13 @@ function bindEvents() {
 
   $("#play").addEventListener("click", () => setPlaying(!playing));
   $("#timeline").addEventListener("input", (event) => {
-    currentTime = Number(event.target.value);
+    currentTime = Math.min(Number(event.target.value), decisionLimit());
     updateFrame();
   });
   $("#playback-speed").addEventListener("change", (event) => {
     speed = Number(event.target.value);
+    autoPace = false;
   });
-  $$('input[name="road"]').forEach((input) => input.addEventListener("change", () => {
-    plan = { ...plan, road: input.value };
-    if (mode === "incident" && step === "outcome") setRememberedRoad(reportIndex, input.value);
-    loadPlayback({ keepTime: true }).catch(fail);
-  }));
   // The ask box's text input is an input, so the space-bar handler below ignores it.
   initAsk(() => ({ scenario: activeScenario, observation: observed })).catch(fail);
   document.addEventListener("keydown", (event) => {
