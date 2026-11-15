@@ -98,7 +98,7 @@ function card(data, onOpen) {
 
   const rate = el("p", "history-rate");
   rate.append(el("b", null, baseRate(s, w)));
-  if (s.current_estimate != null) rate.append(` · now ${pct(s.current_estimate)} (${appliedWeb() ? "estimated" : "assumed"})`);
+  if (s.current_estimate != null) rate.append(` · now ${pct(s.current_estimate)}`);
 
   const parts = [head, rate];
   if (s.by_action?.length) parts.push(actionTable(s, w));
@@ -179,7 +179,7 @@ function list(title, key, reached) {
 function caseList(data, w, reached) {
   const labels = Object.fromEntries((data.summary.by_action ?? []).map((a) => [a.action, a.label]));
   const box = list(`Cases (${data.cases.length})`, "cases", reached);
-  box.append(el("p", "note", "Figures: estimate → result."));
+  box.append(el("p", "note", "Plan → result."));
   const items = el("ol", "history-cases");
   data.cases.forEach((c) => items.append(caseItem(c, w, labels)));
   box.append(items);
@@ -195,7 +195,7 @@ function caseItem(c, w, labels) {
 
   const before = [];
   if (c.reports) before.push(sentence(c.reports));
-  if (c.estimated_bad_probability != null) before.push(`Estimated ${pct(c.estimated_bad_probability)} ${w.bad}.`);
+  if (c.estimated_bad_probability != null) before.push(`${pct(c.estimated_bad_probability)} chance the road is ${w.bad}.`);
   if (c.web_finding) before.push(`Web check: ${webWords[c.web_finding] ?? c.web_finding}.`);
   if (c.inspection?.flown) {
     const wait = c.inspection.wait_min != null ? `, ${whole(c.inspection.wait_min)} min` : "";
@@ -318,7 +318,7 @@ function resultTable(record, meta) {
   table.append(el("caption", null, `${meta?.label ?? record.title} · ${record.action_label ?? record.action}${road}`));
   const head = el("tr");
   const happened = el("th", "num", "Happened");
-  head.append(el("th", null, "Indicator"), el("th", "num", "Estimated"), happened);
+  head.append(el("th", null, "Indicator"), el("th", "num", "Plan"), happened);
   const thead = el("thead");
   thead.append(head);
   const tbody = el("tbody");

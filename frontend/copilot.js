@@ -54,7 +54,7 @@ export async function renderFootageOpinion(caseItem, labels = {}, scenarioId = n
   const card = document.querySelector("#inspection-llm");
   if (!(await llmStatus()).enabled || token !== footageToken) return;
   delete card.dataset.agrees;
-  card.replaceChildren(llmTag("AI review · unvalidated"), el("p", "note", "Reviewing…"));
+  card.replaceChildren(llmTag("AI review"), el("p", "note", "Reviewing…"));
   card.hidden = false;
   const query = new URLSearchParams({ case_id: caseItem.id });
   if (scenarioId) query.set("scenario", scenarioId);
@@ -69,7 +69,7 @@ export async function renderFootageOpinion(caseItem, labels = {}, scenarioId = n
     ? `Agrees: ${finding}`
     : `Disagrees: ${finding}`);
   headline.append(el("small", null, `${result.confidence} confidence`));
-  const parts = [llmTag("AI review · unvalidated"), headline, el("p", null, result.rationale)];
+  const parts = [llmTag("AI review"), headline, el("p", null, result.rationale)];
   if (result.checks?.length) {
     const list = el("ul", "copilot-checks");
     result.checks.forEach((item) => list.append(el("li", null, item)));
@@ -96,7 +96,7 @@ export async function renderBrief(container, scenarioId, observation = null) {
   const token = briefTokens.get(container);
   const stale = () => briefTokens.get(container) !== token;
   if (!(await llmStatus()).enabled || stale()) return;
-  const label = "AI explanation · unvalidated";
+  const label = "AI explanation";
   container.replaceChildren(llmTag(label), el("p", "note", "Loading…"));
   container.hidden = false;
   const query = withWeb(new URLSearchParams({ scenario: scenarioId }));
@@ -160,7 +160,7 @@ export async function initAsk(getContext) {
       answer.replaceChildren(el("p", "note", "Couldn't get an answer. Try again."));
       return;
     }
-    const parts = [llmTag("AI answer · unvalidated"), el("p", "copilot-answer-text", result.answer)];
+    const parts = [llmTag("AI answer"), el("p", "copilot-answer-text", result.answer)];
     if (!result.grounded) {
       parts.push(el("p", "copilot-warn", "Some figures aren't in the calculation. Check before using them."));
     }

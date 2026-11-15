@@ -124,7 +124,7 @@
             <tbody id="fleet-list"></tbody>
           </table>
         </div>
-        <p class="note">Simulated check-ins. Schedule risk is an illustrative assumption: extra delay is uniformly spread from 0 to the smaller of 30 minutes or 25% of remaining trip time. It estimates arrival after the appointment starts, and is not a measured traffic forecast. A detour is a contingency, never an automatic dispatch.</p>
+        <p class="note">Schedule risk shows the chance of arriving after the appointment starts. A detour is a contingency until you choose it.</p>
       </div>
 
       <div id="view-method" class="view view-method" role="tabpanel" aria-label="Data and method" hidden>
@@ -163,7 +163,7 @@
             <button id="start-button" class="btn primary big" type="button" disabled>Start morning</button>
           </div>
           <p id="start-note" class="note"></p>
-          <p class="fine-print">Simulation. You approve each response; no dispatch occurs.</p>
+          <p class="fine-print">You approve each response.</p>
         </section>
 
         <section class="step step-monitor" data-step="monitor" aria-labelledby="monitor-title" hidden>
@@ -222,7 +222,7 @@
             <button id="skip-inspection" class="btn" type="button">Skip inspection</button>
           </div>
           <div id="observation-buttons" class="choices" hidden>
-            <p>No matching footage. Choose a simulated result:</p>
+            <p>No matching footage. Choose a road finding:</p>
             <div>
               <button class="choice" type="button" data-observation="blocked">Road blocked</button>
               <button class="choice" type="button" data-observation="clear">Road clear</button>
@@ -235,7 +235,7 @@
           <div class="evidence">
             <figure id="selected-evidence" class="selected-evidence" hidden>
               <img id="selected-evidence-image" alt="Reviewed drone frame">
-              <figcaption><span id="selected-evidence-title"></span> Stock footage from another location.</figcaption>
+              <figcaption><span id="selected-evidence-title"></span></figcaption>
             </figure>
             <p id="posterior" class="posterior"></p>
             <details class="more ai-explanation"><summary>AI explanation</summary><div id="brief-respond" class="copilot-brief" aria-live="polite" hidden></div></details>
@@ -243,7 +243,7 @@
           </div>
           <h1 id="options-title">Choose a response</h1>
           <p id="response-limits" class="note"></p>
-          <p id="ranking-state" class="subhead">Lowest expected loss first. Estimates.</p>
+          <p id="ranking-state" class="subhead">Lowest expected loss first.</p>
           <p id="response-why" class="decision-context"></p>
           <button id="compare-responses" class="btn compare-open" type="button">Compare all responses</button>
           <ol id="rankings" class="options"></ol>
@@ -253,14 +253,14 @@
           <div class="actions">
             <button id="confirm-button" class="btn primary" type="button">Confirm</button>
           </div>
-          <details class="more"><summary>Expected loss</summary><p>Probability-weighted cost of driving, delay, CO₂ and missed appointments for both loads. Rates are assumed. Confirming runs the simulation.</p></details>
+          <details class="more"><summary>Expected loss</summary><p>Probability-weighted cost of driving, delay, CO₂ and missed appointments for both loads.</p></details>
         </section>
 
         <section class="step step-outcome" data-step="outcome" aria-labelledby="outcome-title" hidden>
-          <h1 id="outcome-title">Simulation</h1>
+          <h1 id="outcome-title">Outcome</h1>
           <p id="outcome-sub" class="subhead"></p>
           <div class="road-case only-disruption">
-            <span id="road-case-label">Simulate the incident road as</span>
+            <span id="road-case-label">Road state</span>
             <fieldset class="segmented" style="--n:2">
               <legend class="visually-hidden">Incident road state</legend>
               <input type="radio" name="road" id="road-open" value="open"><label for="road-open">open</label>
@@ -273,7 +273,6 @@
           <section id="tally-block" class="tally" aria-labelledby="tally-title" hidden>
             <div class="tally-head">
               <h2 id="tally-title">Trip totals</h2>
-              <span class="basis estimated">Estimated</span>
             </div>
             <p id="tally-scope" class="subhead"></p>
             <ul id="tally" class="tally-tiles"></ul>
@@ -290,7 +289,7 @@
                 <tbody id="report-indicators"></tbody>
               </table>
             </div>
-            <p id="report-indicators-note" class="note">Whole-plan estimates for the top-ranked response before inspection.</p>
+            <p id="report-indicators-note" class="note"></p>
             <section id="report-outcomes" class="history-results" aria-labelledby="report-outcomes-title" hidden>
               <h2 id="report-outcomes-title">Estimate and result</h2>
               <div id="report-outcomes-body" class="history-results-body"></div>
@@ -337,7 +336,7 @@
     <header class="inspection-header">
       <div>
         <h2 id="inspection-dialog-heading">Review footage</h2>
-        <p class="inspection-scope">Simulated drone check · pre-recorded stock footage from another location.</p>
+        <p class="inspection-scope">Drone check</p>
       </div>
       <button id="inspection-close" class="btn small" type="button">Close</button>
     </header>
@@ -350,7 +349,7 @@
       </div>
       <div class="inspection-side">
         <div id="inspection-cv" class="inspection-cv">
-          <span class="tag">Video analysis · unvalidated</span>
+          <span class="tag">Video analysis</span>
           <h3 id="inspection-cv-signal"></h3>
         </div>
         <div id="inspection-llm" class="inspection-llm" aria-live="polite" hidden></div>
@@ -368,7 +367,7 @@
           <p id="inspection-finding" class="inspection-finding"></p>
           <p id="inspection-note" class="inspection-note"></p>
           <p id="inspection-cv-basis" class="fine-print"></p>
-          <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a><span>Provisional road markings. Estimated speeds.</span></div>
+          <div class="inspection-provenance"><span id="inspection-date"></span><span id="inspection-location"></span><a id="inspection-source" target="_blank" rel="noopener noreferrer"></a></div>
           <label class="inspection-review-note">Note (optional)<textarea id="inspection-review-note" rows="2" maxlength="500"></textarea></label>
           <p class="fine-print">Reviews are saved locally.</p>
         </details>

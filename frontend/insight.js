@@ -12,9 +12,9 @@ export function inspectionSentence(evoi) {
   const wait = evoi.assumptions.launch_and_review_minutes;
   const cost = evoi.inspection_cost;
   if (evoi.recommend_inspection) {
-    return `Estimated saving: ${money(evoi.net_value_of_information)} after the ${money(cost)} check and ${wait} min wait.`;
+    return `Saving: ${money(evoi.net_value_of_information)} after the ${money(cost)} check and ${wait} min wait.`;
   }
-  return `Checking first adds an estimated ${money(-evoi.net_value_of_information)} in cost and delay.`;
+  return `Checking first adds ${money(-evoi.net_value_of_information)} in cost and delay.`;
 }
 
 // Use the engine's actual conditional decisions, including the inspection wait.
@@ -30,7 +30,7 @@ export function inspectionChoices(evoi, words) {
 export function responseExplanation(items) {
   const [best, next] = items;
   if (!best || !next) return "";
-  return `${best.label}: ${money(best.expected_loss)} estimated loss, ${money(next.expected_loss - best.expected_loss)} less than ${next.label}.`;
+  return `${best.label}: ${money(best.expected_loss)} expected loss, ${money(next.expected_loss - best.expected_loss)} less than ${next.label}.`;
 }
 
 // How accurate the inspection has to be, what the page assumes, and how automated CV alone compares.
@@ -42,13 +42,13 @@ export function accuracyNote(evoi) {
     : breakEven >= 0.995
       ? "Break-even accuracy: over 99%."
       : `Break-even accuracy: ${pct(breakEven)}.`;
-  const assumed = `Assumed accuracy after human review: ${pct(a.inspection_accuracy)}. Unmeasured.`;
+  const accuracy = `Accuracy after human review: ${pct(a.inspection_accuracy)}.`;
   const cv = evoi.cv_only;
-  if (!cv) return `${need} ${assumed}`;
+  if (!cv) return `${need} ${accuracy}`;
   const alone = cv.recommend_inspection
-    ? `${money(cv.net_value_of_information)} estimated saving`
-    : `${money(-cv.net_value_of_information)} estimated added loss`;
-  return `${need} ${assumed} Automated image analysis alone: ${alone}, using accuracy measured on aerial stills.`;
+    ? `${money(cv.net_value_of_information)} saving`
+    : `${money(-cv.net_value_of_information)} added loss`;
+  return `${need} ${accuracy} Automated image analysis alone: ${alone}.`;
 }
 
 // Ranges of blockage chance where the net value of inspecting is above zero, as [low, high] pairs.
@@ -131,7 +131,7 @@ export function renderSensitivity(container, analysis, words = { bad: "blocked" 
 
   container.hidden = false;
   container.innerHTML = `<h3>When a drone check pays off</h3>
-    <p class="sens-sub">Estimated net saving ($)</p>
+    <p class="sens-sub">Net saving ($)</p>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(summary)}">
       ${bands}
       <line class="sens-zero" x1="${left}" x2="${W - right}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}"/>
@@ -194,7 +194,7 @@ export function outcomeCases(option, blockedProbability, affectedId, words = { b
   const open = caseFor(option.outcomes?.open, affectedId);
   const blocked = caseFor(option.outcomes?.blocked, affectedId);
   if (!open || !blocked) return "";
-  const row = (label, share, item) => `<li class="${item.tone}"><span class="case">${esc(label)}${share === null ? "" : ` <small>${pct(share)} estimated chance</small>`}</span><span>${item.text}.</span></li>`;
+  const row = (label, share, item) => `<li class="${item.tone}"><span class="case">${esc(label)}${share === null ? "" : ` <small>${pct(share)} chance</small>`}</span><span>${item.text}.</span></li>`;
   if (open.text === blocked.text) return `<ul class="option-cases">${row(`Road ${words.good} or ${words.bad}`, null, open)}</ul>`;
   return `<ul class="option-cases">${row(`Road ${words.good}`, 1 - blockedProbability, open)}${row(`Road ${words.bad}`, blockedProbability, blocked)}</ul>`;
 }

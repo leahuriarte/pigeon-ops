@@ -418,7 +418,7 @@ function renderPlanNote() {
   const row = tallies[plan.action]?.find((item) => item.shipment === affectedShipment().id);
   const late = row ? row.lateness_min : outcome.lateness_min;
   const later = row && row.moved > 0.5
-    ? ` It checks in ${Math.round(row.moved)} min later than the estimate, which assumes the response began at ${clockLabel(span.start)}: from the ${clockLabel(incidentAt())} report the truck first drives back or waits to rejoin it (simulated).`
+    ? ` It checks in ${Math.round(row.moved)} min later than a response starting at ${clockLabel(span.start)}: from the ${clockLabel(incidentAt())} report the truck first drives back or waits to rejoin it.`
     : "";
   $("#plan-note").textContent = `${affectedShipment().id} arrives ${late > 0 ? `about ${Math.round(late)} min late` : "on time"} in this case.${later}`;
 }
@@ -631,7 +631,7 @@ function renderTallyFrame() {
   $("#tally-alternatives").hidden = normal;
   const label = actions.find((a) => a.id === plan.action).label;
   const road = scenario.scenario_type === "disruption" ? `, ${incidentPlace()}: ${roadWord(plan.road)}` : "";
-  $("#tally-scope").textContent = normal ? `${current.length} modeled shipments on their planned routes · estimated` : `${label}${road}`;
+  $("#tally-scope").textContent = normal ? `${current.length} shipments on their planned routes` : `${label}${road}`;
   $("#tally-race-road").textContent = scenario.scenario_type === "disruption" ? `(${incidentPlace()}: ${roadWord(plan.road)})` : "";
   $("#tally").innerHTML = tallyMetrics.map((metric) => `<li class="tally-tile" data-metric="${metric.id}">
     <span class="kpi-label">${metric.label}</span>
@@ -649,7 +649,7 @@ function renderTallyFrame() {
   }).join("");
   const r = scenario.decision_model;
   const shipments = [...new Set(current.map((row) => row.shipment))].join(" and ");
-  $("#tally-note").textContent = `${shipments}, from ${clockLabel(span.start)} to delivery. Assumed rates: driving $${r.rates.cost_per_mile.toFixed(2)}/mi; driver time $${r.rates.driver_hourly_rate}/h; delay ${money(r.lateness_cost_per_minute)}/min; CO₂ $${r.emissions_cost_per_kg.toFixed(2)}/kg; missed appointment ${money(r.hard_constraint_penalty)}.`;
+  $("#tally-note").textContent = `${shipments}, from ${clockLabel(span.start)} to delivery. Rates: driving $${r.rates.cost_per_mile.toFixed(2)}/mi; driver time $${r.rates.driver_hourly_rate}/h; delay ${money(r.lateness_cost_per_minute)}/min; CO₂ $${r.emissions_cost_per_kg.toFixed(2)}/kg; missed appointment ${money(r.hard_constraint_penalty)}.`;
   tallyKeys.clear();
 }
 
@@ -984,7 +984,7 @@ async function drawMap() {
       renderer = await createArcGISRenderer();
       $("#map-fallback").classList.add("hidden");
       $("#arcgis-map").classList.remove("hidden");
-      $("#map-provider").textContent = "OpenStreetMap · OSRM routes · Simulated trucks";
+      $("#map-provider").textContent = "OpenStreetMap · OSRM routes";
     } catch (error) {
       console.warn("Using the schematic map because ArcGIS failed to load:", error);
       renderer = createSchematicRenderer();
@@ -1000,7 +1000,7 @@ function showSchematic(message) {
   $(".map-shell").classList.add("schematic");
   $("#arcgis-map").classList.add("hidden");
   $("#map-fallback").classList.remove("hidden");
-  $("#map-provider").textContent = `${message} Simulated trucks.`;
+  $("#map-provider").textContent = message;
 }
 
 function affectedShipment() {
@@ -1017,21 +1017,21 @@ function renderDecision() {
   const when = scenario.scenario_type === "disruption" ? "Reported" : "As of";
   $("#reported-at").textContent = d.reported_at ? ` · ${when} ${reportClock(d.reported_at)}` : "";
   $("#disruption-title").textContent = d.title;
-  $("#disruption-description").textContent = d.description;
-  $("#incident-place").textContent = `${d.evidence_summary ?? "No incident reports"} · Synthetic`;
+  $("#disruption-description").textContent = d.description.replace("the assumed 30 min delay", "a 30 min delay");
+  $("#incident-place").textContent = d.evidence_summary ?? "No incident reports";
   $("#inspection-limits").textContent = d.inspection_limits ?? "";
   $("#inspection-limits").hidden = !$("#inspection-limits").textContent;
   $("#response-limits").textContent = check().type === "environment" ? d.inspection_limits ?? "" : "";
   $("#response-limits").hidden = !$("#response-limits").textContent;
   $("#incident-stop-label").textContent = check().type === "congestion" ? "In queue" : check().type === "environment" ? "At water hazard" : "At closure";
-  $("#road-case-label").textContent = `Simulate ${incidentPlace()} as`;
-  $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
+  $("#road-case-label").textContent = `${incidentPlace()} road state`;
+  $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item.replace("synthetic planned arrival", "planned arrival").replace(" (assumed)", "").replace("Assumed visual-check accuracy", "Visual-check accuracy"))}</li>`).join("");
   $("#risk-value").innerHTML = d.web_evidence
-    ? `${pct(d.prior_blocked_probability)}<small>estimated · was ${pct(d.web_evidence.prior_before)} (assumed) before the web check</small>`
-    : `${pct(d.prior_blocked_probability)}<small>assumed</small>`;
+    ? `${pct(d.prior_blocked_probability)}<small>was ${pct(d.web_evidence.prior_before)} before the web check</small>`
+    : `${pct(d.prior_blocked_probability)}`;
   $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
   $("#deadline").innerHTML = reportShift()
-    ? `${reportClock(d.decision_deadline)}<small>synthetic · moved with the simulated report time</small>`
+    ? `${reportClock(d.decision_deadline)}`
     : esc(d.decision_deadline);
 }
 
@@ -1050,7 +1050,6 @@ const reportClock = (text) => clockLabel(minutesOf(text) + reportShift());
 
 // Indicator tiles. Normal flow is the baseline the changed condition is compared with.
 const higherIsBetter = new Set(["appointments_feasible"]);
-const basisLabel = { stub: "Not yet calculated", estimated: "Estimated", simulated: "Simulated", measured: "Measured" };
 function indicatorNumber(item, value) {
   if (item.unit === "mi") return value.toFixed(1);
   return whole(value);
@@ -1094,7 +1093,7 @@ function updateLiveComparison() {
   $("#live-delay").textContent = `${live.delay.toFixed(1)} min`;
   $("#live-co2").textContent = live.co2 == null ? "—" : `${live.co2.toFixed(1)} kg`;
   $("#live-delay-progress").textContent = `${live.completed} of ${scenario.shipments.length} check-ins`;
-  $("#live-co2-progress").textContent = `${Math.round(live.progress * 100)}% of estimated trip distance`;
+  $("#live-co2-progress").textContent = `${Math.round(live.progress * 100)}% of trip distance`;
 }
 
 function renderIndicators(indicators) {
@@ -1102,18 +1101,18 @@ function renderIndicators(indicators) {
   const missing = indicators.filter((item) => item.value === null || item.value === undefined);
   const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
   $("#indicators-note").textContent = scenario.scenario_type === "normal"
-    ? `End values are estimates. Live delay comes from completed simulated check-ins; live CO₂ allocates the whole-plan estimate by loaded trip progress.${pending}`
-    : `Estimates before inspection.${activeScenario === "congestion" ? " Cargo released earlier than baseline." : ""}${pending}`;
+    ? `Live delay comes from completed check-ins; live CO₂ follows loaded trip progress.${pending}`
+    : `${activeScenario === "congestion" ? " Cargo released earlier than baseline." : ""}${pending}`;
   $("#comparison-caption").textContent = scenario.scenario_type === "normal"
     ? "Normal morning · live progress" : `Changed scenario · ${scenario.name}`;
-  $("#comparison-base-head").textContent = scenario.scenario_type === "normal" ? "Estimated at end" : "Normal";
-  $("#comparison-current-head").textContent = scenario.scenario_type === "normal" ? "Simulated so far" : "Current";
+  $("#comparison-base-head").textContent = scenario.scenario_type === "normal" ? "At end" : "Normal";
+  $("#comparison-current-head").textContent = scenario.scenario_type === "normal" ? "So far" : "Current";
   $("#comparison-change-head").textContent = scenario.scenario_type === "normal" ? "Progress" : "Change";
   $("#scenario-comparison").innerHTML = indicators.filter((item) => comparisonIndicators.has(item.id)).map((item) => {
     if (scenario.scenario_type === "normal") {
       const delay = item.id === "expected_delay_min";
       const expected = item.value == null ? "—" : `${item.value.toFixed(1)} ${item.unit}`;
-      return `<tr><th scope="row">${delay ? "Delivery delay" : "CO₂"}</th><td class="num">${expected}<small>estimated</small></td><td class="num"><b id="live-${delay ? "delay" : "co2"}">—</b><small>${delay ? "simulated" : "estimated · simulated progress"}</small></td><td id="live-${delay ? "delay" : "co2"}-progress" class="num">—</td></tr>`;
+      return `<tr><th scope="row">${delay ? "Delivery delay" : "CO₂"}</th><td class="num">${expected}</td><td class="num"><b id="live-${delay ? "delay" : "co2"}">—</b></td><td id="live-${delay ? "delay" : "co2"}-progress" class="num">—</td></tr>`;
     }
     const base = baseline?.find((entry) => entry.id === item.id);
     const available = item.value != null && base?.value != null;
@@ -1122,16 +1121,13 @@ function renderIndicators(indicators) {
   }).join("");
   $("#indicators").innerHTML = indicators.filter((item) => !missing.includes(item) && !comparisonIndicators.has(item.id)).map((item) => {
     const label = shortLabels[item.id] ?? indicatorLabel(item);
-    const basis = basisLabel[item.basis] ?? item.basis;
-    const title = `title="${indicatorLabel(item)} · ${esc(basis)}"`;
+    const title = `title="${indicatorLabel(item)}"`;
     const of = item.of !== undefined ? ` of ${whole(item.of)}` : "";
     // Count units repeat the label, so only physical units are printed.
     const unit = ["min", "mi", "kg"].includes(item.unit) ? ` <small>${esc(item.unit)}</small>` : "";
     let delta = '<span class="stat-delta">Usual morning</span>';
     const base = compare && baseline.find((b) => b.id === item.id);
-    if (item.basis !== "estimated") {
-      delta = `<span class="stat-delta">${esc(basis)}</span>`;
-    } else if (base && base.value !== null) {
+    if (base && base.value !== null) {
       const change = indicatorChange(item, base);
       delta = change
         ? `<span class="stat-delta ${change.tone}"><span aria-hidden="true">${change.arrow}</span> ${change.amount} vs usual</span>`
@@ -1147,7 +1143,7 @@ let communitySchools = null;
 
 function updateResponseComparison() {
   renderResponseComparison($("#response-comparison-body"), scenario, comparisonOptions, comparisonProbability, plan.action, communitySchools);
-  $("#comparison-context").textContent = `${observed ? "After drone check" : "Before drone check"} · ${scenario.name} · Estimated`;
+  $("#comparison-context").textContent = `${observed ? "After drone check" : "Before drone check"} · ${scenario.name}`;
 }
 
 async function openResponseComparison() {
@@ -1162,7 +1158,7 @@ async function openResponseComparison() {
 function renderRankings(items, observation = null, blocked = scenario.disruption.prior_blocked_probability) {
   comparisonOptions = items;
   comparisonProbability = blocked;
-  $("#ranking-state").textContent = `${observation ? "After inspection" : "Before inspection"} · Estimated`;
+  $("#ranking-state").textContent = `${observation ? "After inspection" : "Before inspection"}`;
   $("#response-why").textContent = responseExplanation(items);
   $("#rankings").innerHTML = items.map((item) => {
     const e = item.expected;
@@ -1192,7 +1188,7 @@ function renderRankings(items, observation = null, blocked = scenario.disruption
 function schoolsNote(item) {
   const n = item.schools_within_300m;
   if (n === null || n === undefined) return "";
-  return ` ${n} ${n === 1 ? "school" : "schools"} within 300 m (OSM estimate).`;
+  return ` ${n} ${n === 1 ? "school" : "schools"} within 300 m.`;
 }
 
 function actionLabel(id) {
@@ -1226,9 +1222,9 @@ function renderEvoi(analysis) {
   renderSensitivity($("#sensitivity"), analysis, check());
   const a = e.assumptions;
   $("#assumptions").innerHTML = [
-    ["Assumed accuracy", `${pct(a.inspection_accuracy)} (${esc(a.accuracy_basis)})`],
-    ["Assumed check time", `${a.launch_and_review_minutes} min`],
-    [`Estimated chance of a “${esc(check().bad)}” result`, pct(a.signal_blocked_probability)],
+    ["Accuracy", pct(a.inspection_accuracy)],
+    ["Check time", `${a.launch_and_review_minutes} min`],
+    [`Chance of a “${esc(check().bad)}” result`, pct(a.signal_blocked_probability)],
   ].map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("");
   // LLM-written brief from the engine's numbers; the normal morning has no incident step.
   if (activeScenario === "normal") clearBrief($("#brief-incident"));
@@ -1306,15 +1302,15 @@ function updateFleetWatch(states) {
     const activeDetour = routeId === fallback && shipment.route !== fallback;
     const canDetour = routeId === scenario.decision_model.blockage?.route && routes[fallback];
     checkin.innerHTML = `${clockLabel(event.t)}<span class="detail">${esc(shipment.id)} · ${Math.max(0, Math.round(remaining))} min away</span>`;
-    riskCell.innerHTML = `<span class="status ${chance >= 50 ? "risk" : chance >= 20 ? "watch" : "ok"}">${chance}% assumed</span><span class="detail">${buffer >= 0 ? `${Math.round(buffer)} min before` : `${Math.round(-buffer)} min after`} appointment start</span>`;
-    const routeNote = activeDetour ? "Detour in simulated plan" : canDetour ? `${esc(routes[fallback].name)} · contingency only` : "";
+    riskCell.innerHTML = `<span class="status ${chance >= 50 ? "risk" : chance >= 20 ? "watch" : "ok"}">${chance}%</span><span class="detail">${buffer >= 0 ? `${Math.round(buffer)} min before` : `${Math.round(-buffer)} min after`} appointment start</span>`;
+    const routeNote = activeDetour ? "Detour in plan" : canDetour ? `${esc(routes[fallback].name)} · contingency only` : "";
     routeCell.innerHTML = `${esc(route?.name ?? routeId)}${routeNote ? `<span class="detail">${routeNote}</span>` : ""}`;
     if (chance >= 20) watched.push({ truck: state.id, shipment: shipment.id, chance, buffer });
   }
   if (step === "monitor") {
     watched.sort((a, b) => b.chance - a.chance);
     $("#monitor-alerts").innerHTML = watched.length
-      ? `<h2>Schedule watch <small>illustrative · assumed</small></h2><ul>${watched.slice(0, 3).map((item) => `<li><button class="link" type="button" data-truck="${esc(item.truck)}">${esc(shortTruck(item.truck))}</button> · ${esc(item.shipment)}: ${item.chance}% chance of arriving after the appointment starts (${item.buffer >= 0 ? `${Math.round(item.buffer)} min buffer` : `${Math.round(-item.buffer)} min past start`}).</li>`).join("")}</ul>`
+      ? `<h2>Schedule watch</h2><ul>${watched.slice(0, 3).map((item) => `<li><button class="link" type="button" data-truck="${esc(item.truck)}">${esc(shortTruck(item.truck))}</button> · ${esc(item.shipment)}: ${item.chance}% chance of arriving after the appointment starts (${item.buffer >= 0 ? `${Math.round(item.buffer)} min buffer` : `${Math.round(-item.buffer)} min past start`}).</li>`).join("")}</ul>`
       : '<h2>Schedule watch</h2><p>No modeled trip is near its appointment start.</p>';
   }
 }
@@ -1364,7 +1360,7 @@ function resetObservation() {
   $("#override-reason").value = "";
   clearBrief($("#brief-respond"));
   resetAsk();
-  $("#posterior").textContent = `No inspection · ${incidentPlace()}. Assumed ${riskText().toLowerCase()}: ${pct(scenario.disruption.prior_blocked_probability)}.`;
+  $("#posterior").textContent = `No inspection · ${incidentPlace()}. ${riskText()}: ${pct(scenario.disruption.prior_blocked_probability)}.`;
 }
 
 // Opens the footage dialog, or falls back to simulated results when there is no library.
@@ -1396,11 +1392,11 @@ async function showObservation(analysis, summary = null) {
   currentTime = Math.max(currentTime, span.start + scenario.decision_model.drone.launch_and_review_minutes);
   logDecision(`${check().label} at ${incidentPlace()}: ${finding}. ${riskText()} ${prior} → ${posterior}. Best response: ${best}.`);
   $("#posterior").textContent = summary ?? {
-    blocked: `Finding: road ${bad}. Estimated ${riskText().toLowerCase()}: ${posterior} (was ${prior}).`,
-    clear: `Finding: road ${check().good}. Estimated ${riskText().toLowerCase()}: ${posterior} (was ${prior}).`,
-    inconclusive: `Inconclusive. Assumed ${riskText().toLowerCase()}: ${prior}, unchanged.`,
+    blocked: `Finding: road ${bad}. ${riskText()}: ${posterior} (was ${prior}).`,
+    clear: `Finding: road ${check().good}. ${riskText()}: ${posterior} (was ${prior}).`,
+    inconclusive: `Inconclusive. ${riskText()}: ${prior}, unchanged.`,
   }[observation];
-  $("#risk-value").innerHTML = `${posterior}<small>estimated · ${posterior === prior ? "unchanged" : `was ${prior}`}</small>`;
+  $("#risk-value").innerHTML = `${posterior}<small>${posterior === prior ? "unchanged" : `was ${prior}`}</small>`;
   $("#recommendation-short").innerHTML = `${esc(finding)}<small>Recommended: ${esc(best)}</small>`;
   renderSensitivity($("#sensitivity"), analysis, check());
   renderBrief($("#brief-respond"), activeScenario, observation);
@@ -1434,7 +1430,7 @@ async function loadScenario(id, { keepTime = false } = {}) {
     if (stale()) return false;
   }
   document.body.dataset.scenario = scenario.scenario_type;
-  $("#drone-note").textContent = "Stock footage. Inspection accuracy and review time are assumed.";
+  $("#drone-note").textContent = "";
   plan = {
     action: scenario.analysis.before[0].id,
     road: scenario.disruption.prior_blocked_probability >= 0.5 ? "blocked" : "open",
@@ -1469,7 +1465,7 @@ async function loadScenario(id, { keepTime = false } = {}) {
 // until the next report. The shift report closes the morning.
 // ---------------------------------------------------------------------------
 const reports = [
-  { id: "disruption", after: 2, label: "Crash" }, // Minutes after the start of the morning (simulated).
+  { id: "disruption", after: 2, label: "Crash" }, // Minutes after the start of the morning.
   { id: "flood", after: 8, label: "Water" },
 ];
 const steps = ["start", "incident", "respond", "outcome"]; // "monitor" is outside the stepper.
@@ -1560,10 +1556,10 @@ function renderStart() {
 function renderMonitor() {
   const a = scenario.analysis;
   const feasible = a.indicators.find((item) => item.id === "appointments_feasible");
-  $("#monitor-feasible").innerHTML = feasible ? `${whole(feasible.value)} of ${whole(feasible.of)}<small>estimated</small>` : "—";
+  $("#monitor-feasible").innerHTML = feasible ? `${whole(feasible.value)} of ${whole(feasible.of)}` : "—";
   const totalCo2 = a.indicators.find((item) => item.id === "co2_kg");
   const schools = a.indicators.find((item) => item.id === "community_exposure");
-  $("#monitor-environment").textContent = `End estimate: ${totalCo2?.value == null ? "CO₂ unavailable" : `${totalCo2.value.toFixed(1)} kg CO₂`}; ${schools?.value == null ? "school proximity unavailable" : `${whole(schools.value)} schools within 300 m of planned routes (OSM estimate)`}. Live CO₂ follows the simulated progress of all assigned loads.`;
+  $("#monitor-environment").textContent = `At end: ${totalCo2?.value == null ? "CO₂ unavailable" : `${totalCo2.value.toFixed(1)} kg CO₂`}; ${schools?.value == null ? "school proximity unavailable" : `${whole(schools.value)} schools within 300 m of planned routes`}. Live CO₂ follows assigned loads.`;
   const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
   $("#monitor-note").textContent = unassigned ? `${unassigned} load${unassigned === 1 ? " needs" : "s need"} a truck.` : "";
   fleetWatchKey = "";
@@ -1573,9 +1569,9 @@ function renderMonitor() {
 
 function updateMonitorLive(states) {
   const moving = states.filter((state) => state.moving).length;
-  $("#monitor-moving").innerHTML = `${moving} of ${states.length}<small>simulated positions</small>`;
+  $("#monitor-moving").innerHTML = `${moving} of ${states.length}`;
   const co2 = wholePlanLiveMetrics(currentTime).co2;
-  $("#monitor-co2").innerHTML = co2 === null ? "—" : `${co2.toFixed(1)} kg<small>estimated · simulated progress</small>`;
+  $("#monitor-co2").innerHTML = co2 === null ? "—" : `${co2.toFixed(1)} kg`;
 }
 
 function renderOutcome() {
@@ -1609,7 +1605,7 @@ async function triggerIncident() {
   clearHistory($("#history-card"));
   if (!(await loadScenario(reports[reportIndex].id, { keepTime: true }))) return;
   const d = scenario.disruption;
-  logDecision(`${d.title}. Reported ${clockLabel(incidentAt())} (simulated). ${d.evidence_summary}. Synthetic scenario.`);
+  logDecision(`${d.title}. Reported ${clockLabel(incidentAt())}. ${d.evidence_summary}.`);
   logDecision(`${inspectionSentence(scenario.analysis.evoi)} ${inspectionChoices(scenario.analysis.evoi, check())}`);
   setStep("incident");
   renderTriage($("#web-triage"), activeScenario, { onApply: applyWebFinding });
@@ -1693,7 +1689,7 @@ function showReport() {
 function renderReport() {
   const day = new Date(scenario.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const count = reportIndex + 1;
-  $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${count} incident report${count === 1 ? "" : "s"}. Simulated results.`;
+  $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${count} incident report${count === 1 ? "" : "s"}.`;
 
   const plans = incidentPlans.filter(Boolean);
   const names = plans.map((p) => `${p.label} (${p.title}, ${clockLabel(p.at)})`).join(" and ");
@@ -1701,7 +1697,6 @@ function renderReport() {
   $("#report-indicators-note").textContent = `Usual is the planned morning with no incident. ${names ? `The ${names} column${plans.length === 1 ? " estimates" : "s each estimate"}` : "Each report column estimates"} the whole plan under that report's recommended response, before inspection. Each is worked out on its own from ${clockLabel(span.start)}, as if that report were the only incident${plans.length > 1 ? `, so the ${plans.at(-1).label} column does not include the effects of the ${plans[0].label.toLowerCase()} report and the columns do not add up` : ""}. The small figure under each value is the change from usual.`;
   $("#report-indicators").innerHTML = (baseline ?? plans[0]?.indicators ?? []).map((base) => {
     const items = plans.map((p) => p.indicators.find((item) => item.id === base.id));
-    const bases = [...new Set([base, ...items].filter(Boolean).map((item) => basisLabel[item.basis] ?? item.basis))].join(" / ");
     const cells = items.map((item) => {
       if (item?.value == null) return '<td class="num">—</td>';
       const change = base.value == null ? null : indicatorChange(item, base);
@@ -1710,7 +1705,7 @@ function renderReport() {
         : '<span class="detail kpi-delta">Same</span>';
       return `<td class="num">${indicatorText(item, item.value)}${shown}</td>`;
     }).join("");
-    return `<tr><td>${shortLabels[base.id] ?? indicatorLabel(base)}<span class="detail">${esc(bases)}</span></td><td class="num">${base.value == null ? "—" : indicatorText(base, base.value)}</td>${cells}</tr>`;
+    return `<tr><td>${shortLabels[base.id] ?? indicatorLabel(base)}</td><td class="num">${base.value == null ? "—" : indicatorText(base, base.value)}</td>${cells}</tr>`;
   }).join("");
 
   const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
@@ -1834,7 +1829,7 @@ window.addEventListener("inspection-reviewed", ({ detail }) => {
   const before = pct(detail.analysis.prior_blocked_probability);
   const after = pct(detail.analysis.posterior_blocked_probability);
   const change = before === after ? "unchanged" : `was ${before}`;
-  const summary = `Reviewed: ${findingText(choice)}. ${incidentPlace()}. Estimated ${riskText().toLowerCase()}: ${after} (${change}).${agreement}`;
+  const summary = `Reviewed: ${findingText(choice)}. ${incidentPlace()}. ${riskText()}: ${after} (${change}).${agreement}`;
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;

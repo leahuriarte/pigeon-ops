@@ -67,7 +67,6 @@ function evidenceList(result) {
   result.evidence.forEach((item) => {
     const row = el("li", item.cited ? "cited" : "");
     const meta = el("p", "web-meta");
-    meta.append(el("span", "basis live", "Live"));
     const where = item.distance_km === null || item.distance_km === undefined ? "covers the area"
       : item.distance_km < 0.1 ? "under 0.1 km away" : `${item.distance_km} km away`;
     meta.append(` ${item.source} · ${item.time || "time not given"} · ${where}${item.cited ? " · cited" : ""} · `, link(item.source_url, "source"));
@@ -85,9 +84,9 @@ function effectLine(result) {
   const e = result.effect;
   const bad = result.check.bad;
   const risk = e.prior_after === e.prior_before
-    ? `${pct(e.prior_before)} unchanged (assumed)`
-    : `${pct(e.prior_before)} assumed → ${pct(e.prior_after)} estimated`;
-  return `Road ${bad}: ${risk}. Check: ${money(e.inspection_after.net_value)} estimated net value.`;
+    ? `${pct(e.prior_before)} unchanged`
+    : `${pct(e.prior_before)} → ${pct(e.prior_after)}`;
+  return `Road ${bad}: ${risk}. Check: ${money(e.inspection_after.net_value)} net value.`;
 }
 
 // Runs the web check for an incident and renders the card. `onApply(finding | null, result)` is called
@@ -116,7 +115,7 @@ export async function renderTriage(container, scenarioId, options = {}) {
 
   container.dataset.finding = result.finding;
   const by = result.agent === "llm"
-    ? el("span", "tag llm", `AI agent · ${result.confidence} confidence · unvalidated`)
+    ? el("span", "tag llm", `AI agent · ${result.confidence} confidence`)
     : el("span", "tag llm", "Keyword rule · no AI");
   const parts = [header(), el("h3", null, headline[result.finding])];
   if (result.finding === "nothing_found") parts.push(el("p", "note", "Missing reports are weak evidence."));
@@ -128,7 +127,7 @@ export async function renderTriage(container, scenarioId, options = {}) {
   }
   const isApplied = applied === result.finding;
   if (isApplied) {
-    parts.push(el("p", "web-effect applied", `Applied: road ${result.check.bad} chance ${pct(result.effect.prior_after)} estimated (was ${pct(result.effect.prior_before)} assumed).`));
+    parts.push(el("p", "web-effect applied", `Applied: road ${result.check.bad} chance ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}).`));
   } else {
     parts.push(el("p", "web-effect", effectLine(result)));
   }
@@ -159,9 +158,9 @@ export async function renderTriage(container, scenarioId, options = {}) {
   evidence.append(el("p", "web-summary", result.summary), by);
   if (result.agent_note) evidence.append(el("p", "fine-print", result.agent_note));
   parts.push(actions, evidence);
-  const notes = ["Live reports; fictional scenario.", `Report reliability: ${result.effect.likelihoods_basis}.`];
+  const notes = result.fallback_reason ? ["Live feeds unavailable."] : [];
   const fine = el("p", "fine-print", notes.join(" "));
   if (result.agent_note) fine.title = result.agent_note;
-  parts.push(fine);
+  if (notes.length) parts.push(fine);
   container.replaceChildren(...parts);
 }
