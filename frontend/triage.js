@@ -22,6 +22,7 @@ export function withWeb(target) {
 }
 
 const pct = (value) => `${Math.round(value * 100)}%`;
+const money = (value) => `${value < 0 ? "−" : ""}$${Math.round(Math.abs(value)).toLocaleString("en-US")}`;
 const headline = {
   corroborates: "Feeds support the report",
   contradicts: "Feeds contradict the report",
@@ -54,7 +55,7 @@ export function clearTriage(container) {
 
 function header() {
   const top = el("div", "web-head");
-  top.append(el("h2", null, "Public reports"), el("span", "basis live", "Live feeds"));
+  top.append(el("h2", null, "Public reports"));
   return top;
 }
 
@@ -84,7 +85,7 @@ function effectLine(result) {
   const risk = e.prior_after === e.prior_before
     ? `${pct(e.prior_before)} unchanged`
     : `${pct(e.prior_before)} → ${pct(e.prior_after)}`;
-  return `If applied: estimated blockage risk ${risk}.`;
+  return `If applied: road blocked ${risk}. Inspection value: ${money(e.inspection_after.net_value)}.`;
 }
 
 // Runs the web check for an incident and renders the card. `onApply(finding | null, result)` is called
@@ -116,14 +117,21 @@ export async function renderTriage(container, scenarioId, options = {}) {
     ? el("span", "tag llm", `AI agent · ${result.confidence} confidence`)
     : el("span", "tag llm", "Keyword rule · no AI");
   const parts = [header(), el("h3", null, headline[result.finding])];
+  if (result.finding === "nothing_found") parts.push(el("p", "note", "Missing reports are weak evidence."));
+  // Past decisions on similar reports, beside what the feeds say. A reference only (see history.js).
+  if (result.history?.available && result.history.line) {
+    const history = el("p", "web-history");
+    history.append(el("span", "basis", "History"), ` ${result.history.line}`);
+    parts.push(history);
+  }
   const isApplied = applied === result.finding;
   if (isApplied) {
-    parts.push(el("p", "web-effect applied", `Applied: estimated blockage risk ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}).`));
+    parts.push(el("p", "web-effect applied", `Applied: blockage risk ${pct(result.effect.prior_after)} (was ${pct(result.effect.prior_before)}).`));
   } else {
     parts.push(el("p", "web-effect", effectLine(result)));
   }
   const actions = el("div", "web-actions");
-  const use = el("button", "btn small", isApplied ? "Remove finding" : "Apply finding");
+  const use = el("button", `btn small${isApplied ? "" : " primary"}`, isApplied ? "Remove finding" : "Apply finding");
   use.type = "button";
   const error = el("p", "note");
   error.hidden = true;
@@ -146,8 +154,6 @@ export async function renderTriage(container, scenarioId, options = {}) {
   });
   actions.append(use, error);
   const evidence = evidenceList(result);
-  if (result.finding === "nothing_found") evidence.append(el("p", "note", "Missing reports are weak evidence."));
-  if (result.history?.available && result.history.line) evidence.append(el("p", "note", `Synthetic history: ${result.history.line}`));
   evidence.append(el("p", "web-summary", result.summary), by);
   if (result.agent_note) evidence.append(el("p", "fine-print", result.agent_note));
   parts.push(actions, evidence);

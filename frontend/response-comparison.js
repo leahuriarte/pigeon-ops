@@ -102,7 +102,7 @@ export function renderResponseComparison(container, scenario, options, probabili
     const fuelTotal = Object.values(fuel).reduce((sum, value) => sum + value, 0);
     const electricShare = fuelTotal ? Math.round(fuel.Electric / fuelTotal * 100) : 0;
     return `<article class="compare-option${option.id === selected ? " selected" : ""}${co2Difference < 0.05 ? " lowest-carbon" : ""}">
-      <div class="compare-option-head"><div><span class="compare-rank">${option.rank === 1 ? "Recommended" : `Option ${option.rank}`}</span><h3>${esc(option.label)}</h3><p>${esc(route?.name ?? routeId)}</p></div><strong>${money(option.expected_loss)}<small>estimated loss</small></strong></div>
+      <div class="compare-option-head"><div><span class="compare-rank">${option.rank === 1 ? "Recommended response" : `Option ${option.rank}`}</span><h3>${esc(option.label)}</h3><p>${esc(route?.name ?? routeId)}</p></div><strong>${money(option.expected_loss)}<small>expected loss</small></strong></div>
       <section class="compare-eco" aria-label="Environmental impact">
         <div class="compare-eco-heading"><span>Tailpipe CO₂ · two loads</span><strong>${number(emissions, 1)}<small>kg</small></strong></div>
         <div class="compare-bar" role="img" aria-label="${number(emissions, 1)} kilograms CO₂; ${number(co2Difference, 1)} more than the lowest CO₂ option"><i style="width:${Math.max(2, emissions / maxCo2 * 100)}%"></i></div>
@@ -120,9 +120,9 @@ export function renderResponseComparison(container, scenario, options, probabili
         <div class="compare-fuel-legend"><span><i class="diesel"></i>Diesel <b>${number(fuel.Diesel, 1)} mi</b></span><span><i class="electric"></i>Electric <b>${number(fuel.Electric, 1)} mi</b></span>${fuel.Other ? `<span><i class="other"></i>Other <b>${number(fuel.Other, 1)} mi</b></span>` : ""}</div>
       </section>
       <section class="compare-driver"><h4>Driver impact</h4><div><span><b>${number(driver, 1)} min</b> driver time <small>${option.rank === 1 ? "Recommended response" : `${change >= 0 ? "+" : "−"}${number(Math.abs(change), 1)} min vs recommended`}</small></span><span><b>${number(option.expected.lateness_min, 1)} min</b> delivery delay</span></div><p>${esc(option.stakeholder_effect)}</p></section>
-      <details class="compare-detail"><summary>Road outcomes and arrivals</summary><div class="compare-road-states">${["open", "blocked"].map((state) => `<div><h5>Road ${esc(state === "blocked" ? scenario.disruption.check?.bad ?? "blocked" : scenario.disruption.check?.good ?? "open")}</h5><div class="table-wrap"><table><thead><tr><th>Load / route</th><th>Truck / fuel</th><th>Driver time</th><th>Arrival</th></tr></thead><tbody>${impactRows(option, state, trucks)}</tbody></table></div></div>`).join("")}</div></details>
+      <details class="compare-detail"><summary>Road outcomes and arrivals</summary><div class="compare-road-states">${["open", "blocked"].map((state) => `<div><h5>Road ${esc(state)}</h5><div class="table-wrap"><table><thead><tr><th>Load / route</th><th>Truck / fuel</th><th>Driver time</th><th>Arrival</th></tr></thead><tbody>${impactRows(option, state, trucks)}</tbody></table></div></div>`).join("")}</div></details>
       <button class="btn ${option.id === selected ? "primary" : ""}" type="button" data-compare-select="${esc(option.id)}">${option.id === selected ? "Selected response" : "Choose this response"}</button>
     </article>`;
   });
-  container.innerHTML = `<p class="compare-intro">Estimated impacts for both loads. Tailpipe CO₂ counts diesel miles; the ranking uses the decision model's CO₂ estimate. School distances come from OpenStreetMap.</p><div class="compare-grid">${summaries.join("")}</div>`;
+  container.innerHTML = `<div class="compare-intro"><div><span class="compare-intro-kicker">Estimates for both loads</span><h3>Response impacts</h3><p>Tailpipe CO₂, fuel miles, school proximity and driver impact for each response.</p></div><p>Tailpipe CO₂ counts diesel miles; electric trucks have no tailpipe exhaust. The recommendation uses its separate CO₂ model.</p></div><div class="compare-grid">${summaries.join("")}</div>`;
 }

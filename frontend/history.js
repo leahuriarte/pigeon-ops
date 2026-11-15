@@ -38,7 +38,7 @@ function el(tag, className, text) {
   return node;
 }
 
-const words = (check) => ({ label: "Drone check", bad: "blocked", good: "open", ...check });
+const words = (check) => ({ label: "Drone check", ...check, bad: "blocked", good: "open" });
 const roadWord = (state, w) => (state === "blocked" ? w.bad : w.good);
 const observationText = (observation, w) => ({ blocked: `road ${w.bad}`, clear: `road ${w.good}`, inconclusive: "inconclusive" })[observation] ?? observation;
 const baseRate = (s, w) => `Road ${w.bad} in ${s.bad_count} of ${s.count} similar reports`;
@@ -100,24 +100,21 @@ function card(data, onOpen) {
   rate.append(el("b", null, baseRate(s, w)));
   if (s.current_estimate != null) rate.append(` · now ${pct(s.current_estimate)}`);
 
-  head.append(el("span", "basis", "Synthetic / simulated"));
   const parts = [head, rate];
+  if (s.by_action?.length) parts.push(actionTable(s, w));
+  const i = s.inspection;
+  if (i) {
+    parts.push(el("p", "note", i.flown
+      ? `${w.label} flown in ${i.flown} of ${s.count}; ${i.changed_response ? `it changed the response ${times(i.changed_response)}` : "it never changed the response"}.`
+      : `No ${w.label.toLowerCase()} flown.`));
+  }
   const reached = () => {
     if (opened) return;
     opened = true;
     onOpen?.(`${baseRate(s, w)}.`);
   };
-  const detail = list("Results by response", "results", reached);
-  if (s.by_action?.length) detail.append(actionTable(s, w));
-  const i = s.inspection;
-  if (i) {
-    detail.append(el("p", "note", i.flown
-      ? `Inspected ${i.flown} of ${s.count} cases; response changed ${times(i.changed_response)}.`
-      : "No inspections in these cases."));
-  }
-  parts.push(detail);
   if (data.cases?.length) parts.push(caseList(data, w, reached));
-  const fine = el("p", "note", "History does not affect the risk estimate.");
+  const fine = el("p", "fine-print", "History does not affect the risk estimate.");
   if (data.note) fine.title = data.note;
   parts.push(fine);
   return parts;
@@ -127,7 +124,7 @@ function card(data, onOpen) {
 function actionTable(s, w) {
   const wrap = el("div", "table-wrap");
   const table = el("table", "data history-table");
-  table.append(el("caption", null, "Simulated averages; estimates in small type."));
+  table.append(el("caption", null, "Average results; estimates in small type."));
   const head = el("tr");
   head.append(el("th", null, "Response"), el("th", "num", "Chosen"));
   metrics.forEach((m) => {
@@ -232,7 +229,7 @@ function rankingLine(a) {
   const late = a.actual.lateness_min;
   const delay = late == null ? "" : late >= 0.5 ? `, ${whole(late)} min late` : ", on time";
   const co2 = a.actual.co2_kg == null ? "" : `, ${tenth(a.actual.co2_kg)} kg CO₂`;
-  return `Synthetic history: chosen ${times(a.count)}${delay}${co2} on average.`;
+  return `History: chosen ${times(a.count)}${delay}${co2} on average.`;
 }
 
 // Adds one history line under each response card, or removes them without history. app.js calls this

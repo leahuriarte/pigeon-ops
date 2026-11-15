@@ -13,7 +13,6 @@
   min-height: 240px;
   overflow: hidden;
   border: var(--frame);
-  border-radius: 5px 5px 0 0;
   background: #ecedef;
 }
 /* Absolute so the map fills the flexed shell without relying on percentage heights. */
@@ -32,7 +31,6 @@
   z-index: 2;
   margin: 0;
   border: var(--frame);
-  border-radius: 4px;
   background: var(--overlay);
 }
 
@@ -147,11 +145,12 @@
   border-radius: 3px;
   background: var(--signal);
   color: var(--on-signal);
+  box-shadow: 2px 2px 0 var(--ink);
   cursor: pointer;
-  transition: background 120ms;
+  transition: transform 80ms, box-shadow 80ms;
 }
-.play:hover { background: var(--signal-dark); }
-.play:active { background: var(--signal-dark); }
+.play:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+.play:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
 .play svg { width: 14px; height: 14px; fill: currentColor; }
 .play .icon-pause, .play.playing .icon-play { display: none; }
 .play.playing .icon-pause { display: block; }
