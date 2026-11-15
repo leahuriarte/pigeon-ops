@@ -250,9 +250,9 @@
 .tally-tile.alert .tally-bar i { background: var(--risk); }
 .tally-foot { display: flex; grid-column: 1 / -1; justify-content: space-between; gap: 8px; color: var(--ink-2); font-size: 11.5px; line-height: 1.35; }
 .tally-foot .worse { color: var(--risk); }
-/* In the shift report the value is already final, so only the comparison with the plan is left. */
+body:not([data-mode="report"]) .tally-bar,
+body:not([data-mode="report"]) .tally-foot { display: none; }
 body[data-mode="report"] .tally-foot { justify-content: flex-end; }
-body[data-mode="report"] .tally-foot span:first-child { display: none; }
 .tally-foot .better { color: var(--ok); }
 .tally-tile.bump { animation: tally-bump 0.7s ease-out; }
 @keyframes tally-bump { 0%, 30% { background: var(--risk-bg); } 100% { background: transparent; } }
@@ -267,7 +267,6 @@ body[data-mode="report"] .tally-foot span:first-child { display: none; }
 .race-name small, .race-value small { color: var(--ink-2); font-size: 12px; font-weight: 400; }
 .race-bar { position: relative; grid-row: 2; grid-column: 1 / -1; height: 10px; }
 .race-bar i { position: absolute; inset: 0 auto 0 0; width: 0; }
-.race-bar .ghost { border: 1px dashed var(--ink-2); }
 .race-bar .fill { background: var(--hair); }
 .race-row.current .race-name { font-weight: 700; }
 .race-row.current .race-bar .fill { background: var(--signal); }

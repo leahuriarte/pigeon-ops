@@ -3,6 +3,7 @@ import { clearBrief, initAsk, renderBrief, resetAsk } from "./copilot.js";
 import { appliedWeb, clearTriage, renderTriage, setAppliedWeb, withWeb } from "./triage.js";
 import { annotateRankings, clearHistory, newHistoryRun, rememberDecision, renderHistory, renderHistoryResults, setRememberedRoad } from "./history.js";
 import { inspectionSentence, inspectionChoices, responseExplanation, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
+import { renderResponseComparison } from "./response-comparison.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -642,7 +643,7 @@ function renderTallyFrame() {
     const notes = [a.id === plan.action && "selected", a.id === best && "recommended"].filter(Boolean).join(", ");
     return `<li class="race-row${a.id === plan.action ? " current" : ""}" data-action="${esc(a.id)}">
       <span class="race-name">${esc(a.label)}${notes ? ` <small>${notes}</small>` : ""}</span>
-      <span class="race-bar" aria-hidden="true"><i class="ghost"></i><i class="fill"></i></span>
+      <span class="race-bar" aria-hidden="true"><i class="fill"></i></span>
       <span class="race-value"></span>
     </li>`;
   }).join("");
@@ -656,34 +657,35 @@ function updateTally() {
   const current = tallies[plan.action];
   if (!current) return;
   const now = totalsAt(current, currentTime);
-  const final = totalsAt(current, Infinity);
+  const complete = mode === "report";
+  const final = complete ? totalsAt(current, Infinity) : null;
   tallyMetrics.forEach((metric) => {
     const tile = document.querySelector(`.tally-tile[data-metric="${metric.id}"]`);
     if (!tile) return;
     const changed = setHTML(`v-${metric.id}`, tile.querySelector(".tally-value"), metric.format(now[metric.id]));
-    const share = final[metric.id] > 0 ? now[metric.id] / final[metric.id] : 0;
-    tile.querySelector(".tally-bar i").style.width = `${(share * 100).toFixed(1)}%`;
-    const normal = scenario.scenario_type === "normal";
-    const diff = final[metric.id] - planTotals[metric.id];
-    const tone = Math.abs(diff) < 0.05 ? "" : diff > 0 ? "worse" : "better";
-    const vsPlan = tone ? `${diff > 0 ? "+" : "−"}${metric.format(Math.abs(diff)).replace(/<[^>]+>/g, "")} vs plan` : "same as plan";
-    setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), normal
-      ? `<span>Estimated at delivery: ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span>`
-      : `<span>Ends at ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span><span class="${tone}">${vsPlan}</span>`);
+    if (complete) {
+      tile.querySelector(".tally-bar i").style.width = "100%";
+      const diff = final[metric.id] - planTotals[metric.id];
+      const tone = Math.abs(diff) < 0.05 ? "" : diff > 0 ? "worse" : "better";
+      const vsPlan = tone ? `${diff > 0 ? "+" : "−"}${metric.format(Math.abs(diff)).replace(/<[^>]+>/g, "")} vs plan` : "same as plan";
+      setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), `<span class="${tone}">${vsPlan}</span>`);
+    } else {
+      setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), "");
+    }
     // A missed appointment or the first late minute is a step change worth drawing the eye to.
     if (changed && metric.id === "missed" && now.missed > 0) bump(tile);
     if (metric.id === "late") tile.classList.toggle("alert", now.late > 0);
     if (metric.id === "missed") tile.classList.toggle("alert", now.missed > 0);
   });
   if (scenario.scenario_type === "normal") return;
-  const finals = Object.fromEntries(Object.entries(tallies).map(([id, rows]) => [id, totalsAt(rows, Infinity).cost]));
-  const top = Math.max(...Object.values(finals), 1);
+  $("#tally-race-title").textContent = complete ? "Cost of each response" : "Cost so far by response";
+  const costs = Object.fromEntries(Object.entries(tallies).map(([id, rows]) => [id, totalsAt(rows, currentTime).cost]));
+  const top = Math.max(...Object.values(costs), 1);
   $$("#tally-race .race-row").forEach((row) => {
     const id = row.dataset.action;
-    const cost = totalsAt(tallies[id], currentTime).cost;
-    row.querySelector(".ghost").style.width = `${(finals[id] / top * 100).toFixed(1)}%`;
+    const cost = costs[id];
     row.querySelector(".fill").style.width = `${(cost / top * 100).toFixed(1)}%`;
-    setHTML(`race-${id}`, row.querySelector(".race-value"), `${money(cost)} <small>of ${money(finals[id])}</small>`);
+    setHTML(`race-${id}`, row.querySelector(".race-value"), money(cost));
   });
 }
 
@@ -1139,7 +1141,27 @@ function renderIndicators(indicators) {
   }).join("");
 }
 
+let comparisonOptions = [];
+let comparisonProbability = 0;
+let communitySchools = null;
+
+function updateResponseComparison() {
+  renderResponseComparison($("#response-comparison-body"), scenario, comparisonOptions, comparisonProbability, plan.action, communitySchools);
+  $("#comparison-context").textContent = `${observed ? "After drone check" : "Before drone check"} · ${scenario.name} · Estimated`;
+}
+
+async function openResponseComparison() {
+  if (!communitySchools) {
+    const response = await fetch("/community-schools.json");
+    if (response.ok) communitySchools = await response.json();
+  }
+  updateResponseComparison();
+  $("#response-comparison").showModal();
+}
+
 function renderRankings(items, observation = null, blocked = scenario.disruption.prior_blocked_probability) {
+  comparisonOptions = items;
+  comparisonProbability = blocked;
   $("#ranking-state").textContent = `${observation ? "After inspection" : "Before inspection"} · Estimated`;
   $("#response-why").textContent = responseExplanation(items);
   $("#rankings").innerHTML = items.map((item) => {
@@ -1163,6 +1185,7 @@ function renderRankings(items, observation = null, blocked = scenario.disruption
   }).join("");
   annotateRankings($("#rankings"));
   renderConfirm();
+  if ($("#response-comparison").open) updateResponseComparison();
 }
 
 // Fairness measure for a response: schools within 300 m of the route it sends the affected load on.
@@ -1664,6 +1687,7 @@ function showReport() {
   mode = "report";
   renderReport();
   renderMode();
+  updateTally();
 }
 
 function renderReport() {
@@ -1728,8 +1752,21 @@ function bindEvents() {
     if (event.target.name !== "response") return;
     plan = { ...plan, action: event.target.value };
     renderConfirm();
+    if ($("#response-comparison").open) updateResponseComparison();
     if (!$("#override-reason-wrap").hidden) $("#override-reason").focus();
     loadPlayback({ keepTime: true }).catch(fail);
+  });
+  $("#compare-responses").addEventListener("click", () => openResponseComparison().catch(fail));
+  $("#close-response-comparison").addEventListener("click", () => $("#response-comparison").close());
+  $("#response-comparison-body").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-compare-select]");
+    if (!button) return;
+    const input = document.getElementById(`response-${button.dataset.compareSelect}`);
+    if (!input) return;
+    input.checked = true;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    $("#response-comparison").close();
+    input.focus();
   });
   $("#confirm-button").addEventListener("click", confirmResponse);
   $("#override-reason").addEventListener("input", renderConfirm);
