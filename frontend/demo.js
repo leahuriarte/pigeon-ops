@@ -1,4 +1,4 @@
-// Picker summaries. The scenario API supplies the incident narrative and model inputs.
+// Incident summaries for the inspection dialog. The scenario API supplies the incident narrative and model inputs.
 export const demoIncidents = [
   {
     id: "disruption",

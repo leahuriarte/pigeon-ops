@@ -23,7 +23,7 @@
     <div class="topbar-right">
       <span id="ops-status" class="ops-status ok" role="status">Loading…</span>
       <span class="sim-tag" title="Fictional shipments and incidents. Assumed rates. Estimated results.">Simulation</span>
-      <button id="restart" class="btn small" type="button">Choose scenario</button>
+      <button id="restart" class="btn small" type="button">Restart morning</button>
     </div>
   </header>
 
@@ -155,14 +155,10 @@
 
       <div class="panel-body">
         <section class="step step-start" data-step="start" aria-labelledby="start-title">
-          <h1 id="start-title">Choose a scenario</h1>
-          <fieldset class="story-picker">
-            <legend class="visually-hidden">Scenario</legend>
-            <ul id="story-options" class="options"></ul>
-          </fieldset>
+          <h1 id="start-title">Morning shift</h1>
+          <p class="lede">The fleet starts on its planned routes. Incident reports arrive as the morning plays; you decide each response.</p>
           <div class="actions">
-            <button id="start-button" class="btn primary big" type="button" disabled>Start normal morning</button>
-            <button id="jump-button" class="btn" type="button" hidden disabled>Watch from start</button>
+            <button id="start-button" class="btn primary big" type="button" disabled>Start morning</button>
           </div>
           <p id="start-note" class="note"></p>
           <p class="fine-print">Simulation. You approve each response; no dispatch occurs.</p>
@@ -179,12 +175,8 @@
           <p id="monitor-environment" class="note"></p>
           <div id="monitor-alerts" class="monitor-alerts" aria-live="polite"></div>
           <p id="monitor-note" class="note"></p>
-          <div class="jump">
-            <h2>Introduce an incident</h2>
-            <div id="monitor-incidents" class="jump-list"></div>
-          </div>
           <div class="actions">
-            <button id="monitor-skip" class="btn" type="button">View shift report</button>
+            <button id="monitor-skip" class="btn" type="button">Skip to next report</button>
           </div>
         </section>
 
@@ -290,7 +282,7 @@
             <h2 id="report-indicators-title">Plan comparison</h2>
             <div class="table-wrap">
               <table class="data">
-                <thead><tr><th>Indicator</th><th id="report-usual-head" class="num">Usual</th><th id="report-today-head" class="num">Today</th><th id="report-change-head">Change</th></tr></thead>
+                <thead><tr id="report-head"><th>Indicator</th><th class="num">Usual</th></tr></thead>
                 <tbody id="report-indicators"></tbody>
               </table>
             </div>
@@ -302,11 +294,7 @@
           <div class="actions">
             <button id="skip-end" class="btn" type="button">View shift report</button>
             <button id="change-response" class="btn" type="button">Change response</button>
-            <button id="report-restart" class="btn primary" type="button" hidden>Choose scenario</button>
-          </div>
-          <div id="next-incidents-wrap" class="jump" hidden>
-            <p>Other scenarios</p>
-            <div id="next-incidents" class="jump-list"></div>
+            <button id="report-restart" class="btn primary" type="button" hidden>Restart morning</button>
           </div>
         </section>
 

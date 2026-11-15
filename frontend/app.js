@@ -2,7 +2,6 @@ import { openInspection, resetInspection } from "./inspection.js";
 import { clearBrief, initAsk, renderBrief, resetAsk } from "./copilot.js";
 import { clearTriage, renderTriage, setAppliedWeb, withWeb } from "./triage.js";
 import { inspectionSentence, inspectionChoices, responseExplanation, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
-import { demoIncidents } from "./demo.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -71,6 +70,7 @@ let selectedTruck = null;
 // Playback model
 // ---------------------------------------------------------------------------
 let playback = null;
+let rawPlayback = null; // The chosen response as the backend planned it, before stitching.
 let tracks = [];
 let currentTime = 0;
 let playing = false;
@@ -171,11 +171,15 @@ async function fetchPlayback(action, road, scenarioId = activeScenario, inspecte
 // ---------------------------------------------------------------------------
 // Incident runs. The backend plans every response from the start of the
 // morning, but the report only arrives at incidentAt(). So until then the map
-// plays the usual plan, and the response takes over at the report. A truck
-// whose response has already moved it by then (SYN-TRK-07) runs its first
-// leg slightly faster, so it still reaches its first stop at the computed time.
+// plays what it was already showing (the usual plan, or the previous incident's
+// response), and the new response takes over at the report. A truck that is
+// not where its response puts it by then drives back along the road it came
+// on until it meets its response's path, and the rest of its response runs
+// that much later: a wait for a fixed time (an appointment, a release, a
+// hold) absorbs the delay, otherwise it arrives later.
 // ---------------------------------------------------------------------------
-const incidentAt = () => span.start + INCIDENT_DELAY_MIN;
+const reportTime = (index) => span.start + reports[index].after;
+const incidentAt = () => reportTime(Math.max(reportIndex, 0));
 
 function cutPath(path, from, to) {
   if (path.length < 2 || (from <= 0 && to >= 1)) return path;
@@ -208,39 +212,168 @@ function clipSegments(segments, low, high) {
   });
 }
 
-function stitchPlayback(usual, response, at) {
+// Points about every 15 m along a track between two times, with the time the truck is there and
+// the minutes it has spent driving so far (stops add none).
+function trackPoints(segments, low, high) {
+  const points = [];
+  let driven = 0;
+  for (const segment of clipSegments(segments, low, high)) {
+    const minutes = segment.t1 - segment.t0;
+    if (segment.path.length < 2) {
+      points.push({ pos: segment.path[0], t: segment.t0, until: segment.t1, driven });
+      continue;
+    }
+    const lens = [0];
+    for (let i = 1; i < segment.path.length; i += 1) lens.push(lens[i - 1] + metres(segment.path[i - 1], segment.path[i]));
+    const total = lens.at(-1) || 1;
+    for (let i = 1; i < segment.path.length; i += 1) {
+      const [a, b] = [segment.path[i - 1], segment.path[i]];
+      const steps = Math.max(1, Math.ceil((lens[i] - lens[i - 1]) / 15));
+      for (let k = i === 1 ? 0 : 1; k <= steps; k += 1) {
+        const share = (lens[i - 1] + ((lens[i] - lens[i - 1]) * k) / steps) / total;
+        points.push({ pos: [a[0] + ((b[0] - a[0]) * k) / steps, a[1] + ((b[1] - a[1]) * k) / steps], t: segment.t0 + share * minutes, driven: driven + share * minutes });
+      }
+    }
+    driven += minutes;
+  }
+  return points;
+}
+
+// Where a truck that drove `head` meets its new plan `planned`: a point it passed and a point on the plan
+// within 25 m of each other, chosen for the least time off the plan's schedule. A minute of driving back
+// counts three times as much as a minute of waiting or delay, turning round adds a minute, and so does
+// each 10 m between the two points.
+function rejoin(head, planned, at) {
+  const now = head.at(-1);
+  let best = null;
+  for (let i = head.length - 1; i >= 0; i -= 1) {
+    const h = head[i];
+    const back = now.driven - h.driven;
+    if (best && 3 * back >= best.cost) break;
+    for (const p of planned) {
+      const gap = Math.abs(p.pos[1] - h.pos[1]) > 0.0003 ? Infinity : metres(h.pos, p.pos);
+      if (gap > 25) continue;
+      const t = clamp(at + back, p.t, p.until ?? p.t);
+      const cost = 3 * back + (back > 0 ? 1 : 0) + gap / 10 + Math.abs(at + back - t);
+      if (!best || cost < best.cost) best = { index: i, point: { ...p, t }, back, cost };
+    }
+  }
+  return best;
+}
+
+// Moves segments `shift` minutes later. A stop that waits for a fixed time absorbs what it can.
+function delaySegments(segments, shift) {
+  const marks = [];
+  const moved = segments.flatMap((segment) => {
+    marks.push([segment.t0, shift]);
+    const t0 = segment.t0 + shift;
+    const waits = segment.path.length < 2 && ["waiting", "idle"].includes(segment.kind);
+    const t1 = waits ? Math.max(segment.t1, t0) : segment.t1 + shift;
+    shift = t1 - segment.t1;
+    return t1 - t0 > 0.001 ? [{ ...segment, t0: Math.round(t0 * 100) / 100, t1: Math.round(t1 * 100) / 100 }] : [];
+  });
+  const timeOf = (t) => t + (marks.find(([t0]) => t0 >= t - 0.01)?.[1] ?? shift);
+  return { segments: moved, timeOf };
+}
+
+// A check-in event's wording for the time it now happens, as backend/playback.py words it.
+function checkInEvent(event, t) {
+  const shipment = scenario.shipments.find((item) => event.text.includes(item.id));
+  if (!event.text.startsWith("Checks in") || !shipment) return { ...event, t };
+  const [start, end] = shipment.appointment.split("–").map(clockMinutes);
+  const head = event.text.slice(0, event.text.indexOf(shipment.id) + shipment.id.length);
+  const [note, tone] = t > end ? ["after its appointment window closed", "risk"]
+    : t - start > 0.5 ? [`${Math.round(t - start)} min late for its ${clockLabel(start)} appointment`, "watch"]
+    : [`on time for its ${clockLabel(start)} appointment`, "ok"];
+  return { ...event, t, text: `${head}, ${note}`, tone };
+}
+
+const turnBackText = "Turning back to rejoin its new route";
+
+// `previous` is the unstitched response `usual` was built from, if any: a truck it plans
+// exactly like `response` keeps the track already on the map.
+function stitchPlayback(usual, response, at, previous = null) {
   const usualTracks = new Map(usual.tracks.map((track) => [track.id, track]));
-  const warps = new Map();
+  const previousTracks = new Map((previous?.tracks ?? []).map((track) => [track.id, JSON.stringify(track.segments)]));
+  const metresPerMin = scenario.operations.network_speed_mph * 26.8224;
+  const kept = new Set();
+  const moves = new Map();
   const tracks = response.tracks.map((track) => {
     const before = usualTracks.get(track.id);
     if (!before) return track;
-    const head = clipSegments(before.segments, -Infinity, at);
-    const gap = metres(stateAt(prepareTrack(before), at).pos, stateAt(prepareTrack(track), at).pos);
-    if (gap < 30) return { ...track, segments: [...head, ...clipSegments(track.segments, at, Infinity)] };
-    // The truck already reacted before the report: squeeze its response up to its first stop into the time after the report.
-    const until = track.segments.find((segment) => segment.t0 > at && segment.path.length < 2)?.t0 ?? response.end;
-    const warp = (t) => (t >= until ? t : at + ((t - response.start) * (until - at)) / (until - response.start));
-    warps.set(track.id, warp);
-    return { ...track, segments: [...head, ...track.segments.map((segment) => ({ ...segment, t0: warp(segment.t0), t1: warp(segment.t1) }))] };
+    if (previousTracks.get(track.id) === JSON.stringify(track.segments)) {
+      kept.add(track.id);
+      return before;
+    }
+    const head = trackPoints(before.segments, -Infinity, at);
+    // The truck may rejoin its plan ahead of schedule, but not past a stop where it loads, unloads or swaps.
+    const task = track.segments.find((segment) => segment.t0 >= at && segment.path.length < 2 && !["waiting", "busy", "idle"].includes(segment.kind));
+    const planned = trackPoints(track.segments, response.start, Math.min(task?.t0 ?? Infinity, at + 60));
+    const join = rejoin(head, planned, at);
+    if (!join) return { ...track, segments: [...clipSegments(before.segments, -Infinity, at), ...clipSegments(track.segments, at, Infinity)] };
+    const { point, back, index } = join;
+    const path = [...head.slice(index).reverse().map((h) => h.pos), point.pos]
+      .filter((pos, i, all) => i === 0 || metres(all[i - 1], pos) > 0.5);
+    const length = path.slice(1).reduce((sum, pos, i) => sum + metres(path[i], pos), 0);
+    const rejoined = at + Math.max(back, length / metresPerMin);
+    const tail = clipSegments(track.segments, point.t, Infinity);
+    const bridge = [];
+    if (path.length > 1) {
+      bridge.push({ t0: at, t1: rejoined, kind: back > 0.1 ? "detour" : tail[0]?.kind ?? "driving",
+        text: back > 0.1 ? turnBackText : tail[0]?.text ?? "", shipment: tail[0]?.shipment ?? null, path, distance_m: Math.round(length) });
+    }
+    const end = path.length > 1 ? rejoined : at;
+    if (end < point.t) {
+      const held = track.segments.find((segment) => segment.kind === "waiting" && segment.path.length < 2 && segment.t0 < point.t && segment.t1 > end);
+      bridge.push({ t0: end, t1: point.t, kind: "waiting", text: held?.text ?? "Holding until its new plan resumes", shipment: tail[0]?.shipment ?? null, path: [point.pos] });
+    }
+    const delayed = delaySegments(tail, Math.max(0, end - point.t));
+    moves.set(track.id, { from: point.t, timeOf: delayed.timeOf, turned: back > 0.1 });
+    return { ...track, segments: [...clipSegments(before.segments, -Infinity, at), ...bridge, ...delayed.segments] };
   });
+  // The two trucks of a load swap start the transfer together: the one there first waits for the other.
+  const swaps = tracks.flatMap((track, n) => {
+    const i = track.segments.findIndex((segment) => segment.kind === "transfer" && segment.t0 >= at);
+    return i > 0 ? [{ n, i, t0: track.segments[i].t0 }] : [];
+  });
+  const meet = Math.max(...swaps.map((swap) => swap.t0));
+  const syncs = new Map();
+  if (swaps.length === 2) swaps.filter(({ t0 }) => meet - t0 > 0.01).forEach(({ n, i, t0 }) => {
+    const { segments, id } = tracks[n];
+    const delayed = delaySegments(segments.slice(i), meet - t0);
+    const wait = { ...segments[i], t0, t1: meet, kind: "waiting", text: "Waiting for the other truck to arrive for the swap" };
+    tracks[n] = { ...tracks[n], segments: [...segments.slice(0, i), wait, ...delayed.segments] };
+    syncs.set(id, { from: t0, timeOf: delayed.timeOf });
+  });
+  const retime = (event, t) => {
+    const sync = syncs.get(event.truck);
+    const final = Math.round((sync && t >= sync.from - 0.01 ? sync.timeOf(t) : t) * 100) / 100;
+    return Math.abs(final - event.t) > 0.01 ? checkInEvent(event, final) : event;
+  };
   const events = [
-    ...usual.events.filter((event) => event.t < at),
+    ...usual.events.filter((event) => event.t < at || kept.has(event.truck)).map((event) => (event.t < at ? event : retime(event, event.t))),
+    ...[...moves].filter(([, move]) => move.turned).map(([truck]) => ({ t: at, truck, text: "Turns back to rejoin its new route", tone: "watch" })),
     ...response.events.flatMap((event) => {
-      const warp = warps.get(event.truck);
-      if (warp) return [{ ...event, t: Math.round(warp(event.t) * 100) / 100 }];
-      return event.t >= at ? [event] : [];
+      if (kept.has(event.truck)) return [];
+      const move = moves.get(event.truck);
+      if (!move) return event.t >= at ? [retime(event, event.t)] : [];
+      if (event.t < move.from - 0.01) return [];
+      return [retime(event, Math.max(at, move.timeOf(event.t)))];
     }),
   ].sort((a, b) => a.t - b.t);
-  return { ...response, tracks, events };
+  const last = Math.max(...tracks.map((track) => track.segments.at(-1).t1));
+  return { ...response, end: Math.max(response.end, Math.ceil(last)), tracks, events };
 }
 
 async function loadPlayback({ keepTime = false } = {}) {
   const actions = scenario.decision_model.actions.map((a) => a.id);
   let all = await Promise.all(actions.map((id) => fetchPlayback(id, plan.road)));
+  const raw = all[actions.indexOf(plan.action)];
   if (scenario.scenario_type === "disruption") {
-    const usual = await fetchPlayback("hold-course", "open", activeScenario, false);
-    all = all.map((response) => stitchPlayback(usual, response, usual.start + INCIDENT_DELAY_MIN));
+    const usual = lead?.shown ?? await fetchPlayback("hold-course", "open", activeScenario, false);
+    all = all.map((response) => stitchPlayback(usual, response, incidentAt(), lead?.raw));
   }
+  rawPlayback = raw;
   playback = all[actions.indexOf(plan.action)];
   tracks = playback.tracks.map(prepareTrack);
   buildTallies(Object.fromEntries(actions.map((id, i) => [id, all[i]])));
@@ -280,9 +413,12 @@ function renderPlanNote() {
   $(`#road-${plan.road}`).checked = true;
   $$('input[name="road"]').forEach((input) => { $(`label[for="${input.id}"]`).textContent = roadWord(input.value); });
   const outcome = scenario.decision_model.actions.find((a) => a.id === plan.action)[outcomesKey()][plan.road];
-  $("#plan-note").textContent = outcome.lateness_min > 0
-    ? `${affectedShipment().id} arrives about ${Math.round(outcome.lateness_min)} min late in this case.`
-    : `${affectedShipment().id} arrives on time in this case.`;
+  const row = tallies[plan.action]?.find((item) => item.shipment === affectedShipment().id);
+  const late = row ? row.lateness_min : outcome.lateness_min;
+  const later = row && row.moved > 0.5
+    ? ` It checks in ${Math.round(row.moved)} min later than the estimate, which assumes the response began at ${clockLabel(span.start)}: from the ${clockLabel(incidentAt())} report the truck first drives back or waits to rejoin it (simulated).`
+    : "";
+  $("#plan-note").textContent = `${affectedShipment().id} arrives ${late > 0 ? `about ${Math.round(late)} min late` : "on time"} in this case.${later}`;
 }
 
 function updateFrame() {
@@ -292,8 +428,7 @@ function updateFrame() {
   slider.style.setProperty("--p", `${((currentTime - span.start) / (span.end - span.start)) * 100}%`);
   slider.setAttribute("aria-valuetext", clockLabel(currentTime));
   $("#clock").textContent = clockLabel(currentTime);
-  // The CA-47 route options, the obstruction and their legend entries appear only once the report is in.
-  // (Not data-incident: that attribute marks the incident jump buttons.)
+  // The route options, the obstruction and their legend entries appear only once the report is in.
   const live = scenario.scenario_type === "disruption" && currentTime >= incidentAt() - 0.01;
   document.body.dataset.incidentShown = String(live);
   renderer?.setIncidentVisible(live);
@@ -312,14 +447,9 @@ function frame(now) {
   if (!playing) return;
   const elapsed = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
-  const before = currentTime;
   currentTime = Math.min(span.end, currentTime + elapsed * speed);
-  const reportAt = incidentAt();
-  if (mode === "monitoring" && story !== "normal" && before < reportAt && currentTime >= reportAt) {
-    currentTime = reportAt;
-    updateFrame();
-    setPlaying(false);
-    triggerIncident();
+  if (awaitingReport() && currentTime >= reportTime(reportIndex + 1)) {
+    nextReport();
     return;
   }
   updateFrame();
@@ -328,7 +458,7 @@ function frame(now) {
     return;
   }
   setPlaying(false);
-  if ((mode === "incident" && step === "outcome") || step === "monitor") showReport();
+  if (mode === "incident" && step === "outcome") showReport();
 }
 
 function setPlaying(value) {
@@ -440,9 +570,22 @@ function buildTallies(playbacks) {
       const t1 = Math.max(t0 + 1, checkInTime(pb, row));
       const d0 = track ? stateAt(track, t0).dist : 0;
       const d1 = track ? stateAt(track, t1).dist : 0;
-      const windowEnd = clockMinutes(row.appointment.split("–")[1] ?? row.appointment);
-      return { ...row, track, t0, t1, d0, d1, breachAt: Math.min(t1, windowEnd) };
+      const [windowStart, windowEnd] = row.appointment.split("–").map(clockMinutes);
+      // A truck that had to rejoin its response after a report checks in later than estimated: count it as it plays.
+      const moved = t1 - clockMinutes(row.arrival);
+      const timing = Math.abs(moved) > 0.5 ? { lateness_min: Math.max(0, t1 - windowStart), constraint_breaches: t1 > (windowEnd ?? windowStart) ? 1 : 0 } : {};
+      return { ...row, ...timing, moved, track, t0, t1, d0, d1, breachAt: Math.min(t1, windowEnd ?? windowStart) };
     });
+    // Driving back to rejoin a response adds miles, CO₂ and driver time to the truck's next delivery.
+    const r = scenario.decision_model.rates;
+    pb.tracks.forEach((track) => track.segments.filter((segment) => segment.text === turnBackText).forEach((segment) => {
+      const row = tallies[actionId].filter((item) => item.truck === track.id && item.t1 > segment.t0).sort((a, b) => a.t1 - b.t1)[0];
+      if (!row) return;
+      const miles = segment.distance_m / 1609.344;
+      row.miles += miles;
+      row.emissions_kg += miles * r.co2_kg_per_mile;
+      row.trip_cost += miles * r.cost_per_mile + ((segment.t1 - segment.t0) * r.driver_hourly_rate) / 60;
+    }));
   }
   planTotals = totalsAt(outcomeRows("hold-course", "open", "outcomes")?.map((row) => ({ ...row, t0: 0, t1: 1, breachAt: 0 })) ?? [], Infinity);
 }
@@ -869,7 +1012,7 @@ function renderDecision() {
   $$("[data-observation]").forEach((button) => { button.textContent = { blocked: `Road ${check().bad}`, clear: `Road ${check().good}`, inconclusive: "Inconclusive" }[button.dataset.observation]; });
   $("#affected-label").textContent = scenario.scenario_type === "disruption" ? "Affected shipment" : "Tightest delivery";
   const when = scenario.scenario_type === "disruption" ? "Reported" : "As of";
-  $("#reported-at").textContent = d.reported_at ? ` · ${when} ${d.reported_at}` : "";
+  $("#reported-at").textContent = d.reported_at ? ` · ${when} ${reportClock(d.reported_at)}` : "";
   $("#disruption-title").textContent = d.title;
   $("#disruption-description").textContent = d.description;
   $("#incident-place").textContent = `${d.evidence_summary ?? "No incident reports"} · Synthetic`;
@@ -884,8 +1027,23 @@ function renderDecision() {
     ? `${pct(d.prior_blocked_probability)}<small>estimated · was ${pct(d.web_evidence.prior_before)} (assumed) before the web check</small>`
     : `${pct(d.prior_blocked_probability)}<small>assumed</small>`;
   $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
-  $("#deadline").textContent = d.decision_deadline;
+  $("#deadline").innerHTML = reportShift()
+    ? `${reportClock(d.decision_deadline)}<small>synthetic · moved with the simulated report time</small>`
+    : esc(d.decision_deadline);
 }
+
+// The config gives each incident report a time; in the scripted morning a report can arrive later,
+// so its report time and deadline move to the simulated clock.
+const minutesOf = (text) => {
+  const [hours, minutes] = text.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+function reportShift() {
+  const d = scenario.disruption;
+  if (scenario.scenario_type !== "disruption" || !d.reported_at) return 0;
+  return Math.round(incidentAt()) - minutesOf(d.reported_at);
+}
+const reportClock = (text) => clockLabel(minutesOf(text) + reportShift());
 
 // Indicator tiles. Normal flow is the baseline the changed condition is compared with.
 const higherIsBetter = new Set(["appointments_feasible"]);
@@ -1257,6 +1415,9 @@ async function loadScenario(id, { keepTime = false } = {}) {
     road: scenario.disruption.prior_blocked_probability >= 0.5 ? "blocked" : "open",
   };
   modelPick = scenario.analysis.before[0];
+  if (scenario.scenario_type === "disruption" && reports[reportIndex]?.id === id) {
+    incidentPlans[reportIndex] = { label: reports[reportIndex].label, title: scenario.disruption.title, at: incidentAt(), indicators: scenario.analysis.indicators };
+  }
   furthest = 0;
   resetObservation();
   renderDecision();
@@ -1277,23 +1438,23 @@ async function loadScenario(id, { keepTime = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Flow. Start with normal operations and introduce an incident,
-// or open an incident directly. Watch-from-start reports arrive after INCIDENT_DELAY_MIN.
-// The dispatcher decides on a drone check, chooses a response and watches
-// it play out. The shift report compares today with the usual morning.
+// Flow. One scripted morning: normal operations, then each report in
+// `reports` arrives at its simulated time. For each one the dispatcher
+// decides on a drone check, chooses a response and watches it play out
+// until the next report. The shift report closes the morning.
 // ---------------------------------------------------------------------------
-const INCIDENT_DELAY_MIN = 2;
+const reports = [
+  { id: "disruption", after: 2, label: "Crash" }, // Minutes after the start of the morning (simulated).
+  { id: "flood", after: 8, label: "Water" },
+];
 const steps = ["start", "incident", "respond", "outcome"]; // "monitor" is outside the stepper.
 let mode = "monitoring";
 let step = "start";
-let furthest = 0; // Index in steps of the furthest step reached in this run.
-let story = "normal";
-const stories = [
-  { id: "normal", normal: true, title: "Normal morning", tag: "Baseline", mission: "Follow the planned routes" },
-  ...demoIncidents,
-];
+let furthest = 0; // Index in steps of the furthest step reached for this report.
+let reportIndex = -1; // Index in reports of the incident on screen; -1 before the first report.
+let lead = null; // From the latest report: { shown, raw }, the playback on the map then, stitched and as planned.
+let incidentPlans = []; // Per report reached: its whole-plan indicators before inspection, for the shift report.
 let decisionLog = [];
-let routine = false; // True for a normal morning with no incident report.
 
 function logDecision(text) {
   decisionLog.push({ t: currentTime, text });
@@ -1355,37 +1516,22 @@ function renderStepper() {
     respond: at === 2 ? "current" : at > 2 ? "done" : "pending",
     outcome: at === 3 ? (mode === "report" ? "done" : "current") : "pending",
   };
-  if (routine) Object.assign(states, { incident: "skipped", inspect: "skipped", respond: "skipped" });
   const reached = { incident: furthest >= 1, inspect: furthest >= 1, respond: furthest >= 2, outcome: furthest >= 3 };
   $$("#stepper [data-goto]").forEach((button) => {
     const key = button.dataset.goto;
     button.closest("li").dataset.state = states[key];
-    button.disabled = step === "start" || !reached[key] || (routine && key !== "outcome");
+    button.disabled = step === "start" || !reached[key];
     if (states[key] === "current") button.setAttribute("aria-current", "step");
     else button.removeAttribute("aria-current");
   });
 }
 
-const storyDetail = (item) => `${item.mission}.`;
-const jumpButton = (item) => `<button class="btn jump-btn" type="button" data-jump="${esc(item.id)}"><b>${esc(item.tag)}: ${esc(item.title)}</b><small>${esc(storyDetail(item))}</small></button>`;
-
 function renderStart() {
-  $("#story-options").innerHTML = stories.map((item) => `<li class="option">
-    <input type="radio" name="story" id="story-${esc(item.id)}" value="${esc(item.id)}"${item.id === story ? " checked" : ""}>
-    <label for="story-${esc(item.id)}">
-      <span class="tag ${item.normal ? "ok" : "risk"}">${esc(item.tag)}</span>
-      <span class="option-name story-title">${esc(item.title)}</span>
-      <span class="option-summary story-detail">${esc(storyDetail(item))}</span>
-    </label>
-  </li>`).join("");
-  $("#start-button").textContent = story === "normal" ? "Start normal morning" : "Open incident";
   $("#start-button").disabled = false;
-  $("#jump-button").disabled = false;
-  $("#jump-button").hidden = story === "normal";
   $("#start-note").textContent = "";
 }
 
-// The regular morning: nothing to decide, so the guide shows what PigeonOps is watching.
+// Before the first report: nothing to decide, so the guide shows what PigeonOps is watching.
 function renderMonitor() {
   const a = scenario.analysis;
   const feasible = a.indicators.find((item) => item.id === "appointments_feasible");
@@ -1395,7 +1541,6 @@ function renderMonitor() {
   $("#monitor-environment").textContent = `End estimate: ${totalCo2?.value == null ? "CO₂ unavailable" : `${totalCo2.value.toFixed(1)} kg CO₂`}; ${schools?.value == null ? "school proximity unavailable" : `${whole(schools.value)} schools within 300 m of planned routes (OSM estimate)`}. Live CO₂ follows the simulated progress of all assigned loads.`;
   const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
   $("#monitor-note").textContent = unassigned ? `${unassigned} load${unassigned === 1 ? " needs" : "s need"} a truck.` : "";
-  $("#monitor-incidents").innerHTML = stories.filter((item) => !item.normal).map(jumpButton).join("");
   fleetWatchKey = "";
   if (tracks.length) updateFleetWatch(tracks.map((track) => stateAt(track, currentTime)));
   if (tracks.length) updateMonitorLive(tracks.map((track) => stateAt(track, currentTime)));
@@ -1414,24 +1559,34 @@ function renderOutcome() {
   $("#outcome-title").textContent = report ? "Shift report" : actionLabel(plan.action);
   if (!report) $("#outcome-sub").textContent = "";
   $("#skip-end").hidden = report;
-  $("#change-response").hidden = report || routine;
+  $("#skip-end").textContent = reports[reportIndex + 1] ? "Skip to next report" : "View shift report";
+  $("#change-response").hidden = report;
   $("#report-restart").hidden = !report;
-  const others = stories.filter((item) => item.id !== story);
-  $("#next-incidents").innerHTML = others.map(jumpButton).join("");
-  $("#next-incidents-wrap").hidden = !report || !others.length;
 }
 
-async function triggerIncident(variant = story) {
-  story = variant;
-  routine = false;
+// True while the map plays toward the next report: before the first one, or after a confirmed response.
+const awaitingReport = () => Boolean(reports[reportIndex + 1]) && (step === "monitor" || (mode === "incident" && step === "outcome"));
+
+function nextReport() {
+  setPlaying(false);
+  currentTime = reportTime(reportIndex + 1);
+  updateFrame();
+  triggerIncident().catch((error) => console.error(error));
+}
+
+async function triggerIncident() {
+  reportIndex += 1;
+  // Each report starts from what the map shows now, so the trucks stay in place up to the report.
+  lead = { shown: playback, raw: rawPlayback };
   mode = "incident";
   setAppliedWeb(null);
-  if (!(await loadScenario(variant, { keepTime: true }))) return;
+  clearTriage($("#web-triage"));
+  if (!(await loadScenario(reports[reportIndex].id, { keepTime: true }))) return;
   const d = scenario.disruption;
-  logDecision(`${d.title}. Reported ${d.reported_at}. ${d.evidence_summary}. Synthetic scenario.`);
+  logDecision(`${d.title}. Reported ${clockLabel(incidentAt())} (simulated). ${d.evidence_summary}. Synthetic scenario.`);
   logDecision(`${inspectionSentence(scenario.analysis.evoi)} ${inspectionChoices(scenario.analysis.evoi, check())}`);
   setStep("incident");
-  renderTriage($("#web-triage"), variant, { onApply: applyWebFinding });
+  renderTriage($("#web-triage"), activeScenario, { onApply: applyWebFinding });
 }
 
 // The dispatcher used (or stopped using) the web check's finding: reload the incident from the new chance.
@@ -1444,37 +1599,21 @@ async function applyWebFinding(finding, result) {
     : `Web check no longer used. ${riskText()} at ${incidentPlace()} back to ${pct(scenario.disruption.prior_blocked_probability)}.`);
 }
 
-// Start a fresh run at the moment the incident report arrives.
-async function jumpToIncident(variant) {
-  setPlaying(false);
-  story = variant;
-  document.body.dataset.story = variant;
-  mode = "monitoring";
-  decisionLog = [];
-  currentTime = span.start + INCIDENT_DELAY_MIN;
-  await triggerIncident(variant);
-}
-
-// Play the chosen morning from its start.
-async function startMorning(id = story) {
-  story = id;
-  if (step !== "start") await restartMorning();
-  routine = id === "normal";
-  document.body.dataset.story = id;
-  // Use this story's starting truck positions and release times during the lead-in.
-  if (id !== "normal") await loadScenario(id);
-  if (id === "normal") {
-    logDecision("Started on the planned routes. No incidents reported.");
-    setStep("monitor");
-  }
+// Play the morning from its start; the first report arrives after a short normal lead-in.
+function startMorning() {
+  logDecision("Started on the planned routes.");
+  setStep("monitor");
   setView("map");
   showMap();
+  setSpeed(1);
   setPlaying(true);
 }
 
 async function restartMorning() {
   mode = "monitoring";
-  routine = false;
+  reportIndex = -1;
+  lead = null;
+  incidentPlans = [];
   decisionLog = [];
   setSpeed(5);
   setAppliedWeb(null);
@@ -1494,54 +1633,55 @@ function confirmResponse() {
   setStep("outcome");
   setView("map");
   showMap();
-  setSpeed(15);
+  // Slow enough to watch the response start before the next report arrives.
+  setSpeed(reports[reportIndex + 1] ? 1 : 15);
   setPlaying(true);
 }
 
 function showReport() {
-  if (mode === "monitoring" && step !== "monitor") return;
   setPlaying(false);
   mode = "report";
   renderReport();
-  if (step === "outcome") renderMode();
-  else setStep("outcome");
+  renderMode();
 }
 
 function renderReport() {
-  const d = scenario.disruption;
   const day = new Date(scenario.generated_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  const incident = scenario.scenario_type === "normal" ? "No incidents" : d.title;
-  $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${incident}. Simulated results.`;
-  $("#report-indicators-title").textContent = routine ? "Regular morning" : "Plan comparison";
-  $("#report-usual-head").hidden = routine;
-  $("#report-today-head").textContent = routine ? "Planned day" : "Today";
-  $("#report-change-head").textContent = routine ? "Basis" : "Change";
-  $("#report-indicators-note").textContent = routine
-    ? "Whole-plan estimates."
-    : `Estimates for the recommended response before inspection.${activeScenario === "congestion" ? " Cargo released earlier than baseline." : ""}`;
+  const count = reportIndex + 1;
+  $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${count} incident report${count === 1 ? "" : "s"}. Simulated results.`;
 
-  $("#report-indicators").innerHTML = scenario.analysis.indicators.map((item) => {
-    if (routine) return `<tr><td>${indicatorLabel(item)}</td><td class="num">${item.value == null ? "—" : indicatorText(item, item.value)}</td><td class="muted">${esc(basisLabel[item.basis] ?? item.basis)}</td></tr>`;
-    const base = baseline?.find((b) => b.id === item.id);
-    if (item.value === null || item.value === undefined || !base || base.value === null) {
-      return `<tr><td>${indicatorLabel(item)}</td><td class="num">—</td><td class="num">—</td><td class="muted">${esc(basisLabel[item.basis] ?? item.basis)}</td></tr>`;
-    }
-    const change = indicatorChange(item, base);
-    const shown = change ? `<span class="kpi-delta ${change.tone}"><span aria-hidden="true">${change.arrow}</span> ${change.amount}</span>` : '<span class="kpi-delta">Same</span>';
-    return `<tr><td>${indicatorLabel(item)}</td><td class="num">${indicatorText(item, base.value)}</td><td class="num">${indicatorText(item, item.value)}</td><td>${shown}</td></tr>`;
+  const plans = incidentPlans.filter(Boolean);
+  const names = plans.map((p) => `${p.label} (${p.title}, ${clockLabel(p.at)})`).join(" and ");
+  $("#report-head").innerHTML = `<th>Indicator</th><th class="num">Usual</th>${plans.map((p) => `<th class="num">${esc(p.label)}<span class="detail">${clockLabel(p.at)}</span></th>`).join("")}`;
+  $("#report-indicators-note").textContent = `Usual is the planned morning with no incident. ${names ? `The ${names} column${plans.length === 1 ? " estimates" : "s each estimate"}` : "Each report column estimates"} the whole plan under that report's recommended response, before inspection. Each is worked out on its own from ${clockLabel(span.start)}, as if that report were the only incident${plans.length > 1 ? `, so the ${plans.at(-1).label} column does not include the effects of the ${plans[0].label.toLowerCase()} report and the columns do not add up` : ""}. The small figure under each value is the change from usual.`;
+  $("#report-indicators").innerHTML = (baseline ?? plans[0]?.indicators ?? []).map((base) => {
+    const items = plans.map((p) => p.indicators.find((item) => item.id === base.id));
+    const bases = [...new Set([base, ...items].filter(Boolean).map((item) => basisLabel[item.basis] ?? item.basis))].join(" / ");
+    const cells = items.map((item) => {
+      if (item?.value == null) return '<td class="num">—</td>';
+      const change = base.value == null ? null : indicatorChange(item, base);
+      const shown = base.value == null ? "" : change
+        ? `<span class="detail kpi-delta ${change.tone}"><span aria-hidden="true">${change.arrow}</span> ${change.amount}</span>`
+        : '<span class="detail kpi-delta">Same</span>';
+      return `<td class="num">${indicatorText(item, item.value)}${shown}</td>`;
+    }).join("");
+    return `<tr><td>${shortLabels[base.id] ?? indicatorLabel(base)}<span class="detail">${esc(bases)}</span></td><td class="num">${base.value == null ? "—" : indicatorText(base, base.value)}</td>${cells}</tr>`;
   }).join("");
 
   const action = scenario.decision_model.actions.find((a) => a.id === plan.action);
-  const closing = scenario.scenario_type === "normal"
-    ? "Completed the planned routes without inspection."
-    : plan.action === modelPick?.id
+  const closing = plan.action === modelPick?.id
     ? `Completed: ${action.label} (recommended).`
     : `Completed: ${action.label}. Recommended: ${modelPick.label}.`;
   $("#report-log").innerHTML = [...decisionLog, { t: currentTime, text: closing }]
     .map((entry) => `<li><time>${clockLabel(entry.t)}</time><span>${esc(entry.text)}</span></li>`).join("");
 }
 
+// Skips to the next report while one is still due, otherwise to the end of the morning.
 function skipToReport() {
+  if (reports[reportIndex + 1]) {
+    nextReport();
+    return;
+  }
   setPlaying(false);
   currentTime = span.end;
   updateFrame();
@@ -1550,14 +1690,7 @@ function skipToReport() {
 
 function bindEvents() {
   const fail = (error) => console.error(error);
-  $("#start-button").addEventListener("click", () => (story === "normal" ? startMorning() : jumpToIncident(story)).catch(fail));
-  $("#jump-button").addEventListener("click", () => startMorning().catch(fail));
-  $("#story-options").addEventListener("change", (event) => {
-    if (event.target.name !== "story") return;
-    story = event.target.value;
-    renderStart();
-    $(`#story-${story}`).focus();
-  });
+  $("#start-button").addEventListener("click", startMorning);
   $("#monitor-skip").addEventListener("click", skipToReport);
   $("#inspect-button").addEventListener("click", () => startInspection().catch(fail));
   $("#reinspect-button").addEventListener("click", () => startInspection().catch(fail));
@@ -1609,10 +1742,6 @@ function bindEvents() {
   document.addEventListener("click", (event) => {
     const truck = event.target.closest("[data-truck]");
     if (truck) selectTruck(selectedTruck === truck.dataset.truck ? null : truck.dataset.truck);
-    const jump = event.target.closest("[data-jump]");
-    if (!jump) return;
-    const id = jump.dataset.jump;
-    (id === "normal" ? startMorning(id) : jumpToIncident(id)).catch(fail);
   });
 
   $("#play").addEventListener("click", () => setPlaying(!playing));
