@@ -2,6 +2,7 @@ import { openInspection, resetInspection } from "./inspection.js";
 import { clearBrief, initAsk, renderBrief, resetAsk } from "./copilot.js";
 import { clearTriage, renderTriage, setAppliedWeb, withWeb } from "./triage.js";
 import { inspectionSentence, inspectionChoices, responseExplanation, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
+import { renderResponseComparison } from "./response-comparison.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -1138,7 +1139,27 @@ function renderIndicators(indicators) {
   }).join("");
 }
 
+let comparisonOptions = [];
+let comparisonProbability = 0;
+let communitySchools = null;
+
+function updateResponseComparison() {
+  renderResponseComparison($("#response-comparison-body"), scenario, comparisonOptions, comparisonProbability, plan.action, communitySchools);
+  $("#comparison-context").textContent = `${observed ? "After drone check" : "Before drone check"} · ${scenario.name} · Estimated`;
+}
+
+async function openResponseComparison() {
+  if (!communitySchools) {
+    const response = await fetch("/community-schools.json");
+    if (response.ok) communitySchools = await response.json();
+  }
+  updateResponseComparison();
+  $("#response-comparison").showModal();
+}
+
 function renderRankings(items, observation = null, blocked = scenario.disruption.prior_blocked_probability) {
+  comparisonOptions = items;
+  comparisonProbability = blocked;
   $("#ranking-state").textContent = `${observation ? "After inspection" : "Before inspection"} · Estimated`;
   $("#response-why").textContent = responseExplanation(items);
   $("#rankings").innerHTML = items.map((item) => {
@@ -1161,6 +1182,7 @@ function renderRankings(items, observation = null, blocked = scenario.disruption
     </li>`;
   }).join("");
   renderConfirm();
+  if ($("#response-comparison").open) updateResponseComparison();
 }
 
 // Fairness measure for a response: schools within 300 m of the route it sends the affected load on.
@@ -1706,8 +1728,21 @@ function bindEvents() {
     if (event.target.name !== "response") return;
     plan = { ...plan, action: event.target.value };
     renderConfirm();
+    if ($("#response-comparison").open) updateResponseComparison();
     if (!$("#override-reason-wrap").hidden) $("#override-reason").focus();
     loadPlayback({ keepTime: true }).catch(fail);
+  });
+  $("#compare-responses").addEventListener("click", () => openResponseComparison().catch(fail));
+  $("#close-response-comparison").addEventListener("click", () => $("#response-comparison").close());
+  $("#response-comparison-body").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-compare-select]");
+    if (!button) return;
+    const input = document.getElementById(`response-${button.dataset.compareSelect}`);
+    if (!input) return;
+    input.checked = true;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    $("#response-comparison").close();
+    input.focus();
   });
   $("#confirm-button").addEventListener("click", confirmResponse);
   $("#override-reason").addEventListener("input", renderConfirm);

@@ -1,0 +1,53 @@
+.compare-open { width: 100%; margin: 8px 0 14px; }
+.response-comparison {
+  width: min(1480px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: var(--frame);
+  border-radius: 3px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+.response-comparison[open] { display: flex; flex-direction: column; overflow: hidden; }
+.response-comparison::backdrop { background: rgb(21 24 28 / 0.65); }
+.response-comparison-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; flex: none; padding: 16px 22px; border-bottom: var(--frame); }
+.response-comparison-header h2 { font-size: 25px; }
+.response-comparison-header .btn { flex: none; }
+.response-comparison-body { min-height: 0; overflow: auto; padding: 18px 22px 26px; }
+.compare-method { max-width: 110ch; margin-bottom: 17px; color: var(--ink-2); font-size: 13px; }
+.compare-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 14px; }
+.compare-option { display: flex; flex-direction: column; min-width: 0; padding: 14px; border: var(--frame); background: var(--white); }
+.compare-option.selected { background: var(--checked); box-shadow: inset 0 0 0 2px var(--ink); }
+.compare-option-head { display: flex; justify-content: space-between; gap: 10px; min-height: 100px; border-bottom: var(--rule); }
+.compare-option-head h3 { margin: 4px 0; font-size: 21px; }
+.compare-option-head p { color: var(--ink-2); font-size: 12px; }
+.compare-option-head strong { flex: none; text-align: right; font-family: var(--font-mono); font-size: 17px; }
+.compare-option-head strong small { display: block; color: var(--ink-2); font: 11px var(--font-body); }
+.compare-rank { color: var(--ink-2); font-family: var(--font-display); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.compare-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 0; border-bottom: var(--rule); }
+.compare-metrics > div { min-width: 0; }
+.compare-metrics span, .compare-metrics small { display: block; color: var(--ink-2); font-size: 11px; }
+.compare-metrics strong { display: block; margin: 2px 0; font-family: var(--font-mono); font-size: 19px; }
+.compare-co2 { grid-column: 1 / -1; }
+.compare-co2 strong { font-size: 25px; }
+.compare-bar { height: 9px; margin-top: 5px; background: var(--paper); border: 1px solid var(--hair); }
+.compare-bar i { display: block; height: 100%; background: var(--ok); }
+.compare-metrics .compare-fuel { margin-top: 5px; font-size: 11px; }
+.compare-detail { display: grid; gap: 14px; padding: 13px 0; }
+.compare-detail h4 { margin: 0 0 5px; font-family: var(--font-display); font-size: 15px; }
+.compare-detail h5 { margin: 9px 0 4px; color: var(--ink-2); font-size: 12px; text-transform: uppercase; }
+.compare-detail p { color: var(--ink-2); font-size: 12px; }
+.compare-schools { max-height: 125px; overflow: auto; margin: 0; padding-left: 18px; font-size: 12px; }
+.compare-schools li { padding: 2px 0; }
+.compare-schools a { color: var(--ink); }
+.compare-schools span { display: block; color: var(--ink-2); font-size: 11px; }
+.compare-road-states table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; }
+.compare-road-states th, .compare-road-states td { padding: 5px 3px; border-bottom: var(--rule); vertical-align: top; }
+.compare-road-states thead th { color: var(--ink-2); font-size: 10px; }
+.compare-road-states tbody th { font-weight: 600; }
+.compare-road-states small { display: block; color: var(--ink-2); font-size: 10px; font-weight: 400; }
+.compare-option > .btn { width: 100%; margin-top: auto; }
+@media (max-width: 1100px) { .compare-grid { grid-template-columns: 1fr; } .compare-option-head { min-height: 0; padding-bottom: 12px; } .compare-detail { grid-template-columns: 1fr 1.5fr; } }
+@media (max-width: 620px) { .response-comparison-body { padding: 12px; } .response-comparison-header { padding: 12px; } .compare-detail { grid-template-columns: 1fr; } }

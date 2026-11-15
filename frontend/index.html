@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/insight.css">
   <link rel="stylesheet" href="/copilot.css">
   <link rel="stylesheet" href="/triage.css">
+  <link rel="stylesheet" href="/response-comparison.css">
 </head>
 <body data-mode="monitoring" data-step="start" data-view="map">
   <header class="topbar">
@@ -242,6 +243,7 @@
           <p id="response-limits" class="note"></p>
           <p id="ranking-state" class="subhead">Lowest expected loss first. Estimates.</p>
           <p id="response-why" class="decision-context"></p>
+          <button id="compare-responses" class="btn compare-open" type="button">Compare all responses</button>
           <ol id="rankings" class="options"></ol>
           <label id="override-reason-wrap" class="override-reason" hidden>Reason for choosing another response
             <textarea id="override-reason" rows="2" maxlength="200"></textarea>
@@ -316,6 +318,14 @@
       </div>
     </aside>
   </main>
+
+  <dialog id="response-comparison" class="response-comparison" aria-labelledby="response-comparison-title">
+    <header class="response-comparison-header">
+      <div><p id="comparison-context" class="subhead"></p><h2 id="response-comparison-title">Compare responses</h2></div>
+      <button id="close-response-comparison" class="btn small" type="button">Close</button>
+    </header>
+    <div id="response-comparison-body" class="response-comparison-body"></div>
+  </dialog>
 
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-heading">
     <header class="inspection-header">
