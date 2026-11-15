@@ -20,14 +20,14 @@ const shortTruck = (id) => id.replace("SYN-TRK-", "T");
 const svgNS = "http://www.w3.org/2000/svg";
 
 const colors = {
-  ink: "#142231",
-  muted: "#4a5866",
-  stopped: "#7c858c",
-  accent: "#24508f",
-  selected: "#a3176e",
+  ink: "#1f1e29",
+  muted: "#545462",
+  stopped: "#7d7e88",
+  accent: "#5f4690",
+  selected: "#7b3fc4",
   risk: "#b42318",
   amber: "#c27c0e",
-  route: "#8a939b",
+  route: "#8b8c96",
 };
 const attentionStatuses = new Set(["at-risk", "watch", "unassigned"]);
 const shipmentStatus = {
@@ -883,7 +883,7 @@ async function createArcGISRenderer() {
         layer.add(new Graphic({
           geometry,
           symbol: {
-            type: "text", text: location.name, color: location.kind === "incident" ? colors.risk : "#2f353a",
+            type: "text", text: location.name, color: location.kind === "incident" ? colors.risk : "#2e2d38",
             haloColor: "#ffffff", haloSize: 2, xoffset: 10, yoffset: -4, horizontalAlignment: "left",
             font: { size: 11, weight: location.kind === "warehouse" ? "normal" : "bold" },
           },

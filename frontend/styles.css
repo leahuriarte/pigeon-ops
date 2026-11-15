@@ -1,27 +1,31 @@
-/* PigeonOps: harbor yard and road sign.
-   Navy chart ink on concrete grey, one action colour (crane yellow, ink text on it),
-   chart magenta for the selected truck, hard offset shadows on things you can press.
-   Map and playback live in arcgis.css, the dialog in inspection.css. */
+/* PigeonOps: rock dove on concrete.
+   Charcoal ink on pigeon grey, one action colour (a muted neck-sheen purple, white text on it),
+   an iridescent green accent for progress and tabs, violet for the selected truck, hard offset
+   shadows on things you can press. Map and playback live in arcgis.css, the dialog in inspection.css. */
 
 :root {
-  --paper: #e6e9ea;
-  --card: #f5f6f6;
+  --paper: #e4e5e8;   /* pigeon grey */
+  --card: #f4f4f6;
   --white: #fff;
-  --ink: #142231;
-  --ink-2: #4a5866;
-  --hair: #c2c9ce;
-  --signal: #f2b705;
-  --signal-dark: #6e5300;
+  --ink: #1f1e29;     /* charcoal with a hint of the head's slate */
+  --ink-2: #545462;
+  --hair: #c5c6cd;
+  --signal: #5f4690;  /* muted neck-sheen purple: the one action colour */
+  --signal-dark: #46336c;
+  --on-signal: #fff;
+  --sheen: #0f8a70;   /* neck-sheen green accent */
+  --sheen-bg: #d9efe7;
+  --sheen-gradient: linear-gradient(90deg, #6e4aa6, #4f5a8f 50%, #119a7c);
   --risk: #b3261e;
   --risk-bg: #f7dfdc;
   --ok: #1d7347;
   --ok-bg: #dbede2;
   --watch: #8a5300;
   --watch-bg: #f6e5c8;
-  --selected: #a3176e; /* the map JS draws the selected truck in this colour */
-  --selected-bg: #f6e3ee;
-  --planned: #4a5866;
-  --checked: #fff5d1;
+  --selected: #7b3fc4; /* the map JS draws the selected truck in this colour */
+  --selected-bg: #f0eaf7;
+  --planned: #545462;
+  --checked: #e6f2ed;  /* pale sheen green for a chosen card or row */
 
   --font-display: "Bahnschrift", "DIN Alternate", "DIN Condensed", "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   --font-body: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -103,8 +107,8 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
 }
 .btn:not(:disabled):hover, .choice:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
 .btn:not(:disabled):active, .choice:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-/* Ink text on yellow: white on --signal fails contrast. */
-.btn.primary { background: var(--signal); }
+/* White on purple: 7.6:1. */
+.btn.primary { background: var(--signal); color: var(--on-signal); }
 .btn:disabled {
   border-color: var(--ink-2);
   background: var(--paper);
@@ -129,7 +133,7 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
   text-underline-offset: 2px;
   cursor: pointer;
 }
-.link:hover { color: var(--signal-dark); }
+.link:hover { color: var(--signal); }
 .link.quiet { font-weight: 700; text-decoration: none; }
 .link.quiet:hover { color: var(--ink); text-decoration: underline; }
 
@@ -148,7 +152,7 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
   white-space: nowrap;
 }
 .tag.risk { background: var(--risk); color: var(--white); }
-.tag.pick { background: var(--signal); color: var(--ink); }
+.tag.pick { background: var(--sheen); color: var(--white); }
 .tag.ok { background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 85%, var(--ink)); }
 
 /* Dashed border = estimated or assumed; solid = measured. */
@@ -200,20 +204,16 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
   align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
+  position: relative;
   min-height: 48px;
-  padding: 8px 16px;
+  padding: 8px 16px 11px;
   background: var(--card);
   border-bottom: var(--frame);
 }
+/* Iridescent neck band under the top bar. */
+.topbar::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: var(--sheen-gradient); }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.brand-mark {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  border: var(--frame);
-  background: var(--signal);
-  box-shadow: 2px 2px 0 var(--ink);
-}
+.brand-mark { flex: none; display: block; width: 30px; height: 30px; margin: -4px 0 -2px; }
 .brand strong { font-family: var(--font-display); font-size: 18px; font-stretch: 87.5%; font-weight: 700; }
 .brand-sub { overflow: hidden; color: var(--ink-2); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
@@ -294,6 +294,7 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
   margin-bottom: -1.5px;
   border-bottom: 1.5px solid var(--card);
   background: var(--card);
+  box-shadow: inset 0 3px 0 var(--sheen);
 }
 .count { margin-left: 3px; color: var(--ink-2); font-family: var(--font-mono); font-size: 11.5px; font-weight: 400; }
 
@@ -412,9 +413,9 @@ body:not([data-incident-shown="true"]) :is(.only-incident, #map-fallback .alt, #
 .stepper li:not([data-state="current"]) button:not(:disabled):hover .step-name { text-decoration: underline; text-underline-offset: 2px; }
 .stepper li[data-state="current"] button { background: var(--ink); color: var(--card); }
 .stepper li[data-state="current"] button:focus-visible { outline-color: var(--card); }
-.stepper li[data-state="current"] .step-num { background: var(--signal); color: var(--ink); }
+.stepper li[data-state="current"] .step-num { border-color: var(--card); background: var(--sheen); color: var(--white); }
 .stepper li[data-state="done"] button { color: var(--ink); }
-.stepper li[data-state="done"] .step-num { background: var(--ink); color: var(--card); font-size: 0; }
+.stepper li[data-state="done"] .step-num { border-color: var(--sheen); background: var(--sheen); color: var(--white); font-size: 0; }
 .stepper li[data-state="done"] .step-num::after { content: "✓"; font-size: 12px; }
 .stepper li[data-state="skipped"] .step-num { border-style: dashed; border-color: var(--ink-2); }
 
@@ -472,7 +473,7 @@ details.more > summary::before {
   font-weight: 700;
 }
 details.more[open] > summary::before { content: "−"; }
-details.more > summary:hover { color: var(--signal-dark); }
+details.more > summary:hover { color: var(--signal); }
 details.more > :not(summary) { margin-top: 8px; }
 .ai-explanation:has(> .copilot-brief[hidden]) { display: none; }
 
@@ -497,6 +498,13 @@ details.more > :not(summary) { margin-top: 8px; }
 .choices { display: flex; flex-direction: column; gap: 8px; }
 .choices > p { color: var(--ink-2); font-size: 13px; }
 .choices > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+/* Start step: three pigeons perched on the fine-print rule, purely decorative. */
+.perch { position: relative; height: 30px; margin-bottom: -14px; } /* cancels the step gap so feet land on the rule */
+.perch img { position: absolute; bottom: -2px; width: 30px; height: 30px; }
+.perch img:nth-child(1) { left: 14%; }
+.perch img:nth-child(2) { left: calc(14% + 26px); transform: scaleX(-1); }
+.perch img:nth-child(3) { right: 12%; bottom: -2px; width: 26px; height: 26px; }
 
 /* Respond step */
 .evidence { display: flex; flex-direction: column; gap: 10px; }
@@ -524,7 +532,7 @@ details.more > :not(summary) { margin-top: 8px; }
 }
 .option label:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
 .option label:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-/* Yellow is too pale for a shadow on grey, so a checked card gets a heavier frame instead. */
+/* A checked card gets a pale green fill and a heavier frame. */
 .option input:checked + label { background: var(--checked); box-shadow: inset 0 0 0 1.5px var(--ink), 3px 3px 0 var(--ink); }
 .option input:checked + label:hover { box-shadow: inset 0 0 0 1.5px var(--ink), 4px 4px 0 var(--ink); }
 .option input:focus-visible + label { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -542,7 +550,7 @@ details.more > :not(summary) { margin-top: 8px; }
   font-weight: 600;
   line-height: 1;
 }
-.option input:checked + label .rank { background: var(--signal); }
+.option input:checked + label .rank { background: var(--sheen); color: var(--white); }
 .option-name { min-width: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; line-height: 1.2; }
 .option-head .tag { flex: none; }
 .option-loss { display: grid; flex: none; justify-items: end; margin-left: auto; line-height: 1.2; white-space: nowrap; }

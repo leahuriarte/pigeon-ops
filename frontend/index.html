@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PigeonOps dispatch</title>
+  <link rel="icon" type="image/svg+xml" href="/pigeon.svg">
+  <meta name="theme-color" content="#5f4690">
   <link rel="stylesheet" href="https://js.arcgis.com/5.2/esri/themes/light/main.css">
   <script type="module" src="https://js.arcgis.com/5.2/"></script>
   <link rel="stylesheet" href="/styles.css">
@@ -18,7 +20,7 @@
 <body data-mode="monitoring" data-step="start" data-view="map">
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true"></span>
+      <img class="brand-mark" src="/pigeon.svg" alt="" width="30" height="30">
       <strong>PigeonOps</strong>
       <span class="brand-sub">Los Angeles &amp; Long Beach dispatch</span>
     </div>
@@ -163,6 +165,7 @@
             <button id="start-button" class="btn primary big" type="button" disabled>Start morning</button>
           </div>
           <p id="start-note" class="note"></p>
+          <div class="perch" aria-hidden="true"><img src="/pigeon.svg" alt=""><img src="/pigeon.svg" alt=""><img src="/pigeon.svg" alt=""></div>
           <p class="fine-print">You approve each response.</p>
         </section>
 

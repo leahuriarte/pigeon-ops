@@ -2,26 +2,26 @@
    Colours and fonts come from the :root tokens in styles.css; the fallbacks repeat those values. */
 .sensitivity { margin: 12px 0 0; }
 .sensitivity h3 { margin: 0 0 2px; font-family: var(--font-display, inherit); font-size: 14px; font-weight: 600; }
-.sensitivity .sens-sub { margin: 0 0 6px; color: var(--ink-2, #4a5866); font-size: 12.5px; }
+.sensitivity .sens-sub { margin: 0 0 6px; color: var(--ink-2, #545462); font-size: 12.5px; }
 .sensitivity svg { display: block; width: 100%; max-width: 440px; height: auto; overflow: visible; touch-action: pan-y; }
-.sensitivity svg text { fill: var(--ink-2, #4a5866); font-family: var(--font-mono, inherit); font-size: 10px; paint-order: stroke; stroke: var(--card, #f5f6f6); stroke-width: 3px; stroke-linejoin: round; }
+.sensitivity svg text { fill: var(--ink-2, #545462); font-family: var(--font-mono, inherit); font-size: 10px; paint-order: stroke; stroke: var(--card, #f4f4f6); stroke-width: 3px; stroke-linejoin: round; }
 .sensitivity .sens-band { fill: var(--ok-bg, #dbede2); }
 .sensitivity svg .sens-band-label { fill: var(--ok, #1d7347); font-family: var(--font-display, inherit); font-weight: 600; stroke: var(--ok-bg, #dbede2); }
-.sensitivity .sens-zero { stroke: var(--hair, #c2c9ce); stroke-width: 1; }
-.sensitivity .sens-line { fill: none; stroke: var(--ink, #142231); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.sensitivity .sens-mark { stroke: var(--ink, #142231); stroke-width: 1; stroke-dasharray: 3 3; }
-.sensitivity .sens-dot { fill: var(--ink, #142231); stroke: var(--card, #f5f6f6); stroke-width: 2; }
-.sensitivity .sens-dot.hollow { fill: var(--card, #f5f6f6); stroke: var(--ink, #142231); stroke-width: 1.5; }
-.sensitivity svg .sens-mark-label { fill: var(--ink, #142231); font-family: var(--font-display, inherit); font-weight: 600; }
-.sensitivity .sens-hover line { stroke: var(--selected, #a3176e); stroke-width: 1; }
-.sensitivity .sens-hover circle { fill: var(--selected, #a3176e); stroke: var(--card, #f5f6f6); stroke-width: 2; }
-.sensitivity .sens-readout { margin: 4px 0 0; color: var(--ink-2, #4a5866); font-size: 12.5px; }
+.sensitivity .sens-zero { stroke: var(--hair, #c5c6cd); stroke-width: 1; }
+.sensitivity .sens-line { fill: none; stroke: var(--ink, #1f1e29); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.sensitivity .sens-mark { stroke: var(--ink, #1f1e29); stroke-width: 1; stroke-dasharray: 3 3; }
+.sensitivity .sens-dot { fill: var(--ink, #1f1e29); stroke: var(--card, #f4f4f6); stroke-width: 2; }
+.sensitivity .sens-dot.hollow { fill: var(--card, #f4f4f6); stroke: var(--ink, #1f1e29); stroke-width: 1.5; }
+.sensitivity svg .sens-mark-label { fill: var(--ink, #1f1e29); font-family: var(--font-display, inherit); font-weight: 600; }
+.sensitivity .sens-hover line { stroke: var(--selected, #7b3fc4); stroke-width: 1; }
+.sensitivity .sens-hover circle { fill: var(--selected, #7b3fc4); stroke: var(--card, #f4f4f6); stroke-width: 2; }
+.sensitivity .sens-readout { margin: 4px 0 0; color: var(--ink-2, #545462); font-size: 12.5px; }
 .sensitivity figcaption { margin-top: 6px; font-size: 13px; }
 
 .option-cases { display: grid; margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.4; }
-.option-cases li { display: grid; gap: 1px; padding: 5px 0; border-top: 1px solid var(--hair, #c2c9ce); }
+.option-cases li { display: grid; gap: 1px; padding: 5px 0; border-top: 1px solid var(--hair, #c5c6cd); }
 .option-cases .case { display: flex; align-items: baseline; gap: 6px; font-weight: 600; }
 .option-cases .case::before { content: ""; flex: none; width: 8px; height: 8px; background: var(--ok, #1d7347); }
 .option-cases li.warn .case::before { background: var(--watch, #8a5300); }
 .option-cases li.bad .case::before { background: var(--risk, #b3261e); }
-.option-cases .case small { color: var(--ink-2, #4a5866); font-family: var(--font-mono, inherit); font-size: 11.5px; font-weight: 400; }
+.option-cases .case small { color: var(--ink-2, #545462); font-family: var(--font-mono, inherit); font-size: 11.5px; font-weight: 400; }

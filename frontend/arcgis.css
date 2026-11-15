@@ -2,7 +2,7 @@
    running tally and comparison shown in the outcome step. Tokens are in styles.css. */
 
 :root {
-  --route-current: #24508f;
+  --route-current: #5f4690;
   --route-detour: #c27c0e;
   --overlay: rgb(255 255 255 / 0.96);
 }
@@ -13,7 +13,7 @@
   min-height: 240px;
   overflow: hidden;
   border: var(--frame);
-  background: #eef0f0;
+  background: #ecedef;
 }
 /* Absolute so the map fills the flexed shell without relying on percentage heights. */
 .arcgis-map, #map-fallback {
@@ -49,9 +49,9 @@
 .legend .swatch { width: 18px; height: 0; border-top: 3px solid; }
 .legend .swatch.primary { border-color: var(--route-current); border-top-width: 4px; }
 .legend .swatch.detour { border-top-style: dashed; border-top-width: 4px; border-color: var(--route-detour); }
-.legend .swatch.fleet { border-top-width: 2px; border-color: #8a939b; }
+.legend .swatch.fleet { border-top-width: 2px; border-color: #8b8c96; }
 .legend .swatch.arrow { width: 12px; height: 13px; border: 0; background: var(--ink); clip-path: polygon(50% 0, 100% 100%, 50% 74%, 0 100%); }
-.legend .swatch.stopped { width: 9px; height: 9px; margin: 0 2px; border: 0; background: #7c858c; transform: rotate(45deg); }
+.legend .swatch.stopped { width: 9px; height: 9px; margin: 0 2px; border: 0; background: #7d7e88; transform: rotate(45deg); }
 .legend .swatch.stopped.stuck { background: var(--risk); }
 
 .truck-card {
@@ -107,7 +107,7 @@
 .alt.current { stroke: var(--route-current); }
 .alt.detour { stroke: var(--route-detour); stroke-dasharray: 9 7; }
 .alt.active { opacity: 0.95; }
-.trail { fill: none; stroke: #8a939b; stroke-linecap: round; stroke-linejoin: round; }
+.trail { fill: none; stroke: #8b8c96; stroke-linecap: round; stroke-linejoin: round; }
 .trail.ahead { stroke-width: 2.25; opacity: 0.65; }
 .trail.behind { stroke-width: 1.5; stroke-dasharray: 1 4; opacity: 0.45; }
 .trail.selected { stroke: var(--selected); }
@@ -115,8 +115,8 @@
 .place rect { fill: var(--ink); stroke: #fff; stroke-width: 2; }
 .place circle { fill: #fff; stroke: var(--ink-2); stroke-width: 2.5; }
 .place.incident circle { fill: var(--risk); stroke: #fff; }
-.place text { fill: #2f353a; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
-.truck { --tone: #7c858c; cursor: pointer; }
+.place text { fill: #2e2d38; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.truck { --tone: #7d7e88; cursor: pointer; }
 .truck .arrow, .truck .stop { fill: var(--tone); stroke: #fff; stroke-width: 1.5; }
 .truck .arrow, .truck.moving .stop { display: none; }
 .truck.moving .arrow { display: block; }
@@ -144,7 +144,7 @@
   border: var(--frame);
   border-radius: 3px;
   background: var(--signal);
-  color: var(--ink);
+  color: var(--on-signal);
   box-shadow: 2px 2px 0 var(--ink);
   cursor: pointer;
   transition: transform 80ms, box-shadow 80ms;
@@ -176,7 +176,7 @@
   cursor: pointer;
   appearance: none;
 }
-/* Hard colour stop, not a gradient: yellow up to the playhead, hairline after. */
+/* Hard colour stop, not a gradient: purple up to the playhead, hairline after. */
 .timeline input::-webkit-slider-runnable-track {
   height: 6px;
   background: linear-gradient(to right, var(--signal) var(--p), var(--hair) var(--p));
