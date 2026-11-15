@@ -102,7 +102,7 @@ export function renderResponseComparison(container, scenario, options, probabili
     const fuelTotal = Object.values(fuel).reduce((sum, value) => sum + value, 0);
     const electricShare = fuelTotal ? Math.round(fuel.Electric / fuelTotal * 100) : 0;
     return `<article class="compare-option${option.id === selected ? " selected" : ""}${co2Difference < 0.05 ? " lowest-carbon" : ""}">
-      <div class="compare-option-head"><div><span class="compare-rank">${option.rank === 1 ? "Recommended response" : `Option ${option.rank}`}</span><h3>${esc(option.label)}</h3><p>${esc(route?.name ?? routeId)}</p></div><strong>${money(option.expected_loss)}<small>expected loss</small></strong></div>
+      <div class="compare-option-head"><div><span class="compare-rank">${option.rank === 1 ? "Recommended" : `Option ${option.rank}`}</span><h3>${esc(option.label)}</h3><p>${esc(route?.name ?? routeId)}</p></div><strong>${money(option.expected_loss)}<small>estimated loss</small></strong></div>
       <section class="compare-eco" aria-label="Environmental impact">
         <div class="compare-eco-heading"><span>Tailpipe CO₂ · two loads</span><strong>${number(emissions, 1)}<small>kg</small></strong></div>
         <div class="compare-bar" role="img" aria-label="${number(emissions, 1)} kilograms CO₂; ${number(co2Difference, 1)} more than the lowest CO₂ option"><i style="width:${Math.max(2, emissions / maxCo2 * 100)}%"></i></div>
@@ -110,7 +110,7 @@ export function renderResponseComparison(container, scenario, options, probabili
         <div class="compare-carbon-facts"><span><b>${Math.abs(carbonChange) < 0.05 ? "0" : `${carbonChange > 0 ? "+" : "−"}${number(Math.abs(carbonChange), 1)}`} kg</b> vs current route</span><span><b>${number(option.expected.emissions_kg, 1)} kg</b> in decision model</span></div>
       </section>
       <section class="compare-environment" aria-label="Route environment">
-        <div class="compare-environment-title"><h4>School corridor</h4><strong>${option.schools_within_300m ?? "—"}<small>within 300 m</small></strong></div>
+        <div class="compare-environment-title"><h4>Nearby schools</h4><strong>${option.schools_within_300m ?? "—"}<small>within 300 m</small></strong></div>
         ${schoolCorridor(nearby)}
         <div class="compare-env-stats"><div><span>Within 150 m</span><b>${proximity.close ?? "—"}</b></div><div><span>Nearest school</span><b>${proximity.nearest === null ? "—" : `${number(proximity.nearest)} m`}</b></div><div><span>Added miles</span><b>${miles > 0 ? "+" : miles < 0 ? "−" : ""}${number(Math.abs(miles), 1)} mi</b></div></div>
         <details class="compare-schools-detail"><summary>School names</summary>${schoolList(routeId, schools)}</details>
@@ -124,5 +124,5 @@ export function renderResponseComparison(container, scenario, options, probabili
       <button class="btn ${option.id === selected ? "primary" : ""}" type="button" data-compare-select="${esc(option.id)}">${option.id === selected ? "Selected response" : "Choose this response"}</button>
     </article>`;
   });
-  container.innerHTML = `<div class="compare-intro"><div><span class="compare-intro-kicker">ENVIRONMENT / ROUTE / DRIVER</span><h3>See the tradeoffs at a glance</h3><p>Tailpipe CO₂, fuel miles, school proximity and driver impact for each response.</p></div><p>Tailpipe CO₂ counts diesel miles; electric trucks have no tailpipe exhaust. The recommendation uses its separate CO₂ model.</p></div><div class="compare-grid">${summaries.join("")}</div>`;
+  container.innerHTML = `<p class="compare-intro">Estimated impacts for both loads. Tailpipe CO₂ counts diesel miles; the ranking uses the decision model's CO₂ estimate. School distances come from OpenStreetMap.</p><div class="compare-grid">${summaries.join("")}</div>`;
 }

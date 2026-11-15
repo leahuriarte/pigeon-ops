@@ -12,9 +12,9 @@ export function inspectionSentence(evoi) {
   const wait = evoi.assumptions.launch_and_review_minutes;
   const cost = evoi.inspection_cost;
   if (evoi.recommend_inspection) {
-    return `Saving: ${money(evoi.net_value_of_information)} after the ${money(cost)} check and ${wait} min wait.`;
+    return `Estimated saving: ${money(evoi.net_value_of_information)} after a ${money(cost)} inspection and ${wait} min wait (assumed).`;
   }
-  return `Checking first adds ${money(-evoi.net_value_of_information)} in cost and delay.`;
+  return `Inspection adds an estimated ${money(-evoi.net_value_of_information)} after its ${money(cost)} cost and ${wait} min wait (assumed).`;
 }
 
 // Use the engine's actual conditional decisions, including the inspection wait.
@@ -30,7 +30,10 @@ export function inspectionChoices(evoi, words) {
 export function responseExplanation(items) {
   const [best, next] = items;
   if (!best || !next) return "";
-  return `${best.label}: ${money(best.expected_loss)} expected loss, ${money(next.expected_loss - best.expected_loss)} less than ${next.label}.`;
+  const difference = next.expected_loss - best.expected_loss;
+  return difference < 0.5
+    ? "The top two responses have the same estimated loss."
+    : `Estimated loss is ${money(difference)} lower than the next option.`;
 }
 
 // How accurate the inspection has to be, what the page assumes, and how automated CV alone compares.
@@ -42,7 +45,7 @@ export function accuracyNote(evoi) {
     : breakEven >= 0.995
       ? "Break-even accuracy: over 99%."
       : `Break-even accuracy: ${pct(breakEven)}.`;
-  const accuracy = `Accuracy after human review: ${pct(a.inspection_accuracy)}.`;
+  const accuracy = `Assumed accuracy after human review: ${pct(a.inspection_accuracy)}.`;
   const cv = evoi.cv_only;
   if (!cv) return `${need} ${accuracy}`;
   const alone = cv.recommend_inspection

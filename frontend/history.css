@@ -1,10 +1,10 @@
 /* Past decisions card (incident step, under the web check), history lines on the response cards and
    the shift report's estimate and result tables, all from frontend/history.js.
    Colours and fonts come from the :root tokens in styles.css; .web-head comes from triage.css. */
-.history-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: var(--frame); background: var(--white); }
+.history-card { display: flex; flex-direction: column; gap: 8px; padding: 16px 0 0; border-top: var(--rule); }
 .history-card[hidden] { display: none; }
 .history-card .web-head h2 .count { font-size: 12px; }
-.history-rate { font-size: 13.5px; }
+.history-rate { font-size: 13px; }
 .history-table { font-size: 12.5px; }
 .history-table caption { padding-bottom: 4px; color: var(--ink-2); font-size: 12px; text-align: left; }
 .history-table th, .history-table td { padding: 5px 5px; }

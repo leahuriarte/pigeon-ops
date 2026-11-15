@@ -51,12 +51,10 @@ const activity = {
   idle: ["Done", "planned", false],
 };
 const tag = ([label, tone]) => `<span class="status ${esc(tone)}">${esc(label)}</span>`;
-const activityFor = (state) => state.segment.kind === "blocked" && check().type === "congestion"
-  ? ["In queue", "watch", false] : activity[state.segment.kind] ?? [state.segment.kind, "planned", false];
+const activityFor = (state) => activity[state.segment.kind] ?? [state.segment.kind, "planned", false];
 
 let scenario;
-// Wording for the kind of drone check the incident calls for (disruption.check): a crash check asks
-// whether the road is blocked, a traffic check whether it is jammed, a road damage check whether it is impassable.
+// The dispatcher demo uses a crash report with open or blocked road outcomes.
 const check = () => ({ type: "crash", label: "Drone check", bad: "blocked", good: "open", ...scenario?.disruption?.check });
 const roadWord = (state) => (state === "blocked" ? check().bad : check().good);
 const findingText = (observation) => ({ blocked: `road ${check().bad}`, clear: `road ${check().good}`, inconclusive: "inconclusive" })[observation];
@@ -627,7 +625,7 @@ function renderTallyFrame() {
   if (!current) return;
   const actions = scenario.decision_model.actions;
   const normal = scenario.scenario_type === "normal";
-  $("#tally-title").textContent = normal ? "Planned trips" : "Trip totals";
+  $("#tally-title").textContent = normal ? "Planned trips" : "Simulated totals";
   $("#tally-alternatives").hidden = normal;
   const label = actions.find((a) => a.id === plan.action).label;
   const road = scenario.scenario_type === "disruption" ? `, ${incidentPlace()}: ${roadWord(plan.road)}` : "";
@@ -1010,25 +1008,22 @@ function affectedShipment() {
 function renderDecision() {
   const d = scenario.disruption;
   const affected = affectedShipment();
-  $("#situation-eyebrow").textContent = scenario.scenario_type === "disruption" ? `Incident · ${check().label.toLowerCase()}` : "All clear";
+  $("#situation-eyebrow").textContent = scenario.scenario_type === "disruption" ? "Unconfirmed" : "All clear";
   $("#risk-label").textContent = riskText();
   $$("[data-observation]").forEach((button) => { button.textContent = { blocked: `Road ${check().bad}`, clear: `Road ${check().good}`, inconclusive: "Inconclusive" }[button.dataset.observation]; });
   $("#affected-label").textContent = scenario.scenario_type === "disruption" ? "Affected shipment" : "Tightest delivery";
   const when = scenario.scenario_type === "disruption" ? "Reported" : "As of";
-  $("#reported-at").textContent = d.reported_at ? ` · ${when} ${reportClock(d.reported_at)}` : "";
+  $("#reported-at").textContent = d.reported_at ? `${when} ${reportClock(d.reported_at)}` : "";
   $("#disruption-title").textContent = d.title;
-  $("#disruption-description").textContent = d.description.replace("the assumed 30 min delay", "a 30 min delay");
-  $("#incident-place").textContent = d.evidence_summary ?? "No incident reports";
+  $("#disruption-description").textContent = d.description;
   $("#inspection-limits").textContent = d.inspection_limits ?? "";
   $("#inspection-limits").hidden = !$("#inspection-limits").textContent;
-  $("#response-limits").textContent = check().type === "environment" ? d.inspection_limits ?? "" : "";
-  $("#response-limits").hidden = !$("#response-limits").textContent;
-  $("#incident-stop-label").textContent = check().type === "congestion" ? "In queue" : check().type === "environment" ? "At water hazard" : "At closure";
-  $("#road-case-label").textContent = `${incidentPlace()} road state`;
-  $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item.replace("synthetic planned arrival", "planned arrival").replace(" (assumed)", "").replace("Assumed visual-check accuracy", "Visual-check accuracy"))}</li>`).join("");
+  $("#incident-stop-label").textContent = "At closure";
+  $("#road-case-label").textContent = "Simulated road state";
+  $("#constraints").innerHTML = d.constraints.map((item) => `<li>${esc(item)}</li>`).join("");
   $("#risk-value").innerHTML = d.web_evidence
     ? `${pct(d.prior_blocked_probability)}<small>was ${pct(d.web_evidence.prior_before)} before the web check</small>`
-    : `${pct(d.prior_blocked_probability)}`;
+    : `${pct(d.prior_blocked_probability)}<small>assumed</small>`;
   $("#affected").innerHTML = `${esc(affected.id)}<small>${esc(affected.cargo)}, ${affected.slack_min} min slack</small>`;
   $("#deadline").innerHTML = reportShift()
     ? `${reportClock(d.decision_deadline)}`
@@ -1100,11 +1095,9 @@ function renderIndicators(indicators) {
   const compare = scenario.scenario_type !== "normal" && baseline;
   const missing = indicators.filter((item) => item.value === null || item.value === undefined);
   const pending = missing.map((item) => ` ${shortLabels[item.id] ?? indicatorLabel(item)}: not yet calculated.`).join("");
-  $("#indicators-note").textContent = scenario.scenario_type === "normal"
-    ? `Live delay comes from completed check-ins; live CO₂ follows loaded trip progress.${pending}`
-    : `${activeScenario === "congestion" ? " Cargo released earlier than baseline." : ""}${pending}`;
+  $("#indicators-note").textContent = `Estimates for the whole plan.${pending}`;
   $("#comparison-caption").textContent = scenario.scenario_type === "normal"
-    ? "Normal morning · live progress" : `Changed scenario · ${scenario.name}`;
+    ? "Shift estimates" : "Estimated impact · before inspection";
   $("#comparison-base-head").textContent = scenario.scenario_type === "normal" ? "At end" : "Normal";
   $("#comparison-current-head").textContent = scenario.scenario_type === "normal" ? "So far" : "Current";
   $("#comparison-change-head").textContent = scenario.scenario_type === "normal" ? "Progress" : "Change";
@@ -1158,7 +1151,7 @@ async function openResponseComparison() {
 function renderRankings(items, observation = null, blocked = scenario.disruption.prior_blocked_probability) {
   comparisonOptions = items;
   comparisonProbability = blocked;
-  $("#ranking-state").textContent = `${observation ? "After inspection" : "Before inspection"}`;
+  $("#ranking-state").textContent = `${observation ? "After inspection" : "Without inspection"} · estimated costs`;
   $("#response-why").textContent = responseExplanation(items);
   $("#rankings").innerHTML = items.map((item) => {
     const e = item.expected;
@@ -1168,9 +1161,8 @@ function renderRankings(items, observation = null, blocked = scenario.disruption
       <label for="${id}">
         <span class="option-head">
           <span class="rank">${item.rank}</span>
-          <b class="option-name">${esc(item.label)}</b>
-          ${item.rank === 1 ? '<span class="tag pick">Recommended</span>' : ""}
-          <span class="option-loss"><b>${money(item.expected_loss)}</b><small>expected loss</small></span>
+          <b class="option-name">${esc(item.label)}${item.rank === 1 ? "<small>Recommended</small>" : ""}</b>
+          <span class="option-loss"><b>${money(item.expected_loss)}</b><small>estimated loss</small></span>
         </span>
         <span class="option-summary">${esc(item.summary)}</span>
         ${outcomeCases(item, blocked, scenario.disruption.affected_shipment, check())}
@@ -1199,32 +1191,32 @@ function actionLabel(id) {
 function renderConfirm() {
   const override = Boolean(modelPick) && plan.action !== modelPick.id;
   $("#override-reason-wrap").hidden = !override;
-  $("#confirm-button").textContent = override ? "Confirm other response" : "Confirm response";
+  $("#confirm-button").textContent = "Confirm response";
   $("#confirm-button").disabled = override && !$("#override-reason").value.trim();
 }
 
 function renderEvoi(analysis) {
   const e = analysis.evoi;
   const best = analysis.before[0];
-  $("#recommendation").textContent = inspectionSentence(e);
+  $("#recommendation").textContent = `Assumed inspection cost: ${money(e.inspection_cost)}; wait: ${e.assumptions.launch_and_review_minutes} min.`;
   $("#inspection-choices").textContent = inspectionChoices(e, check());
   $("#recommendation-short").innerHTML = e.recommend_inspection
-    ? "Check first"
-    : `Skip the check<small>Recommended: ${esc(best.label)}</small>`;
+    ? `Save an estimated ${money(e.net_value_of_information)}`
+    : `Inspection adds ${money(-e.net_value_of_information)}<small>Recommended: ${esc(best.label)}</small>`;
   $("#act-loss").textContent = money(e.best_act_now_loss);
   $("#evidence-loss").textContent = money(e.expected_loss_after_inspection);
   $("#inspection-cost").textContent = money(e.inspection_cost);
   $("#net-value").textContent = money(e.net_value_of_information);
   $("#inspect-button").classList.toggle("primary", e.recommend_inspection);
   $("#skip-inspection").classList.toggle("primary", !e.recommend_inspection);
-  $("#inspect-button").textContent = "Run drone check";
+  $("#inspect-button").textContent = "Review drone footage";
   $("#cv-only").textContent = accuracyNote(e);
   renderSensitivity($("#sensitivity"), analysis, check());
   const a = e.assumptions;
   $("#assumptions").innerHTML = [
-    ["Accuracy", pct(a.inspection_accuracy)],
-    ["Check time", `${a.launch_and_review_minutes} min`],
-    [`Chance of a “${esc(check().bad)}” result`, pct(a.signal_blocked_probability)],
+    ["Assumed review accuracy", pct(a.inspection_accuracy)],
+    ["Assumed check time", `${a.launch_and_review_minutes} min`],
+    ["Estimated chance of a blocked result", pct(a.signal_blocked_probability)],
   ].map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("");
   // LLM-written brief from the engine's numbers; the normal morning has no incident step.
   if (activeScenario === "normal") clearBrief($("#brief-incident"));
@@ -1310,8 +1302,8 @@ function updateFleetWatch(states) {
   if (step === "monitor") {
     watched.sort((a, b) => b.chance - a.chance);
     $("#monitor-alerts").innerHTML = watched.length
-      ? `<h2>Schedule watch</h2><ul>${watched.slice(0, 3).map((item) => `<li><button class="link" type="button" data-truck="${esc(item.truck)}">${esc(shortTruck(item.truck))}</button> · ${esc(item.shipment)}: ${item.chance}% chance of arriving after the appointment starts (${item.buffer >= 0 ? `${Math.round(item.buffer)} min buffer` : `${Math.round(-item.buffer)} min past start`}).</li>`).join("")}</ul>`
-      : '<h2>Schedule watch</h2><p>No modeled trip is near its appointment start.</p>';
+      ? `<h2>Late-arrival risk <small>estimated</small></h2><ul>${watched.slice(0, 3).map((item) => `<li><button class="link" type="button" data-truck="${esc(item.truck)}">${esc(shortTruck(item.truck))}</button> · ${esc(item.shipment)}: ${item.chance}% (${item.buffer >= 0 ? `${Math.round(item.buffer)} min buffer` : `${Math.round(-item.buffer)} min past start`})</li>`).join("")}</ul>`
+      : '<h2>Late-arrival risk</h2><p>No arrivals at risk in the current estimate.</p>';
   }
 }
 
@@ -1335,7 +1327,7 @@ function renderDefinitions() {
   const definitions = [
     ["Needs attention", "A shipment at risk, under watch, or without a truck."],
     ["Slack", "Time between arrival and the start of the appointment window."],
-    ["Road risk", `Assumed chance the road at ${incidentPlace()} is ${check().bad}. Updated with Bayes’ rule after inspection. A slowdown adds time; a closure requires turning back and detouring.`],
+    ["Road risk", `Assumed chance the road at ${incidentPlace()} is blocked, updated after inspection. A closure requires a return trip and detour.`],
     ["Missed appointment", "Arrival after the appointment window closes. A constraint breach can also mean another hard rule was broken."],
     ["Expected loss", `Average cost across the possible road conditions. Assumed rates: delay ${money(m.lateness_cost_per_minute)}/min, CO₂ $${m.emissions_cost_per_kg.toFixed(2)}/kg, missed appointment ${money(m.hard_constraint_penalty)}, plus driving costs.`],
     ["Inspection value", "Expected loss without inspection minus expected loss with inspection, including its cost and wait. A positive value favors inspection."],
@@ -1360,7 +1352,7 @@ function resetObservation() {
   $("#override-reason").value = "";
   clearBrief($("#brief-respond"));
   resetAsk();
-  $("#posterior").textContent = `No inspection · ${incidentPlace()}. ${riskText()}: ${pct(scenario.disruption.prior_blocked_probability)}.`;
+  $("#posterior").textContent = `No inspection. Estimated blockage risk: ${pct(scenario.disruption.prior_blocked_probability)}.`;
 }
 
 // Opens the footage dialog, or falls back to simulated results when there is no library.
@@ -1392,9 +1384,9 @@ async function showObservation(analysis, summary = null) {
   currentTime = Math.max(currentTime, span.start + scenario.decision_model.drone.launch_and_review_minutes);
   logDecision(`${check().label} at ${incidentPlace()}: ${finding}. ${riskText()} ${prior} → ${posterior}. Best response: ${best}.`);
   $("#posterior").textContent = summary ?? {
-    blocked: `Finding: road ${bad}. ${riskText()}: ${posterior} (was ${prior}).`,
-    clear: `Finding: road ${check().good}. ${riskText()}: ${posterior} (was ${prior}).`,
-    inconclusive: `Inconclusive. ${riskText()}: ${prior}, unchanged.`,
+    blocked: `Simulated finding: road ${bad}. Estimated blockage risk: ${posterior} (was ${prior}).`,
+    clear: `Simulated finding: road ${check().good}. Estimated blockage risk: ${posterior} (was ${prior}).`,
+    inconclusive: `Simulated finding: inconclusive. Estimated blockage risk remains ${prior}.`,
   }[observation];
   $("#risk-value").innerHTML = `${posterior}<small>${posterior === prior ? "unchanged" : `was ${prior}`}</small>`;
   $("#recommendation-short").innerHTML = `${esc(finding)}<small>Recommended: ${esc(best)}</small>`;
@@ -1466,7 +1458,6 @@ async function loadScenario(id, { keepTime = false } = {}) {
 // ---------------------------------------------------------------------------
 const reports = [
   { id: "disruption", after: 2, label: "Crash" }, // Minutes after the start of the morning.
-  { id: "flood", after: 8, label: "Water" },
 ];
 const steps = ["start", "incident", "respond", "outcome"]; // "monitor" is outside the stepper.
 let mode = "monitoring";
@@ -1487,7 +1478,7 @@ function renderMode() {
   const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
   const deliveries = (n) => `${n} ${n === 1 ? "delivery" : "deliveries"}`;
   const [text, tone] = mode === "report" ? ["Shift complete", "neutral"]
-    : mode === "incident" ? [atRisk ? `Incident · ${deliveries(atRisk)} at risk` : "Incident · arrival buffer available", atRisk ? "risk" : "watch"]
+    : mode === "incident" ? [atRisk ? `${deliveries(atRisk)} at risk` : "Crash reported", atRisk ? "risk" : "watch"]
     : atRisk ? [`${deliveries(atRisk)} at risk`, "watch"]
     : unassigned ? [`Deliveries on track · ${unassigned} load${unassigned === 1 ? "" : "s"} without a truck`, "watch"] : ["All deliveries on track", "ok"];
   $("#ops-status").textContent = text;
@@ -1559,7 +1550,7 @@ function renderMonitor() {
   $("#monitor-feasible").innerHTML = feasible ? `${whole(feasible.value)} of ${whole(feasible.of)}` : "—";
   const totalCo2 = a.indicators.find((item) => item.id === "co2_kg");
   const schools = a.indicators.find((item) => item.id === "community_exposure");
-  $("#monitor-environment").textContent = `At end: ${totalCo2?.value == null ? "CO₂ unavailable" : `${totalCo2.value.toFixed(1)} kg CO₂`}; ${schools?.value == null ? "school proximity unavailable" : `${whole(schools.value)} schools within 300 m of planned routes`}. Live CO₂ follows assigned loads.`;
+  $("#monitor-environment").textContent = `Planned routes: ${totalCo2?.value == null ? "CO₂ unavailable" : `estimated ${totalCo2.value.toFixed(1)} kg CO₂`}; ${schools?.value == null ? "school data unavailable" : `${whole(schools.value)} schools within 300 m`}.`;
   const unassigned = scenario.shipments.filter((item) => item.truck === "Unassigned").length;
   $("#monitor-note").textContent = unassigned ? `${unassigned} load${unassigned === 1 ? " needs" : "s need"} a truck.` : "";
   fleetWatchKey = "";
@@ -1692,9 +1683,8 @@ function renderReport() {
   $("#outcome-sub").textContent = `${day} · ${clockLabel(span.start)} to ${clockLabel(currentTime)} · ${count} incident report${count === 1 ? "" : "s"}.`;
 
   const plans = incidentPlans.filter(Boolean);
-  const names = plans.map((p) => `${p.label} (${p.title}, ${clockLabel(p.at)})`).join(" and ");
   $("#report-head").innerHTML = `<th>Indicator</th><th class="num">Usual</th>${plans.map((p) => `<th class="num">${esc(p.label)}<span class="detail">${clockLabel(p.at)}</span></th>`).join("")}`;
-  $("#report-indicators-note").textContent = `Usual is the planned morning with no incident. ${names ? `The ${names} column${plans.length === 1 ? " estimates" : "s each estimate"}` : "Each report column estimates"} the whole plan under that report's recommended response, before inspection. Each is worked out on its own from ${clockLabel(span.start)}, as if that report were the only incident${plans.length > 1 ? `, so the ${plans.at(-1).label} column does not include the effects of the ${plans[0].label.toLowerCase()} report and the columns do not add up` : ""}. The small figure under each value is the change from usual.`;
+  $("#report-indicators-note").textContent = "Whole-plan estimates before inspection: the recommended crash response vs a shift without an incident. Small figures show the change.";
   $("#report-indicators").innerHTML = (baseline ?? plans[0]?.indicators ?? []).map((base) => {
     const items = plans.map((p) => p.indicators.find((item) => item.id === base.id));
     const cells = items.map((item) => {
@@ -1823,13 +1813,11 @@ function bindEvents() {
 
 window.addEventListener("inspection-reviewed", ({ detail }) => {
   if (detail.review.scenario !== activeScenario) return;
-  const cv = detail.review.cv_suggestion;
   const choice = detail.review.observation;
-  const agreement = !cv ? "" : cv === choice ? " Matches video analysis." : ` Video analysis suggested ${findingText(cv)}.`;
   const before = pct(detail.analysis.prior_blocked_probability);
   const after = pct(detail.analysis.posterior_blocked_probability);
   const change = before === after ? "unchanged" : `was ${before}`;
-  const summary = `Reviewed: ${findingText(choice)}. ${incidentPlace()}. ${riskText()}: ${after} (${change}).${agreement}`;
+  const summary = `Drone review: ${findingText(choice)}. Estimated blockage risk: ${after} (${change}).`;
   $("#selected-evidence").hidden = false;
   $("#selected-evidence-image").src = detail.caseItem.annotated_image;
   $("#selected-evidence-title").textContent = detail.caseItem.title;

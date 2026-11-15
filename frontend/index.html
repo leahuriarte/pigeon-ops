@@ -22,11 +22,11 @@
     <div class="brand">
       <img class="brand-mark" src="/pigeon.svg" alt="" width="30" height="30">
       <strong>PigeonOps</strong>
-      <span class="brand-sub">Los Angeles &amp; Long Beach dispatch</span>
+      <span class="brand-sub">LA / Long Beach</span>
     </div>
     <div class="topbar-right">
       <span id="ops-status" class="ops-status ok" role="status">Loading…</span>
-      <span class="sim-tag" title="Fictional shipments and incidents. Assumed rates. Estimated results.">Simulation</span>
+      <span class="sim-tag" title="Synthetic shipments and incidents; assumed rates and estimated results.">Simulation</span>
       <button id="restart" class="btn small" type="button">Restart morning</button>
     </div>
   </header>
@@ -43,14 +43,14 @@
           </table>
         </div>
         <p id="indicators-note" class="stats-note"></p>
-        <details class="more"><summary>Other plan indicators</summary><ul id="indicators" class="stats" aria-label="Other plan indicators"></ul></details>
+        <details class="more"><summary>More metrics</summary><ul id="indicators" class="stats" aria-label="Other plan indicators"></ul></details>
       </div>
 
       <div class="views" role="tablist" aria-label="Views">
         <button class="view-tab" type="button" role="tab" data-view="map" aria-selected="true" aria-controls="view-map">Map</button>
         <button class="view-tab" type="button" role="tab" data-view="shipments" aria-selected="false" aria-controls="view-shipments">Shipments <span id="shipment-count" class="count"></span></button>
         <button class="view-tab" type="button" role="tab" data-view="trucks" aria-selected="false" aria-controls="view-trucks">Trucks <span id="fleet-count" class="count"></span></button>
-        <button class="view-tab" type="button" role="tab" data-view="method" aria-selected="false" aria-controls="view-method">Data and method</button>
+        <button class="view-tab" type="button" role="tab" data-view="method" aria-selected="false" aria-controls="view-method">Sources &amp; assumptions</button>
       </div>
 
       <div id="view-map" class="view view-map" role="tabpanel" aria-label="Map">
@@ -126,7 +126,7 @@
             <tbody id="fleet-list"></tbody>
           </table>
         </div>
-        <p class="note">Schedule risk shows the chance of arriving after the appointment starts. A detour is a contingency until you choose it.</p>
+        <p class="note">Estimated risk of arriving after the appointment starts.</p>
       </div>
 
       <div id="view-method" class="view view-method" role="tabpanel" aria-label="Data and method" hidden>
@@ -142,7 +142,7 @@
               <tbody id="provenance"></tbody>
             </table>
           </div>
-          <p class="note">Fictional dispatch data. Stock drone footage from other locations. Sources and assumptions: DATA.md.</p>
+          <p class="note">Synthetic dispatch data and stock drone footage. Full sources: DATA.md.</p>
           <p id="conditions" class="note"></p>
         </section>
       </div>
@@ -160,51 +160,50 @@
       <div class="panel-body">
         <section class="step step-start" data-step="start" aria-labelledby="start-title">
           <h1 id="start-title">Morning shift</h1>
-          <p class="lede">The fleet starts on its planned routes. Incident reports arrive as the morning plays; you decide each response.</p>
+          <p class="lede">A crash report interrupts the shift. Check the road, choose a response, and see the result.</p>
           <div class="actions">
             <button id="start-button" class="btn primary big" type="button" disabled>Start morning</button>
           </div>
           <p id="start-note" class="note"></p>
           <div class="perch" aria-hidden="true"><img src="/pigeon.svg" alt=""><img src="/pigeon.svg" alt=""><img src="/pigeon.svg" alt=""></div>
-          <p class="fine-print">You approve each response.</p>
+          <p class="fine-print">Synthetic scenario. All recommendations need your approval.</p>
         </section>
 
         <section class="step step-monitor" data-step="monitor" aria-labelledby="monitor-title" hidden>
-          <p class="tag-line"><span class="tag ok">No incident</span><span>Regular morning</span></p>
-          <h1 id="monitor-title">Fleet and environment</h1>
+          <p class="tag-line"><span class="tag ok">No incident</span></p>
+          <h1 id="monitor-title">Fleet status</h1>
           <dl class="facts">
-            <div><dt>Trucks moving now</dt><dd id="monitor-moving">—</dd></div>
-            <div><dt>CO₂ estimate so far</dt><dd id="monitor-co2">—</dd></div>
-            <div><dt>Appointments within reach</dt><dd id="monitor-feasible">—</dd></div>
+            <div><dt>Moving</dt><dd id="monitor-moving">—</dd></div>
+            <div><dt>CO₂ so far (est.)</dt><dd id="monitor-co2">—</dd></div>
+            <div><dt>Feasible arrivals (est.)</dt><dd id="monitor-feasible">—</dd></div>
           </dl>
           <p id="monitor-environment" class="note"></p>
           <div id="monitor-alerts" class="monitor-alerts" aria-live="polite"></div>
           <p id="monitor-note" class="note"></p>
           <div class="actions">
-            <button id="monitor-skip" class="btn" type="button">Skip to next report</button>
+            <button id="monitor-skip" class="btn" type="button">Skip to crash report</button>
           </div>
         </section>
 
         <section class="step step-incident" data-step="incident" aria-labelledby="disruption-title" hidden>
           <p class="tag-line"><span id="situation-eyebrow" class="tag risk">Incident</span><span id="reported-at"></span></p>
           <h1 id="disruption-title">Loading…</h1>
-          <p id="incident-place" class="subhead"></p>
           <p id="disruption-description" class="lede"></p>
           <dl class="facts">
             <div><dt id="risk-label">Chance CA-47 is blocked</dt><dd id="risk-value">—</dd></div>
             <div><dt id="affected-label">Shipment at risk</dt><dd id="affected">—</dd></div>
             <div><dt>Decide by</dt><dd id="deadline">—</dd></div>
           </dl>
-          <details class="more"><summary>Constraints</summary><ul id="constraints" class="constraints"></ul></details>
-          <section id="web-triage" class="web-triage" aria-live="polite" hidden></section>
-          <section id="history-card" class="history-card" aria-label="Past decisions" hidden></section>
-
           <div class="verdict">
-            <h2 id="inspection-title">Check by drone?</h2>
+            <h2 id="inspection-title">Drone inspection</h2>
             <p id="recommendation-short" class="verdict-answer">—</p>
             <p id="recommendation" class="verdict-why">Calculating…</p>
-            <p id="inspection-choices" class="decision-context"></p>
-            <details class="more"><summary>Calculation</summary>
+            <div class="actions">
+              <button id="inspect-button" class="btn primary" type="button">Review drone footage</button>
+              <button id="skip-inspection" class="btn" type="button">Choose response without inspection</button>
+            </div>
+            <details class="more"><summary>Costs &amp; assumptions</summary>
+              <p id="inspection-choices" class="decision-context"></p>
               <dl class="ledger">
                 <div><dt>Expected loss: act now</dt><dd id="act-loss">—</dd></div>
                 <div><dt>Expected loss: check first</dt><dd id="evidence-loss">—</dd></div>
@@ -220,12 +219,11 @@
             </details>
           </div>
 
-          <div class="actions">
-            <button id="inspect-button" class="btn primary" type="button">Run drone check</button>
-            <button id="skip-inspection" class="btn" type="button">Skip inspection</button>
-          </div>
+          <details class="more"><summary>Shipment constraints</summary><ul id="constraints" class="constraints"></ul></details>
+          <section id="web-triage" class="web-triage" aria-live="polite" hidden></section>
+          <section id="history-card" class="history-card" aria-label="Past decisions" hidden></section>
           <div id="observation-buttons" class="choices" hidden>
-            <p>No matching footage. Choose a road finding:</p>
+            <p>Footage unavailable. Simulate an observation:</p>
             <div>
               <button class="choice" type="button" data-observation="blocked">Road blocked</button>
               <button class="choice" type="button" data-observation="clear">Road clear</button>
@@ -245,25 +243,24 @@
             <button id="reinspect-button" class="link" type="button">Review footage</button>
           </div>
           <h1 id="options-title">Choose a response</h1>
-          <p id="response-limits" class="note"></p>
-          <p id="ranking-state" class="subhead">Lowest expected loss first.</p>
+          <p id="ranking-state" class="subhead"></p>
           <p id="response-why" class="decision-context"></p>
-          <button id="compare-responses" class="btn compare-open" type="button">Compare all responses</button>
+          <button id="compare-responses" class="btn compare-open" type="button">Compare impacts</button>
           <ol id="rankings" class="options"></ol>
-          <label id="override-reason-wrap" class="override-reason" hidden>Reason for choosing another response
+          <label id="override-reason-wrap" class="override-reason" hidden>Reason for override
             <textarea id="override-reason" rows="2" maxlength="200"></textarea>
           </label>
           <div class="actions">
             <button id="confirm-button" class="btn primary" type="button">Confirm</button>
           </div>
-          <details class="more"><summary>Expected loss</summary><p>Probability-weighted cost of driving, delay, CO₂ and missed appointments for both loads.</p></details>
+          <details class="more"><summary>How responses are ranked</summary><p>Estimated cost of driving, delay, CO₂ and missed appointments for both loads, weighted by the chance of a blockage.</p></details>
         </section>
 
         <section class="step step-outcome" data-step="outcome" aria-labelledby="outcome-title" hidden>
           <h1 id="outcome-title">Outcome</h1>
           <p id="outcome-sub" class="subhead"></p>
           <div class="road-case only-disruption">
-            <span id="road-case-label">Road state</span>
+            <span id="road-case-label">Simulated road state</span>
             <fieldset class="segmented" style="--n:2">
               <legend class="visually-hidden">Incident road state</legend>
               <input type="radio" name="road" id="road-open" value="open"><label for="road-open">open</label>
@@ -321,7 +318,7 @@
             <button class="btn small" type="button" data-question="Which shipments are late if the road is blocked?">Which loads would be late?</button>
           </div>
           <div id="copilot-answer" class="copilot-answer" aria-live="polite" hidden></div>
-          <p class="fine-print">Questions go to an external AI service. Check its answers against the calculation.</p>
+          <p class="fine-print">Uses an external AI service. Verify figures in the calculation.</p>
         </details>
       </div>
     </aside>
@@ -339,7 +336,6 @@
     <header class="inspection-header">
       <div>
         <h2 id="inspection-dialog-heading">Review footage</h2>
-        <p class="inspection-scope">Drone check</p>
       </div>
       <button id="inspection-close" class="btn small" type="button">Close</button>
     </header>
@@ -352,7 +348,7 @@
       </div>
       <div class="inspection-side">
         <div id="inspection-cv" class="inspection-cv">
-          <span class="tag">Video analysis</span>
+          <span class="tag">CV suggestion</span>
           <h3 id="inspection-cv-signal"></h3>
         </div>
         <div id="inspection-llm" class="inspection-llm" aria-live="polite" hidden></div>
