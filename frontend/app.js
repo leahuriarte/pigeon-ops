@@ -303,7 +303,9 @@ function stitchPlayback(usual, response, at, previous = null) {
   const tracks = response.tracks.map((track) => {
     const before = usualTracks.get(track.id);
     if (!before) return track;
-    if (previousTracks.get(track.id) === JSON.stringify(track.segments)) {
+    // A truck this report does not touch, or one it plans exactly as before, keeps the track already on the map.
+    const untouched = response.focus_trucks && !response.focus_trucks.includes(track.id);
+    if (untouched || previousTracks.get(track.id) === JSON.stringify(track.segments)) {
       kept.add(track.id);
       return before;
     }
@@ -1389,7 +1391,7 @@ async function showObservation(analysis, summary = null) {
   const finding = findingText(observation);
   const bad = check().bad;
   // The check took time: move the clock to when its result came in.
-  currentTime = Math.max(currentTime, span.start + scenario.decision_model.drone.launch_and_review_minutes);
+  currentTime = Math.max(currentTime, incidentAt() + scenario.decision_model.drone.launch_and_review_minutes);
   logDecision(`${check().label} at ${incidentPlace()}: ${finding}. ${riskText()} ${prior} → ${posterior}. Best response: ${best}.`);
   $("#posterior").textContent = summary ?? {
     blocked: `Finding: road ${bad}. ${riskText()}: ${posterior} (was ${prior}).`,
@@ -1466,7 +1468,7 @@ async function loadScenario(id, { keepTime = false } = {}) {
 // ---------------------------------------------------------------------------
 const reports = [
   { id: "disruption", after: 2, label: "Crash" }, // Minutes after the start of the morning.
-  { id: "flood", after: 8, label: "Water" },
+  { id: "flood", after: 68, label: "Water" }, // 10:20, after SYN-SHP-1042 is delivered.
 ];
 const steps = ["start", "incident", "respond", "outcome"]; // "monitor" is outside the stepper.
 let mode = "monitoring";

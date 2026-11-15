@@ -38,8 +38,8 @@ class RouteOptimizerTests(unittest.TestCase):
     def test_search_covers_all_assigned_shipments_and_preserves_dispatch_control(self):
         plan = optimize_routes(self.scenario, catalog=self.catalog, traffic=self.traffic)
         rows = [row for truck in plan["trucks"] for row in truck["shipments"]]
-        self.assertEqual(12, len(rows))
-        self.assertEqual(9, len(plan["trucks"]))
+        self.assertEqual(13, len(rows))
+        self.assertEqual(10, len(plan["trucks"]))
         self.assertTrue(plan["advisory"])
         self.assertFalse(plan["truck_validated"])
         self.assertEqual({"estimated"}, {row["basis"] for row in rows})

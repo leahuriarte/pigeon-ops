@@ -22,7 +22,7 @@ from backend.outcomes import INSPECTED, RouteModel
 ROOT = Path(__file__).resolve().parents[1]
 ROAD_GEOMETRY = ROOT / "config" / "road_geometry.json"
 
-FOCUS_TRUCK = "SYN-TRK-07"
+FOCUS_TRUCK = "SYN-TRK-07"  # The affected load's truck in most variants; focus_truck() reads it from the scenario.
 SWAP_TRUCK = "SYN-TRK-12"
 TRANSFER_SITE = "warehouse-6"
 # Anaheim St waypoints that keep the truck swap off the CA-47 connector.
@@ -100,6 +100,7 @@ class Planner:
         self.start = clock(scenario["generated_at"][11:16])
         self.places = {loc["id"]: loc for loc in scenario["locations"]}
         self.requested = {}
+        self.focus = focus_truck(scenario)
 
     # Geometry -----------------------------------------------------------------
     def point(self, place):
@@ -231,6 +232,9 @@ class Planner:
         dest = affected["destination"]
         track = self.truck_start(truck, shipments)
         self.hold_for_inspection(track, affected)
+        if track["place"] == affected["origin"]:
+            # Still at the terminal: load and leave at the planned departure the outcome model starts from.
+            self.pickup(track, affected, depart_at=clock(affected["eta"]) - RouteModel(self.scenario).planned.driver_min)
 
         if action["plan"].get("route"):
             self.follow_route_trip(track, affected, action["plan"]["route"], target)
@@ -253,7 +257,7 @@ class Planner:
                    via=[DETOUR_VIA[0]], kind="detour")
         self.stop(track, meet, "waiting", f"Waiting for {SWAP_TRUCK} at {self.name(TRANSFER_SITE)}", affected["id"])
         self.drive(helper, TRANSFER_SITE, f"Heading to {self.name(TRANSFER_SITE)} to take {affected['id']}", affected["id"], kind="empty")
-        self.stop(helper, meet, "waiting", f"Waiting for {FOCUS_TRUCK} at {self.name(TRANSFER_SITE)}", affected["id"])
+        self.stop(helper, meet, "waiting", f"Waiting for {truck['id']} at {self.name(TRANSFER_SITE)}", affected["id"])
         for t in (track, helper):
             self.event(t, f"Transfers {affected['id']} at {self.name(TRANSFER_SITE)}", "watch")
             self.stop(t, meet + TRANSFER_MIN, "transfer", f"Transferring {affected['id']} between trucks", affected["id"])
@@ -281,7 +285,8 @@ class Planner:
         place = self.scenario["disruption"].get("location_label", "CA-47 connector")
         flood = self.scenario["disruption"].get("check", {}).get("type") == "environment"
         position = model.truck_at
-        if route is not model.current:
+        turned = route is not model.current and position > 0
+        if turned:
             pieces.append((model.current, position, 0.0, "detour", f"Turning back to {origin} to take the detour", f"Turns back toward {origin} to take the detour", "watch"))
             position = 0.0
         hits = self.road == "blocked" and route is model.blocked_route and position < model.incident_at
@@ -298,7 +303,7 @@ class Planner:
         else:
             kind = "driving" if route is model.current else "detour"
             text = f"Carrying {load} to {dest}" + ("" if kind == "driving" else " on the detour")
-            event = None if kind == "driving" or route is model.current else f"Back at {origin}, starts the detour"
+            event = f"Back at {origin}, starts the detour" if turned else None
             pieces.append((route, position, 1.0, kind, text, event, "watch"))
 
         waits = sum(p[1] for p in pieces if p[0] == "wait")
@@ -340,8 +345,9 @@ class Planner:
             if truck["id"] in tracks:
                 continue
             loads = shipments_by_truck.get(truck["id"], [])
-            if truck["id"] == FOCUS_TRUCK:
-                for track in self.plan_focus(truck, loads, tracks, self.scenario["shipments"]):
+            if truck["id"] == self.focus:
+                focus_tracks = self.plan_focus(truck, loads, tracks, self.scenario["shipments"])
+                for track in focus_tracks:
                     tracks[track["id"]] = track
                 continue
             if truck["id"] == SWAP_TRUCK and self.action == "swap-truck":
@@ -366,7 +372,9 @@ class Planner:
             "action": self.action,
             "road": self.road,
             "inspected": self.outcomes_key == INSPECTED,
-            "focus_truck": FOCUS_TRUCK,
+            "focus_truck": self.focus,
+            # The trucks this report's response plans; the map keeps every other truck on its earlier plan.
+            "focus_trucks": [track["id"] for track in focus_tracks],
             "tracks": ordered,
             "events": events,
             "alternatives": self.alternatives(),
@@ -380,6 +388,12 @@ class Planner:
             {"id": key, "name": route["name"], "color": route["color"], "path": route["geometry"]["coordinates"]}
             for key, route in (("current", model.current), ("detour", model.fallback))
         ]
+
+
+def focus_truck(scenario):
+    """The truck carrying the disruption's affected load."""
+    affected = scenario["disruption"]["affected_shipment"]
+    return next(s["truck"] for s in scenario["shipments"] if s["id"] == affected)
 
 
 def build_playback(scenario, action="hold-course", road="open", geometry=None, inspected=False):

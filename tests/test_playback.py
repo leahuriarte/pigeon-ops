@@ -76,13 +76,26 @@ class PlaybackTests(unittest.TestCase):
                         playback = build_playback(scenario, action_id, road, inspected=inspected)
                         action = next(a for a in scenario["decision_model"]["actions"] if a["id"] == action_id)
                         key = "outcomes_after_inspection" if inspected else "outcomes"
-                        checkin = next(e for e in playback["events"] if "SYN-SHP-1042" in e["text"] and e["text"].startswith("Checks in"))
+                        load = scenario["disruption"]["affected_shipment"]
+                        checkin = next(e for e in playback["events"] if load in e["text"] and e["text"].startswith("Checks in"))
                         self.assertAlmostEqual(clock(action[key][road]["detail"]["arrival"]), checkin["t"], delta=1)
                         if action_id == "hold-course" and road == "blocked":
                             events = " ".join(e["text"] for e in playback["events"])
                             self.assertIn(scenario["disruption"]["location_label"], events)
                             if variant == "congestion":
                                 self.assertNotIn("queue on CA-47", events)
+
+    def test_flood_hits_the_later_pier_400_load(self):
+        scenario = load_scenario(variant="flood")
+        self.assertEqual("SYN-SHP-1086", scenario["disruption"]["affected_shipment"])
+        for action_id in ("hold-course", "reroute"):
+            playback = build_playback(scenario, action_id, "blocked")
+            self.assertEqual(["SYN-TRK-58"], playback["focus_trucks"])
+            events = [e for e in playback["events"] if e["truck"] == "SYN-TRK-58"]
+            leaves = next(e for e in events if e["text"].startswith("Leaves"))
+            # Loaded after the 10:25 release, so it is still at Pier 400 when the 10:20 report arrives.
+            self.assertAlmostEqual(clock("10:40"), leaves["t"], delta=1)
+            self.assertNotIn("Turns back", " ".join(e["text"] for e in events if action_id == "reroute"))
 
 
 if __name__ == "__main__":

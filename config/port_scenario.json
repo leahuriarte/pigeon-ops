@@ -25,7 +25,8 @@
     {"id": "SYN-SHP-1071", "container": "SYN-C-1071", "cargo": "Pharmaceutical products", "commodity_code": "SCTG 21", "origin": "terminal-a", "destination": "warehouse-3", "truck": "SYN-TRK-52", "appointment": "11:45–12:15", "readiness": "Ready 09:01", "eta": "11:29", "slack_min": 16, "priority": "critical", "status": "watch", "route": "northbound"},
     {"id": "SYN-SHP-1074", "container": "SYN-C-1074", "cargo": "Food preparations", "commodity_code": "SCTG 20", "origin": "terminal-c", "destination": "warehouse-5", "truck": "SYN-TRK-22", "appointment": "14:00–14:30", "readiness": "Hold until 10:10", "eta": "13:26", "slack_min": 34, "priority": "high", "status": "planned", "route": "westbound"},
     {"id": "SYN-SHP-1077", "container": "SYN-C-1077", "cargo": "Printed products", "commodity_code": "SCTG 29", "origin": "terminal-b", "destination": "warehouse-2", "truck": "SYN-TRK-41", "appointment": "13:30–14:00", "readiness": "Ready 09:11", "eta": "13:15", "slack_min": 15, "priority": "standard", "status": "watch", "route": "SYN-ROUTE-TB-WLB"},
-    {"id": "SYN-SHP-1082", "container": "SYN-C-1082", "cargo": "Precision instruments", "commodity_code": "SCTG 38", "origin": "terminal-a", "destination": "warehouse-1", "truck": "SYN-TRK-19", "appointment": "15:00–15:30", "readiness": "Hold until 10:40", "eta": "14:18", "slack_min": 42, "priority": "high", "status": "planned", "route": "northbound"}
+    {"id": "SYN-SHP-1082", "container": "SYN-C-1082", "cargo": "Precision instruments", "commodity_code": "SCTG 38", "origin": "terminal-a", "destination": "warehouse-1", "truck": "SYN-TRK-19", "appointment": "15:00–15:30", "readiness": "Hold until 10:40", "eta": "14:18", "slack_min": 42, "priority": "high", "status": "planned", "route": "northbound"},
+    {"id": "SYN-SHP-1086", "container": "SYN-C-1086", "cargo": "Fresh produce", "commodity_code": "SCTG 03", "origin": "terminal-a", "destination": "warehouse-2", "truck": "SYN-TRK-58", "appointment": "11:20–11:50", "readiness": "Hold until 10:25", "eta": "11:11", "slack_min": 9, "priority": "high", "status": "planned", "route": "primary"}
   ],
   "trucks": [
     {"id": "SYN-TRK-07", "status": "en-route", "assignment": "SYN-SHP-1042", "fuel": "Diesel", "duty_remaining_hr": 5.8, "available_at": "09:12", "lat": 33.756, "lon": -118.248},
@@ -36,7 +37,8 @@
     {"id": "SYN-TRK-35", "status": "waiting", "assignment": "SYN-SHP-1060", "fuel": "Battery electric", "duty_remaining_hr": 7.8, "lat": 33.739, "lon": -118.258},
     {"id": "SYN-TRK-41", "status": "en-route", "assignment": "SYN-SHP-1064", "fuel": "Diesel", "duty_remaining_hr": 3.7, "lat": 33.771, "lon": -118.272},
     {"id": "SYN-TRK-44", "status": "en-route", "assignment": "SYN-SHP-1068", "fuel": "Diesel", "duty_remaining_hr": 6.0, "lat": 33.842, "lon": -118.219},
-    {"id": "SYN-TRK-52", "status": "at-terminal", "assignment": "SYN-SHP-1071", "fuel": "Battery electric", "duty_remaining_hr": 8.2, "lat": 33.737, "lon": -118.265}
+    {"id": "SYN-TRK-52", "status": "at-terminal", "assignment": "SYN-SHP-1071", "fuel": "Battery electric", "duty_remaining_hr": 8.2, "lat": 33.737, "lon": -118.265},
+    {"id": "SYN-TRK-58", "status": "at-terminal", "assignment": "SYN-SHP-1086", "fuel": "Diesel", "duty_remaining_hr": 6.6, "available_at": "10:10", "lat": 33.735, "lon": -118.262}
   ],
   "routes": [
     {
@@ -532,11 +534,11 @@
         "id": "SYN-DSP-10",
         "eyebrow": "ACTIVE DISRUPTION",
         "title": "Water on the northern connector approach",
-        "description": "A utility report and driver describe water across the connector after a burst main. Depth and pavement condition are unknown.",
-        "affected_shipment": "SYN-SHP-1042",
+        "description": "A utility report and a driver describe water across the connector after a burst main, an hour after the CA-47 crash report. SYN-TRK-58 is due to leave Pier 400 on that road with SYN-SHP-1086. Depth and pavement condition are unknown.",
+        "affected_shipment": "SYN-SHP-1086",
         "prior_blocked_probability": 0.6,
-        "reported_at": "09:14",
-        "decision_deadline": "09:24",
+        "reported_at": "10:20",
+        "decision_deadline": "10:30",
         "check": {
           "type": "environment",
           "label": "Flood visibility check",
@@ -544,7 +546,8 @@
           "good": "passable"
         },
         "constraints": [
-          "SYN-SHP-1042 appointment: 10:15–10:45; synthetic planned arrival 10:03",
+          "SYN-SHP-1086 appointment: 11:20–11:50; synthetic planned arrival 11:11",
+          "SYN-SHP-1086 is released at 10:25 and SYN-TRK-58 leaves Pier 400 at 10:40 (synthetic)",
           "Water depth and pavement condition remain unverified",
           "Assumed visual-check accuracy: 65%; review wait: 8 min",
           "The Anaheim St route avoids the modeled flooded section"
@@ -577,20 +580,13 @@
             "plan": {
               "route": "detour"
             }
-          },
-          {
-            "id": "swap-truck",
-            "label": "Swap with SYN-TRK-12",
-            "summary": "Swap the two loads.",
-            "stakeholder_effect": "The water remains on the route; handover uses the other load's buffer.",
-            "plan": {
-              "trucks": {
-                "SYN-SHP-1042": "SYN-TRK-12",
-                "SYN-SHP-1048": "SYN-TRK-07"
-              }
-            }
           }
         ],
+        "assignment_pool": {
+          "shipments": ["SYN-SHP-1086"],
+          "trucks": ["SYN-TRK-58"],
+          "note": "SYN-TRK-58 is the only truck free at Pier 400 for this load; no swap is modeled for the flood."
+        },
         "drone": {
           "accuracy": 0.65,
           "launch_and_review_minutes": 8,

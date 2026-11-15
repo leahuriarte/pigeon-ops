@@ -178,22 +178,22 @@
    "override_reason": null,
    "actual_road_state": "blocked",
    "estimate": {
-    "lateness_min": 14.0,
-    "cost_usd": 29.46,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 3.8,
+    "cost_usd": 16.02,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0.0
    },
    "actual": {
-    "lateness_min": 14.0,
-    "cost_usd": 29.46,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 3.8,
+    "cost_usd": 16.02,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0
    },
    "actual_note": null,
    "schools_within_300m": 6,
-   "lesson": "A utility report and a CHP log agreed, so the load avoided the water at once and arrived 14 min late, where holding course would have cost 60 min and the appointment.",
+   "lesson": "A utility report and a CHP log agreed, so the load avoided the water at once and arrived 4 min late, where holding course would have cost 62 min and the appointment.",
    "pattern_ids": [
     "water-main-break",
     "flood-depth-unknown"
@@ -272,22 +272,22 @@
    "override_reason": null,
    "actual_road_state": "open",
    "estimate": {
-    "lateness_min": 22.0,
-    "cost_usd": 124.13,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 3.8,
+    "cost_usd": 106.02,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0.0
    },
    "actual": {
-    "lateness_min": 22.0,
-    "cost_usd": 124.13,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 3.8,
+    "cost_usd": 106.02,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0
    },
    "actual_note": null,
    "schools_within_300m": 6,
-   "lesson": "The footage could not show the water's depth, so the read was inconclusive and the load avoided the water, paying 11 extra miles on a road that was passable.",
+   "lesson": "The footage could not show the water's depth, so the read was inconclusive and the load avoided the water, paying 7 extra miles on a road that was passable.",
    "pattern_ids": [
     "flood-depth-unknown",
     "drone-verification-limits"
@@ -413,22 +413,22 @@
    "override_reason": "The driver said trucks were getting through.",
    "actual_road_state": "blocked",
    "estimate": {
-    "lateness_min": 54.6,
+    "lateness_min": 57.4,
     "cost_usd": 63.46,
-    "co2_kg": 44.0,
+    "co2_kg": 47.5,
     "added_miles": 19.33,
     "missed_appointments": 0.92
    },
    "actual": {
-    "lateness_min": 69.5,
+    "lateness_min": 72.5,
     "cost_usd": 74.93,
-    "co2_kg": 46.7,
+    "co2_kg": 50.2,
     "added_miles": 21.05,
     "missed_appointments": 1
    },
    "actual_note": "Backing out of the water took 25 min, not the assumed 15.",
    "schools_within_300m": 0,
-   "lesson": "Holding course into deep water missed the appointment: backing out took 25 min, not 15, and the load arrived 70 min late.",
+   "lesson": "Holding course into deep water missed the appointment: backing out took 25 min, not 15, and the load arrived 72 min late.",
    "pattern_ids": [
     "water-main-break",
     "flood-depth-unknown"
@@ -647,17 +647,17 @@
    "override_reason": null,
    "actual_road_state": "blocked",
    "estimate": {
-    "lateness_min": 22.0,
-    "cost_usd": 124.13,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 3.8,
+    "cost_usd": 106.02,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0.0
    },
    "actual": {
-    "lateness_min": 22.0,
-    "cost_usd": 124.13,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 3.8,
+    "cost_usd": 106.02,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0
    },
    "actual_note": null,
@@ -787,22 +787,22 @@
    "override_reason": null,
    "actual_road_state": "open",
    "estimate": {
-    "lateness_min": 14.0,
-    "cost_usd": 29.46,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 3.8,
+    "cost_usd": 16.02,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0.0
    },
    "actual": {
-    "lateness_min": 19.0,
-    "cost_usd": 32.38,
-    "co2_kg": 30.6,
-    "added_miles": 10.98,
+    "lateness_min": 8.8,
+    "cost_usd": 18.94,
+    "co2_kg": 27.1,
+    "added_miles": 6.6,
     "missed_appointments": 0
    },
    "actual_note": "Anaheim St ran 5 min slower than estimated behind school drop-off traffic.",
    "schools_within_300m": 6,
-   "lesson": "The connector was passable, so avoiding the water paid 11 extra miles, 18 kg more CO2 and 19 min of lateness, and sent the truck past 6 schools.",
+   "lesson": "The connector was passable, so avoiding the water paid 7 extra miles, 11 kg more CO2 and 9 min of lateness, and sent the truck past 6 schools.",
    "pattern_ids": [
     "neighborhood-truck-detour",
     "water-main-break"

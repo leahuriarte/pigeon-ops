@@ -10,8 +10,8 @@ PigeonOps uses **publicly calibrated synthetic data**. Public sources shape plau
 
 The shared operating picture in `config/port_scenario.json` contains:
 
-- 12 synthetic shipments across three port terminals and six destination facilities
-- 9 synthetic trucks with assignments, powertrains, status, duty time, approximate simulated positions, and availability times for the two trucks the swap option exchanges
+- 13 synthetic shipments across three port terminals and six destination facilities
+- 10 synthetic trucks with assignments, powertrains, status, duty time, approximate simulated positions, and availability times for the two trucks the swap option exchanges
 - 5 illustrative corridors, including a current route, candidate detour, two fleet context routes, and a route for SYN-SHP-1077
 - A playback schedule for every truck, built from the shipment ETAs, appointments, and release holds, with road-following paths in `config/road_geometry.json`
 - 5 scenario variants: routine morning operations and four incident reports, each calling for a kind of drone check: an unverified crash, a corroborated crash, heavy traffic, and road damage from a burst water main
@@ -82,7 +82,7 @@ The prototype currently uses a hand-curated, deterministic scenario so the hacka
 
 The normal scenario uses a 2% blockage prior, so inspection is not cost-effective. The disruption scenario makes information valuable because the preferred action differs materially between road states. The corroborated disruption (`disruption_b`, 80% prior) shows the opposite case: rerouting is best whatever the inspection says, so inspection is not worth its cost.
 
-The queue scenario places the released load outside Pier 400's gate on one outbound access road. Its synthetic 09:40 ETA leaves 35 minutes before the appointment; an assumed severe queue adds 30 minutes and no miles. This models an access-road delay, not terminal gate processing, which changing the road route would not bypass. The flood scenario places the hazard farther north on the connector approach. Aerial review is assumed only 65% accurate and cannot establish water depth or pavement integrity. Both modeled drone findings favor avoiding the flooded section. All locations, reports, release times and incident parameters are fictional; the footage illustrates other places.
+The queue scenario places the released load outside Pier 400's gate on one outbound access road. Its synthetic 09:40 ETA leaves 35 minutes before the appointment; an assumed severe queue adds 30 minutes and no miles. This models an access-road delay, not terminal gate processing, which changing the road route would not bypass. The flood scenario is reported at 10:20, an hour after the crash report, once SYN-SHP-1042 has been delivered. It places the hazard farther north on the connector approach, in the path of SYN-SHP-1086, which SYN-TRK-58 carries from Pier 400 to West Long Beach DC after a synthetic 10:25 release. The flood has no truck swap option. Aerial review is assumed only 65% accurate and cannot establish water depth or pavement integrity. Both modeled drone findings favor avoiding the flooded section. All locations, reports, release times and incident parameters are fictional; the footage illustrates other places.
 
 ## Decision history
 
@@ -116,7 +116,7 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 ## Known limitations
 
 - Route lines are illustrative and must not be used for navigation. Playback paths use a car routing profile, not the California Truck Network.
-- Playback times are derived, not simulated traffic: SYN-TRK-07 arrives at the time the outcome model computes for the chosen option and road state; other trucks arrive at their scenario ETA, drive at up to 1.5× the network travel time, and otherwise wait at the destination. Load, unload, and transfer times (15, 20, and 10 min) are assumptions. Only SYN-TRK-07 and SYN-TRK-12 change with the dispatch option and road state.
+- Playback times are derived, not simulated traffic: the truck carrying the affected load (SYN-TRK-07, or SYN-TRK-58 in the flood) arrives at the time the outcome model computes for the chosen option and road state; other trucks arrive at their scenario ETA, drive at up to 1.5× the network travel time, and otherwise wait at the destination. Load, unload, and transfer times (15, 20, and 10 min) are assumptions. Only that truck and, for the swap, SYN-TRK-12 change with the dispatch option and road state. In the scripted morning each report re-plans only those trucks; the others keep the response already on the map.
 - Terminal turn time, traffic speed, and emissions are not live measurements.
 - The web check reads real public feeds (CHP incident log, Caltrans District 7 message signs, NWS alerts) about roads as they are now, while the incident is fictional. Its reliability table (`decision_model.web_triage`) is assumed. If every feed is unreachable the check reports itself unavailable. See docs/METHODS.md section 9.
 - The accuracy for dispatcher-reviewed drone footage is assumed: 90% by default, 95% for heavy traffic and 85% for road damage. The CV suggestion shown with each clip comes from hand-set speed thresholds and is not validated. Automated CV alone is measured on 27 annotated aerial frames and shown separately; it is not yet worth an inspection (cv/RUN_RESULTS.md).

@@ -86,7 +86,7 @@ Each computed outcome has `basis: "estimated"` and a `detail` block with the aff
 
 ## 4. Truck assignment
 
-`decision_model.assignment_pool` lists the shipments and trucks the dispatcher may reassign. In every variant it is SYN-SHP-1042 and SYN-SHP-1048 with their trucks, SYN-TRK-07 and SYN-TRK-12. The pool must contain the affected shipment and each pool shipment's truck. A pool truck may not carry any shipment outside the pool, because the model does not sequence several loads on one truck.
+`decision_model.assignment_pool` lists the shipments and trucks the dispatcher may reassign. In every variant but `flood` it is SYN-SHP-1042 and SYN-SHP-1048 with their trucks, SYN-TRK-07 and SYN-TRK-12. In `flood` it is SYN-SHP-1086 and SYN-TRK-58 alone, so there is one assignment and no swap. The pool must contain the affected shipment and each pool shipment's truck. A pool truck may not carry any shipment outside the pool, because the model does not sequence several loads on one truck.
 
 The backend lists every assignment of pool trucks to pool shipments with `itertools.permutations(trucks, number of shipments)`. Two trucks over two shipments give two assignments: the plan and the swap. With a spare third truck there would be 3 × 2 = 6. The backend refuses pools with more than 5,040 assignments.
 
@@ -195,7 +195,7 @@ The sensitivity curve repeats the net value at 21 evenly spaced priors from 0 to
 | disruption | 0.40 | reroute | 1227.11 | 1020.91 | +116.20 | yes |
 | disruption_b | 0.80 | reroute | 1227.11 | 1740.61 | −603.50 | no |
 | congestion | 0.50 | hold-course | 12.80 | 15.13 | −92.33 | no |
-| flood | 0.60 | reroute | 1227.11 | 1911.78 | −774.67 | no |
+| flood | 0.60 | reroute | 345.79 | 345.79 | −90.00 | no |
 
 Net value is best loss now minus loss with inspection minus the $90 direct cost.
 
@@ -205,7 +205,7 @@ In `disruption_b` the reports are corroborated, so the prior is 80%. Even after 
 
 In `congestion` the queue is outside Pier 400's gate on one outbound access road, near the start of the primary route. The released truck is upstream of it. Its synthetic 09:40 planned arrival gives 35 minutes of slack; the assumed severe queue adds 30 minutes, giving a 10:10 arrival. The alternate road avoids the queue but adds miles; a swap keeps the affected load on the queued route and disrupts the other delivery. Continuing wins before inspection and after either finding. Traffic-check accuracy is assumed to be 95% with a 4-minute review, but the extra information does not improve the choice. This is not a gate-processing delay.
 
-In `flood` the hazard is farther north on the connector approach. The synthetic prior of impassability is 60%. With assumed aerial-review accuracy of 65% and an 8-minute wait, the posterior is 45% after a favorable finding or 74% after an unfavorable finding. The detour wins in both cases; inspection adds an estimated $774.67 in loss, including its $90 direct cost. In the modeled impassable case, the truck loses an assumed 15 minutes withdrawing before returning to the route start and detouring. Footage cannot establish safe water depth or pavement condition. These are planning comparisons, not permission to enter water.
+In `flood` the hazard is farther north on the connector approach, reported at 10:20. The affected load is SYN-SHP-1086 on SYN-TRK-58, still at Pier 400: it is released at 10:25 and leaves at 10:40 for an 11:20–11:50 appointment (planned arrival 11:11). The detour arrives at 11:24; holding course into impassable water arrives at 12:23 and misses the window. The synthetic prior of impassability is 60%. With assumed aerial-review accuracy of 65% and an 8-minute wait, the posterior is 45% after a favorable finding or 74% after an unfavorable finding. The detour wins in both cases. SYN-TRK-58 is not free until 10:10 (synthetic), so the wait does not hold it (section 5); inspection adds only its $90 direct cost. In the modeled impassable case, the truck loses an assumed 15 minutes withdrawing before returning to the route start and detouring. Footage cannot establish safe water depth or pavement condition. These are planning comparisons, not permission to enter water.
 
 `evoi.response_by_observation` exposes the engine's estimated probability, posterior and best delayed response for each possible finding. The UI uses these results to explain whether checking can change the action, rather than inferring it from the incident title.
 
@@ -241,7 +241,7 @@ Each shipment counts as one full trip on its route. Return trips and empty repos
 | `blockage.slowdown_min` | 30 min in `congestion` | assumed | Time lost in a queue on the outbound access road outside Pier 400's gate. |
 | `blockage.route` / `fallback_route` | primary / detour | assumed | The obstruction sits on `primary`; drivers fall back to the Anaheim St detour. |
 | `indicator_rules.at_risk_probability` | 0.5 | assumed | Probability threshold for "at risk" and "infeasible". |
-| Truck `available_at` | SYN-TRK-07 09:12, SYN-TRK-12 09:25 | synthetic | SYN-TRK-07 is free now; 09:25 comes from the scenario's "is free for a handover from 09:25". |
+| Truck `available_at` | SYN-TRK-07 09:12, SYN-TRK-12 09:25, SYN-TRK-58 10:10 | synthetic | SYN-TRK-07 is free now; 09:25 comes from the scenario's "is free for a handover from 09:25"; SYN-TRK-58 finishes an earlier turn at Pier 400 before its 10:25 release. |
 | `assignment_pool.handover_min` | 15 min | assumed | Time to move a container from one truck to another. Not sourced. |
 | `assignment_pool.fetch_circuity` | 1.3 | assumed | Road distance over straight-line distance on the drive to the load. Round value. |
 | `assignment_pool.fetch_speed_mph` | 25 mph | assumed | Speed on the drive to the load, on surface streets. Round value. |
