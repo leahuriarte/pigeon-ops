@@ -642,7 +642,7 @@ function renderTallyFrame() {
     const notes = [a.id === plan.action && "selected", a.id === best && "recommended"].filter(Boolean).join(", ");
     return `<li class="race-row${a.id === plan.action ? " current" : ""}" data-action="${esc(a.id)}">
       <span class="race-name">${esc(a.label)}${notes ? ` <small>${notes}</small>` : ""}</span>
-      <span class="race-bar" aria-hidden="true"><i class="ghost"></i><i class="fill"></i></span>
+      <span class="race-bar" aria-hidden="true"><i class="fill"></i></span>
       <span class="race-value"></span>
     </li>`;
   }).join("");
@@ -656,34 +656,35 @@ function updateTally() {
   const current = tallies[plan.action];
   if (!current) return;
   const now = totalsAt(current, currentTime);
-  const final = totalsAt(current, Infinity);
+  const complete = mode === "report";
+  const final = complete ? totalsAt(current, Infinity) : null;
   tallyMetrics.forEach((metric) => {
     const tile = document.querySelector(`.tally-tile[data-metric="${metric.id}"]`);
     if (!tile) return;
     const changed = setHTML(`v-${metric.id}`, tile.querySelector(".tally-value"), metric.format(now[metric.id]));
-    const share = final[metric.id] > 0 ? now[metric.id] / final[metric.id] : 0;
-    tile.querySelector(".tally-bar i").style.width = `${(share * 100).toFixed(1)}%`;
-    const normal = scenario.scenario_type === "normal";
-    const diff = final[metric.id] - planTotals[metric.id];
-    const tone = Math.abs(diff) < 0.05 ? "" : diff > 0 ? "worse" : "better";
-    const vsPlan = tone ? `${diff > 0 ? "+" : "−"}${metric.format(Math.abs(diff)).replace(/<[^>]+>/g, "")} vs plan` : "same as plan";
-    setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), normal
-      ? `<span>Estimated at delivery: ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span>`
-      : `<span>Ends at ${metric.format(final[metric.id]).replace(/<[^>]+>/g, "")}</span><span class="${tone}">${vsPlan}</span>`);
+    if (complete) {
+      tile.querySelector(".tally-bar i").style.width = "100%";
+      const diff = final[metric.id] - planTotals[metric.id];
+      const tone = Math.abs(diff) < 0.05 ? "" : diff > 0 ? "worse" : "better";
+      const vsPlan = tone ? `${diff > 0 ? "+" : "−"}${metric.format(Math.abs(diff)).replace(/<[^>]+>/g, "")} vs plan` : "same as plan";
+      setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), `<span class="${tone}">${vsPlan}</span>`);
+    } else {
+      setHTML(`f-${metric.id}`, tile.querySelector(".tally-foot"), "");
+    }
     // A missed appointment or the first late minute is a step change worth drawing the eye to.
     if (changed && metric.id === "missed" && now.missed > 0) bump(tile);
     if (metric.id === "late") tile.classList.toggle("alert", now.late > 0);
     if (metric.id === "missed") tile.classList.toggle("alert", now.missed > 0);
   });
   if (scenario.scenario_type === "normal") return;
-  const finals = Object.fromEntries(Object.entries(tallies).map(([id, rows]) => [id, totalsAt(rows, Infinity).cost]));
-  const top = Math.max(...Object.values(finals), 1);
+  $("#tally-race-title").textContent = complete ? "Cost of each response" : "Cost so far by response";
+  const costs = Object.fromEntries(Object.entries(tallies).map(([id, rows]) => [id, totalsAt(rows, currentTime).cost]));
+  const top = Math.max(...Object.values(costs), 1);
   $$("#tally-race .race-row").forEach((row) => {
     const id = row.dataset.action;
-    const cost = totalsAt(tallies[id], currentTime).cost;
-    row.querySelector(".ghost").style.width = `${(finals[id] / top * 100).toFixed(1)}%`;
+    const cost = costs[id];
     row.querySelector(".fill").style.width = `${(cost / top * 100).toFixed(1)}%`;
-    setHTML(`race-${id}`, row.querySelector(".race-value"), `${money(cost)} <small>of ${money(finals[id])}</small>`);
+    setHTML(`race-${id}`, row.querySelector(".race-value"), money(cost));
   });
 }
 
@@ -1665,6 +1666,7 @@ function showReport() {
   mode = "report";
   renderReport();
   renderMode();
+  updateTally();
 }
 
 function renderReport() {
