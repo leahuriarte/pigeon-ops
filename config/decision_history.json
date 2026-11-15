@@ -1,0 +1,813 @@
+{
+ "basis": "synthetic",
+ "note": "Synthetic past decisions modelled on public patterns, not real dispatch records.",
+ "generated_by": "scripts/build_decision_history.py",
+ "patterns": [
+  {
+   "id": "crash-clearance-time",
+   "claim": "In FHWA's Atlanta freeway data, crashes lasted a median 40 minutes, the 95th percentile was 106 minutes, and 87% blocked at least one lane.",
+   "source": "FHWA Office of Operations, FHWA-HOP-12-045, Tables 4 and 5 (the 87% is summed from Table 4)",
+   "source_url": "https://ops.fhwa.dot.gov/publications/fhwahop12045/4_incdnt.htm"
+  },
+  {
+   "id": "public-feed-lag",
+   "claim": "In a 2018 California study, Waze crash reports arrived on average 2 minutes 41 seconds before the CHP received reports of the same crashes.",
+   "source": "UCLA Newsroom, on a UCLA and UC Irvine study in JAMA Surgery",
+   "source_url": "https://newsroom.ucla.edu/releases/waze-accident-reports-emergency-response"
+  },
+  {
+   "id": "driver-report-reliability",
+   "claim": "In Tennessee, only 26% of Waze crash reports matched an official record; the rest had no official counterpart.",
+   "source": "University of Tennessee for Tennessee DOT and FHWA, Waze Data Reporting, RES2019-11 (2022)",
+   "source_url": "https://rosap.ntl.bts.gov/view/dot/66932/dot_66932_DS1.pdf"
+  },
+  {
+   "id": "gate-queue-variability",
+   "claim": "A GPS study at Los Angeles and Long Beach terminals found a median 20-minute queue and 51-minute visit; trucks arriving 17:00 to 18:00 had 90-minute median visits.",
+   "source": "PierPass Turn Time Study (2011)",
+   "source_url": "https://www.pierpass.org/news/groundbreaking-study-provides-first-comprehensive-measurement-of-truck-queuing-and-visit-times-at-the-ports/"
+  },
+  {
+   "id": "water-main-break",
+   "claim": "The LADWP water system has 2 to 4 water pipe breaks per day.",
+   "source": "LADWP News, Fast Facts About Trunk Lines, Mainlines and Leaks (2026)",
+   "source_url": "https://ladwpnews.com/fast-facts-about-trunk-lines-mainlines-and-leaks-in-the-ladwp-water-system/"
+  },
+  {
+   "id": "flood-depth-unknown",
+   "claim": "The NWS warns that 2 feet of rushing water can carry away SUVs and trucks, and that the road beneath the water may have collapsed.",
+   "source": "National Weather Service, Turn Around Don't Drown",
+   "source_url": "https://www.weather.gov/safety/flood-turn-around-dont-drown"
+  },
+  {
+   "id": "neighborhood-truck-detour",
+   "claim": "CARB recommends siting schools, playgrounds and housing at least 500 feet from freeways and from urban roads carrying 100,000 vehicles per day.",
+   "source": "California Air Resources Board fact sheet citing the 2005 Air Quality and Land Use Handbook",
+   "source_url": "https://ww2.arb.ca.gov/resources/fact-sheets/strategies-reduce-air-pollution-exposure-near-high-volume-roadways"
+  },
+  {
+   "id": "diesel-idle-vs-miles",
+   "claim": "An idling heavy truck burns about 0.8 gallons per hour, about 8 kg CO2; a combination truck at 6.7 mpg emits about 1.5 kg CO2 per mile.",
+   "source": "DOE Clean Cities idling fact sheet; FHWA Highway Statistics 2023, Table VM-1; the CO2 figures are calculated at EPA's 10,180 g per diesel gallon",
+   "source_url": "https://afdc.energy.gov/files/u/publication/hdv_idling_2015.pdf"
+  },
+  {
+   "id": "drone-verification-limits",
+   "claim": "In FHWA case studies drones mainly document crash scenes, and FHWA calls most of the evidence for their benefit anecdotal.",
+   "source": "FHWA Office of Operations, FHWA-HOP-20-063, Chapter 3",
+   "source_url": "https://ops.fhwa.dot.gov/publications/fhwahop20063/chap3.htm"
+  }
+ ],
+ "cases": [
+  {
+   "id": "SYN-HIS-001",
+   "date": "2026-08-04",
+   "reported_at": "08:40",
+   "check_type": "crash",
+   "variant": "disruption",
+   "title": "Possible wreck on the CA-47 connector",
+   "place": "CA-47 connector",
+   "lat": 33.773,
+   "lon": -118.237,
+   "reports": "Two drivers disagreed",
+   "estimated_bad_probability": 0.8571,
+   "web_finding": null,
+   "inspection": {
+    "flown": true,
+    "observation": "blocked",
+    "wait_min": 6,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Reroute via Anaheim St",
+   "recommended_action": "reroute",
+   "override_reason": null,
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 20.0,
+    "cost_usd": 122.96,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 20.0,
+    "cost_usd": 122.96,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 6,
+   "lesson": "Two drivers disagreed, the $90 drone check showed the wreck, and rerouting arrived 20 min late where holding course would have arrived 54 min late and missed the appointment.",
+   "pattern_ids": [
+    "driver-report-reliability",
+    "drone-verification-limits",
+    "crash-clearance-time"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-002",
+   "date": "2026-08-13",
+   "reported_at": "07:55",
+   "check_type": "congestion",
+   "variant": "congestion",
+   "title": "Queue outside the Pier 400 gate",
+   "place": "Pier 400 outbound access road",
+   "lat": 33.74372,
+   "lon": -118.260285,
+   "reports": "One driver saw a queue",
+   "estimated_bad_probability": 0.3271,
+   "web_finding": "nothing_found",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "hold-course",
+   "action_label": "Continue through the exit queue",
+   "recommended_action": "hold-course",
+   "override_reason": null,
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 0.0,
+    "cost_usd": 5.72,
+    "co2_kg": 16.2,
+    "added_miles": 0.0,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 0.0,
+    "cost_usd": 10.5,
+    "co2_kg": 16.2,
+    "added_miles": 0.0,
+    "missed_appointments": 0
+   },
+   "actual_note": "Queue cleared in 18 min, not the assumed 30.",
+   "schools_within_300m": 0,
+   "lesson": "The queue cleared in 18 min, not the assumed 30, so holding course cost $10.50 in driver time and no lateness.",
+   "pattern_ids": [
+    "gate-queue-variability"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-003",
+   "date": "2026-08-20",
+   "reported_at": "08:50",
+   "check_type": "environment",
+   "variant": "flood",
+   "title": "Water main break on the connector",
+   "place": "Northern connector approach",
+   "lat": 33.780881,
+   "lon": -118.226268,
+   "reports": "Utility report and a CHP log",
+   "estimated_bad_probability": 0.9184,
+   "web_finding": "corroborates",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Avoid the water via Anaheim St",
+   "recommended_action": "reroute",
+   "override_reason": null,
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 14.0,
+    "cost_usd": 29.46,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 14.0,
+    "cost_usd": 29.46,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 6,
+   "lesson": "A utility report and a CHP log agreed, so the load avoided the water at once and arrived 14 min late, where holding course would have cost 60 min and the appointment.",
+   "pattern_ids": [
+    "water-main-break",
+    "flood-depth-unknown"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-004",
+   "date": "2026-08-26",
+   "reported_at": "09:20",
+   "check_type": "crash",
+   "variant": "disruption_b",
+   "title": "Closure reports on CA-47",
+   "place": "CA-47 connector",
+   "lat": 33.773,
+   "lon": -118.237,
+   "reports": "Three drivers; no CHP log entry",
+   "estimated_bad_probability": 0.6604,
+   "web_finding": "nothing_found",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "hold-course",
+   "action_label": "Keep current route",
+   "recommended_action": "reroute",
+   "override_reason": "No CHP log entry, so the dispatcher judged the driver reports stale.",
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 31.6,
+    "cost_usd": 39.27,
+    "co2_kg": 32.9,
+    "added_miles": 12.46,
+    "missed_appointments": 0.66
+   },
+   "actual": {
+    "lateness_min": 47.9,
+    "cost_usd": 59.46,
+    "co2_kg": 43.2,
+    "added_miles": 18.86,
+    "missed_appointments": 1
+   },
+   "actual_note": null,
+   "schools_within_300m": 0,
+   "lesson": "A missing CHP log entry did not mean the road was open: the truck held course into the closure, arrived 48 min late and missed its 10:15–10:45 window.",
+   "pattern_ids": [
+    "public-feed-lag",
+    "crash-clearance-time"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-005",
+   "date": "2026-09-03",
+   "reported_at": "09:25",
+   "check_type": "environment",
+   "variant": "flood",
+   "title": "Standing water on the connector",
+   "place": "Northern connector approach",
+   "lat": 33.780881,
+   "lon": -118.226268,
+   "reports": "One driver; no feed entry",
+   "estimated_bad_probability": 0.4217,
+   "web_finding": "nothing_found",
+   "inspection": {
+    "flown": true,
+    "observation": "inconclusive",
+    "wait_min": 8,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Avoid the water via Anaheim St",
+   "recommended_action": "reroute",
+   "override_reason": null,
+   "actual_road_state": "open",
+   "estimate": {
+    "lateness_min": 22.0,
+    "cost_usd": 124.13,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 22.0,
+    "cost_usd": 124.13,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 6,
+   "lesson": "The footage could not show the water's depth, so the read was inconclusive and the load avoided the water, paying 11 extra miles on a road that was passable.",
+   "pattern_ids": [
+    "flood-depth-unknown",
+    "drone-verification-limits"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-006",
+   "date": "2026-09-09",
+   "reported_at": "07:50",
+   "check_type": "congestion",
+   "variant": "congestion",
+   "title": "Pier 400 exit queue at shift start",
+   "place": "Pier 400 outbound access road",
+   "lat": 33.74372,
+   "lon": -118.260285,
+   "reports": "Two drivers and a message sign",
+   "estimated_bad_probability": 0.8824,
+   "web_finding": "corroborates",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Use the alternate exit via Anaheim St",
+   "recommended_action": "hold-course",
+   "override_reason": "The dispatcher wanted no queue risk before the 10:15 appointment.",
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 0.0,
+    "cost_usd": 17.29,
+    "co2_kg": 27.4,
+    "added_miles": 7.01,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 0.0,
+    "cost_usd": 17.29,
+    "co2_kg": 27.4,
+    "added_miles": 7.01,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 6,
+   "lesson": "Rerouting around a real queue drove 7 extra miles and 11 kg more CO2 to skip a wait that would still have arrived on time.",
+   "pattern_ids": [
+    "diesel-idle-vs-miles",
+    "neighborhood-truck-detour"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-007",
+   "date": "2026-09-15",
+   "reported_at": "08:55",
+   "check_type": "crash",
+   "variant": "disruption",
+   "title": "Truck crash reported on CA-47",
+   "place": "CA-47 connector",
+   "lat": 33.773,
+   "lon": -118.237,
+   "reports": "One driver and a CHP log",
+   "estimated_bad_probability": 0.8333,
+   "web_finding": "corroborates",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Reroute via Anaheim St",
+   "recommended_action": "reroute",
+   "override_reason": null,
+   "actual_road_state": "open",
+   "estimate": {
+    "lateness_min": 14.0,
+    "cost_usd": 29.46,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 14.0,
+    "cost_usd": 29.46,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 6,
+   "lesson": "The crash had been cleared to the shoulder, so rerouting paid 11 extra miles, 18 kg more CO2 and 14 min of lateness, and passed 6 schools, for nothing.",
+   "pattern_ids": [
+    "crash-clearance-time",
+    "neighborhood-truck-detour"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-008",
+   "date": "2026-09-22",
+   "reported_at": "08:20",
+   "check_type": "environment",
+   "variant": "flood",
+   "title": "Burst main floods the connector",
+   "place": "Northern connector approach",
+   "lat": 33.780881,
+   "lon": -118.226268,
+   "reports": "City report and a CHP log",
+   "estimated_bad_probability": 0.9184,
+   "web_finding": "corroborates",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "hold-course",
+   "action_label": "Keep the connector plan",
+   "recommended_action": "reroute",
+   "override_reason": "The driver said trucks were getting through.",
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 54.6,
+    "cost_usd": 63.46,
+    "co2_kg": 44.0,
+    "added_miles": 19.33,
+    "missed_appointments": 0.92
+   },
+   "actual": {
+    "lateness_min": 69.5,
+    "cost_usd": 74.93,
+    "co2_kg": 46.7,
+    "added_miles": 21.05,
+    "missed_appointments": 1
+   },
+   "actual_note": "Backing out of the water took 25 min, not the assumed 15.",
+   "schools_within_300m": 0,
+   "lesson": "Holding course into deep water missed the appointment: backing out took 25 min, not 15, and the load arrived 70 min late.",
+   "pattern_ids": [
+    "water-main-break",
+    "flood-depth-unknown"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-009",
+   "date": "2026-09-24",
+   "reported_at": "09:10",
+   "check_type": "congestion",
+   "variant": "congestion",
+   "title": "Possible queue at the Pier 400 exit",
+   "place": "Pier 400 outbound access road",
+   "lat": 33.74372,
+   "lon": -118.260285,
+   "reports": "One driver; signs blank",
+   "estimated_bad_probability": 0.05,
+   "web_finding": null,
+   "inspection": {
+    "flown": true,
+    "observation": "clear",
+    "wait_min": 4,
+    "changed_response": false
+   },
+   "action": "hold-course",
+   "action_label": "Continue through the exit queue",
+   "recommended_action": "hold-course",
+   "override_reason": null,
+   "actual_road_state": "open",
+   "estimate": {
+    "lateness_min": 0.0,
+    "cost_usd": 93.2,
+    "co2_kg": 16.2,
+    "added_miles": 0.0,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 0.0,
+    "cost_usd": 92.33,
+    "co2_kg": 16.2,
+    "added_miles": 0.0,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 0,
+   "lesson": "The drone showed traffic moving, but holding course was the pick either way, so the $90 check and its 4 min wait bought nothing.",
+   "pattern_ids": [
+    "drone-verification-limits",
+    "gate-queue-variability"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-010",
+   "date": "2026-09-29",
+   "reported_at": "09:05",
+   "check_type": "crash",
+   "variant": "disruption_b",
+   "title": "CA-47 connector closed",
+   "place": "CA-47 connector",
+   "lat": 33.773,
+   "lon": -118.237,
+   "reports": "Four drivers and a traffic alert agreed",
+   "estimated_bad_probability": 0.9963,
+   "web_finding": "corroborates",
+   "inspection": {
+    "flown": true,
+    "observation": "blocked",
+    "wait_min": 6,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Reroute via Anaheim St",
+   "recommended_action": "reroute",
+   "override_reason": null,
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 20.0,
+    "cost_usd": 122.96,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 20.0,
+    "cost_usd": 122.96,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 6,
+   "lesson": "Four reports already agreed, so the $90 drone check and its 6 min wait changed nothing: the load rerouted either way.",
+   "pattern_ids": [
+    "drone-verification-limits",
+    "driver-report-reliability"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-011",
+   "date": "2026-10-07",
+   "reported_at": "08:15",
+   "check_type": "congestion",
+   "variant": "congestion",
+   "title": "Shift-change queue at Pier 400",
+   "place": "Pier 400 outbound access road",
+   "lat": 33.74372,
+   "lon": -118.260285,
+   "reports": "One driver at shift change",
+   "estimated_bad_probability": 0.3271,
+   "web_finding": "nothing_found",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "hold-course",
+   "action_label": "Continue through the exit queue",
+   "recommended_action": "hold-course",
+   "override_reason": null,
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 0.0,
+    "cost_usd": 5.72,
+    "co2_kg": 16.2,
+    "added_miles": 0.0,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 17.0,
+    "cost_usd": 30.33,
+    "co2_kg": 16.2,
+    "added_miles": 0.0,
+    "missed_appointments": 0
+   },
+   "actual_note": "Queue lasted 52 min, not the assumed 30.",
+   "schools_within_300m": 0,
+   "lesson": "The queue lasted 52 min, not 30, so holding course arrived 17 min after the window opened, where the alternate exit would have arrived at 09:54.",
+   "pattern_ids": [
+    "gate-queue-variability"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-012",
+   "date": "2026-10-14",
+   "reported_at": "09:30",
+   "check_type": "crash",
+   "variant": "disruption_b",
+   "title": "Closure reports, CHP says lanes reopened",
+   "place": "CA-47 connector",
+   "lat": 33.773,
+   "lon": -118.237,
+   "reports": "Four drivers; CHP said lanes reopened",
+   "estimated_bad_probability": 0.5,
+   "web_finding": "contradicts",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "hold-course",
+   "action_label": "Keep current route",
+   "recommended_action": "reroute",
+   "override_reason": "The dispatcher trusted the newer CHP entry over the driver reports.",
+   "actual_road_state": "open",
+   "estimate": {
+    "lateness_min": 23.9,
+    "cost_usd": 29.73,
+    "co2_kg": 28.1,
+    "added_miles": 9.43,
+    "missed_appointments": 0.5
+   },
+   "actual": {
+    "lateness_min": 0.0,
+    "cost_usd": 2.33,
+    "co2_kg": 13.0,
+    "added_miles": 0.0,
+    "missed_appointments": 0
+   },
+   "actual_note": "Cleanup crews slowed the connector by 4 min.",
+   "schools_within_300m": 0,
+   "lesson": "The CHP note that lanes had reopened was right: the load kept its route, arrived before its window opened and cost $2.33 more than planned, without a drone check.",
+   "pattern_ids": [
+    "public-feed-lag",
+    "crash-clearance-time"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-013",
+   "date": "2026-10-21",
+   "reported_at": "09:40",
+   "check_type": "environment",
+   "variant": "flood",
+   "title": "Water across the connector approach",
+   "place": "Northern connector approach",
+   "lat": 33.780881,
+   "lon": -118.226268,
+   "reports": "One driver; feeds not checked",
+   "estimated_bad_probability": 0.4468,
+   "web_finding": null,
+   "inspection": {
+    "flown": true,
+    "observation": "clear",
+    "wait_min": 8,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Avoid the water via Anaheim St",
+   "recommended_action": "reroute",
+   "override_reason": null,
+   "actual_road_state": "blocked",
+   "estimate": {
+    "lateness_min": 22.0,
+    "cost_usd": 124.13,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 22.0,
+    "cost_usd": 124.13,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 6,
+   "lesson": "The drone read the water as passable, but at 65% assumed accuracy the chance only fell to 45%, and avoiding the water kept the load off a road that was impassable.",
+   "pattern_ids": [
+    "drone-verification-limits",
+    "flood-depth-unknown"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-014",
+   "date": "2026-10-28",
+   "reported_at": "09:00",
+   "check_type": "congestion",
+   "variant": "congestion",
+   "title": "Queue report at the Pier 400 exit",
+   "place": "Pier 400 outbound access road",
+   "lat": 33.74372,
+   "lon": -118.260285,
+   "reports": "One driver; a sign said traffic was moving",
+   "estimated_bad_probability": 0.2,
+   "web_finding": "contradicts",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "swap-truck",
+   "action_label": "Swap with SYN-TRK-12",
+   "recommended_action": "hold-course",
+   "override_reason": "SYN-TRK-07's driver was close to the duty-hour limit.",
+   "actual_road_state": "open",
+   "estimate": {
+    "lateness_min": 11.3,
+    "cost_usd": 49.13,
+    "co2_kg": 32.6,
+    "added_miles": 10.27,
+    "missed_appointments": 0.2
+   },
+   "actual": {
+    "lateness_min": 5.3,
+    "cost_usd": 45.63,
+    "co2_kg": 32.6,
+    "added_miles": 10.27,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 0,
+   "lesson": "The swap got SYN-SHP-1042 in 5 min after its window opened but cut SYN-SHP-1048's buffer from 18 min to 3.",
+   "pattern_ids": [
+    "gate-queue-variability"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-015",
+   "date": "2026-11-03",
+   "reported_at": "08:45",
+   "check_type": "crash",
+   "variant": "disruption",
+   "title": "Conflicting wreck reports on CA-47",
+   "place": "CA-47 connector",
+   "lat": 33.773,
+   "lon": -118.237,
+   "reports": "Driver reports conflicted",
+   "estimated_bad_probability": 0.069,
+   "web_finding": null,
+   "inspection": {
+    "flown": true,
+    "observation": "clear",
+    "wait_min": 6,
+    "changed_response": true
+   },
+   "action": "hold-course",
+   "action_label": "Keep current route",
+   "recommended_action": "hold-course",
+   "override_reason": null,
+   "actual_road_state": "open",
+   "estimate": {
+    "lateness_min": 3.7,
+    "cost_usd": 97.6,
+    "co2_kg": 15.1,
+    "added_miles": 1.3,
+    "missed_appointments": 0.07
+   },
+   "actual": {
+    "lateness_min": 0.0,
+    "cost_usd": 93.5,
+    "co2_kg": 13.0,
+    "added_miles": 0.0,
+    "missed_appointments": 0
+   },
+   "actual_note": null,
+   "schools_within_300m": 0,
+   "lesson": "The reports conflicted, so the $90 drone check paid for itself: it showed the road open and the load kept its route instead of driving 11 extra miles on Anaheim St.",
+   "pattern_ids": [
+    "driver-report-reliability",
+    "drone-verification-limits"
+   ],
+   "basis": "synthetic"
+  },
+  {
+   "id": "SYN-HIS-016",
+   "date": "2026-11-05",
+   "reported_at": "08:35",
+   "check_type": "environment",
+   "variant": "flood",
+   "title": "Water reported at the underpass",
+   "place": "Northern connector approach",
+   "lat": 33.780881,
+   "lon": -118.226268,
+   "reports": "One driver; no feed entry",
+   "estimated_bad_probability": 0.4217,
+   "web_finding": "nothing_found",
+   "inspection": {
+    "flown": false,
+    "observation": null,
+    "wait_min": 0,
+    "changed_response": false
+   },
+   "action": "reroute",
+   "action_label": "Avoid the water via Anaheim St",
+   "recommended_action": "reroute",
+   "override_reason": null,
+   "actual_road_state": "open",
+   "estimate": {
+    "lateness_min": 14.0,
+    "cost_usd": 29.46,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0.0
+   },
+   "actual": {
+    "lateness_min": 19.0,
+    "cost_usd": 32.38,
+    "co2_kg": 30.6,
+    "added_miles": 10.98,
+    "missed_appointments": 0
+   },
+   "actual_note": "Anaheim St ran 5 min slower than estimated behind school drop-off traffic.",
+   "schools_within_300m": 6,
+   "lesson": "The connector was passable, so avoiding the water paid 11 extra miles, 18 kg more CO2 and 19 min of lateness, and sent the truck past 6 schools.",
+   "pattern_ids": [
+    "neighborhood-truck-detour",
+    "water-main-break"
+   ],
+   "basis": "synthetic"
+  }
+ ]
+}

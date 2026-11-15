@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/insight.css">
   <link rel="stylesheet" href="/copilot.css">
   <link rel="stylesheet" href="/triage.css">
+  <link rel="stylesheet" href="/history.css">
 </head>
 <body data-mode="monitoring" data-step="start" data-view="map">
   <header class="topbar">
@@ -192,6 +193,7 @@
           </dl>
           <details class="more"><summary>Constraints</summary><ul id="constraints" class="constraints"></ul></details>
           <section id="web-triage" class="web-triage" aria-live="polite" hidden></section>
+          <section id="history-card" class="history-card" aria-label="Past decisions" hidden></section>
 
           <div class="verdict">
             <h2 id="inspection-title">Check by drone?</h2>
@@ -287,6 +289,10 @@
               </table>
             </div>
             <p id="report-indicators-note" class="note">Whole-plan estimates for the top-ranked response before inspection.</p>
+            <section id="report-outcomes" class="history-results" aria-labelledby="report-outcomes-title" hidden>
+              <h2 id="report-outcomes-title">Estimate and result</h2>
+              <div id="report-outcomes-body" class="history-results-body"></div>
+            </section>
             <h2 id="report-log-title">Decision log</h2>
             <ol id="report-log" class="report-log"></ol>
           </div>

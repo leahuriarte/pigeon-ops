@@ -288,7 +288,7 @@ Nothing changes until the dispatcher clicks "Use this finding". The finding is t
 
 At the `disruption` variant's 40%, a corroborating finding gives 0.4 × 0.60 / (0.4 × 0.60 + 0.6 × 0.08) = 83%, and the drone check's net value drops from +$116 to −$604, so it is no longer recommended. A contradicting finding gives 14% and nothing found gives 24%. The updated chance becomes the prior for everything after it, including the drone's value and the drone update; the two are treated as independent given the road state.
 
-Live feeds describe real roads now, while the incidents are fictional, so a live check usually finds nothing that matches. `config/web_triage_fixtures.json` holds synthetic records written for each incident (`SYN-` ids), used when the dispatcher picks "Demo feed" or when every live feed fails.
+Live feeds describe real roads now, while the incidents are fictional, so a live check usually finds nothing that matches. There is no synthetic fallback: if every feed is unreachable the check reports itself unavailable and the prior is unchanged.
 
 ## 10. Offline route candidates and synthetic traffic
 
@@ -297,6 +297,20 @@ Live feeds describe real roads now, while the incidents are fictional, so a live
 `config/synthetic_traffic.json` supplies synthetic time-of-day duration multipliers, maximum extra-delay ranges and a few route-specific multipliers. `backend/route_optimizer.py` searches every combination of saved candidates for each truck's ordered loads. It propagates positive delay from an earlier load to a later load on the same truck. A candidate's estimated arrival is its synthetic planned ETA plus the difference between its traffic-adjusted duration and the baseline candidate's saved duration, plus any carried delay. The illustrative chance of arriving after the appointment starts assumes additional delay is uniformly distributed from zero to the period's `extra_delay_max_min`. Estimated loss uses **expected** lateness and missed-appointment probability under that uniform delay, plus the same driving and emissions weights as the decision engine. This is an assumed distribution, not a calibrated forecast. An optional time is a **hypothetical shift start** from the saved synthetic truck positions: all planned ETAs move with it; it is not a live GPS update.
 
 Run `python3 scripts/preview_route_plan.py normal` to inspect the advisory search. It does not change dispatch, replace the incident/drone response model, account for incident probability, or validate restrictions such as truck access, bridge clearance or hazardous cargo. No route is applied without the dispatcher.
+
+## 11. Decision history
+
+The history shows the dispatcher how similar past reports turned out. `config/decision_history.json` holds 16 synthetic cases, and `outputs/decision-log.jsonl` holds decisions saved in the app at the end of the simulated morning. `backend/history.py` reads both.
+
+**Estimate and actual.** `history.decision_record` builds every record, both for the generator and for saved decisions. Let p be the chance of the bad road state when the decision was made: the posterior after the drone observation if the drone flew, else the prior after any web finding. The estimate is the chosen response's figures weighted by p, using the outcomes that start after the drone wait when it flew. The actual figures are that response's outcome for the road state that followed. Cost is `incremental_cost` plus the drone's `direct_cost` when it flew; added miles are `detail.added_miles`; missed appointments are `constraint_breaches`. A synthetic case may add a stated deviation to its actual figures (`actual_note`), for a model assumption that turned out wrong. For a saved decision the road state is the one the playback showed, so its actual figures are simulated.
+
+**Similarity.** Cases match on the kind of check (`crash`, `congestion`, `environment`). They are ordered by the gap between their estimated chance and the incident's chance now, then by date, newest first. The summary counts the cases with the road in the bad state and averages each response's estimate and actual figures.
+
+**Why it does not move the probability.** The blockage chance changes only with the web finding and the drone observation. The synthetic cases are written to illustrate lessons, not observed, so treating them as evidence would overstate what the tool knows. Their base rates sit within 0.2 of each variant's prior, which shows the assumed priors are plausible but does not test them.
+
+**Agents.** The web-check agent can call `search_decision_history` and may add one sentence on how similar reports turned out. The live feeds alone decide its finding; it may cite only case ids the tool returned, and its figures must appear in the tool results. The copilot's facts carry a `similar_past_decisions` block and its Q&A has a `past_decisions` tool.
+
+**Limits.** Sixteen cases are too few for reliable rates. Every case is synthetic and comes from the same engine it is compared with, so agreement between estimate and actual mostly reflects the model, apart from the stated deviations. Saved decisions use the playback's road state, not a real trip.
 
 ## Known limitations
 

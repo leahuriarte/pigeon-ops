@@ -8,9 +8,11 @@ Nothing changes until the dispatcher applies the finding. `apply_web_evidence` t
 chance with Bayes' rule, using the assumed table `decision_model.web_triage.likelihoods`, and every later
 analysis (including the drone's value) starts from the updated chance.
 
-Modes: `live` reads the real feeds, which describe real roads now while the incident is fictional; if every
-feed is unreachable it falls back to `demo`. `demo` uses the synthetic records in
-`config/web_triage_fixtures.json`.
+The feeds are live and describe real roads now, while the incident is fictional. If every feed is
+unreachable the check reports itself unavailable rather than guessing.
+
+The agent can also search the decision history (`backend/history.py`) and add one sentence on how similar
+past reports turned out. The history is synthetic and never decides the finding.
 """
 import json
 import math
@@ -18,18 +20,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime, timezone
-from pathlib import Path
 
-from backend import llm, web_feeds
+from backend import history, llm, web_feeds
 from backend.copilot import (CONFIDENCE, _arguments, _call_name, _force, _model, _structured, _text, _tool,
                              ungrounded_numbers)
 from backend.decision_engine import information_value, posterior_blocked
 
-ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = ROOT / "config" / "web_triage_fixtures.json"
 FINDINGS = ("corroborates", "contradicts", "nothing_found")
-MODES = ("live", "demo")
-FEEDS = ("chp", "signs", "weather")
 DEFAULT_RADIUS_KM = 2.0
 MIN_RADIUS_KM = 0.5
 MAX_ROUNDS = 5
@@ -129,31 +126,6 @@ def _live_sources(point):
         return {feed: future.result() for feed, future in futures.items()}
 
 
-def _demo_sources(variant, point, fixtures_path=FIXTURES):
-    data = json.loads(Path(fixtures_path).read_text(encoding="utf-8"))
-    names = {"chp": "CHP incident log", "signs": "Caltrans message signs", "weather": "NWS alerts"}
-    sources = {feed: {"source": f"{names[feed]} (synthetic demo feed)", "feed_url": str(fixtures_path.name),
-                      "status": "ok", "items": []} for feed in FEEDS}
-    for record in data["variants"].get(variant, []):
-        item = {key: value for key, value in record.items() if key != "feed"}
-        has_place = item.get("lat") is not None and item.get("lon") is not None
-        item["distance_km"] = round(web_feeds.distance_km(point, (item["lat"], item["lon"])), 1) if has_place else None
-        item["basis"] = "synthetic"
-        sources[record["feed"]]["items"].append(item)
-    return sources
-
-
-def gather(variant, point, mode, live_fn=None):
-    """(sources by feed, mode used, fallback reason or None)."""
-    if mode == "demo":
-        return _demo_sources(variant, point), "demo", None
-    sources = (live_fn or _live_sources)(point)
-    if all(source["status"] != "ok" for source in sources.values()):
-        reasons = "; ".join(f"{source['source']}: {source['status']}" for source in sources.values())
-        return _demo_sources(variant, point), "demo", f"every live feed failed ({reasons})"
-    return sources, "live", None
-
-
 def _within(items, radius_km):
     return [item for item in items if item["distance_km"] is None or item["distance_km"] <= radius_km]
 
@@ -204,7 +176,10 @@ TRIAGE_SYSTEM = (
     "'nothing_found' if nothing relevant turned up. A missing report is weak evidence: a fresh incident may "
     "not be logged yet. Records more than about 2 km away or on another road rarely speak to this spot. "
     "Cite the ids of the records you relied on. Use only figures that appear in the records or the incident. "
-    "Write the summary in at most three short, plain sentences. The dispatcher decides whether to use it."
+    "Write the summary in at most three short, plain sentences. Also call search_decision_history. The live "
+    "feeds alone decide the finding. You may add one sentence on how similar past reports turned out and which "
+    "response held up; say the history is synthetic and list the case ids you used in history_ids. "
+    "The dispatcher decides whether to use it."
 )
 RADIUS = {"type": "number", "minimum": MIN_RADIUS_KM, "maximum": web_feeds.MAX_RADIUS_KM,
           "description": f"Search radius in km around the reported spot (default {DEFAULT_RADIUS_KM:g})."}
@@ -216,15 +191,21 @@ SEARCH_TOOLS = [
     _tool("weather_alerts", "Active National Weather Service alerts covering the reported spot.", {}),
 ]
 TOOL_FEEDS = {"search_chp_incidents": "chp", "read_message_signs": "signs", "weather_alerts": "weather"}
+HISTORY_TOOL = _tool("search_decision_history",
+                     "Synthetic past decisions on similar reports: what was estimated and what happened. "
+                     "A reference only; it does not decide the finding.", {})
 
 
 def _report_tool():
     return _tool("report_triage", "Report what the public feeds say about the incident.", {
         "finding": {"type": "string", "enum": list(FINDINGS)},
         "confidence": {"type": "string", "enum": list(CONFIDENCE)},
-        "summary": {"type": "string", "description": "At most three short sentences."},
+        "summary": {"type": "string",
+                    "description": "At most three short sentences on the feeds, plus at most one on the history."},
         "cited_ids": {"type": "array", "items": {"type": "string"}, "description": "Ids of the records relied on."},
-    })
+        "history_ids": {"type": "array", "items": {"type": "string"},
+                        "description": "Ids of the past cases relied on, if any."},
+    }, required=["finding", "confidence", "summary", "cited_ids"])
 
 
 def _radius(arguments):
@@ -253,10 +234,11 @@ def run_search(name, arguments, sources, seen, searches):
                                              for item in shown]}
 
 
-def _validate_report(reply, seen, incident, results):
+def _validate_report(reply, seen, incident, results, seen_history=()):
     finding, confidence = reply.get("finding"), reply.get("confidence")
     summary, cited = reply.get("summary"), reply.get("cited_ids", [])
-    if finding not in FINDINGS or confidence not in CONFIDENCE or not _text(summary):
+    history_ids = reply.get("history_ids") or []
+    if finding not in FINDINGS or confidence not in CONFIDENCE or not _text(summary, 800):
         raise ValueError("malformed triage report")
     if not isinstance(cited, list) or not all(isinstance(item, str) for item in cited):
         raise ValueError("cited_ids must be a list of record ids")
@@ -265,21 +247,39 @@ def _validate_report(reply, seen, incident, results):
         raise ValueError("cited a record the searches did not return")
     if finding != "nothing_found" and not cited:
         raise ValueError("a corroborating or contradicting finding must cite a record")
-    if ungrounded_numbers(summary, incident, results):
+    if not isinstance(history_ids, list) or not all(isinstance(item, str) for item in history_ids):
+        raise ValueError("history_ids must be a list of case ids")
+    history_ids = list(dict.fromkeys(item.strip() for item in history_ids))
+    if any(item not in seen_history for item in history_ids):
+        raise ValueError("cited a past case the history search did not return")
+    if ungrounded_numbers(summary, incident, results):  # results include any history search
         raise ValueError("ungrounded numbers")
-    return {"finding": finding, "confidence": confidence, "summary": summary.strip(), "cited_ids": cited}
+    return {"finding": finding, "confidence": confidence, "summary": summary.strip(), "cited_ids": cited,
+            "history_ids": history_ids}
 
 
-def llm_triage(incident, sources, chat_fn=None):
-    """Run the search-then-report loop. Raises LLMUnavailable or ValueError when no usable report comes back."""
+def run_history_search(past, seen_history):
+    """The history tool's result, from a `history.report` result; records the case ids it showed."""
+    result = history.tool_result(past)
+    seen_history.update(case["id"] for case in result.get("cases", []))
+    return result
+
+
+def llm_triage(incident, sources, chat_fn=None, past=None):
+    """Run the search-then-report loop. Raises LLMUnavailable or ValueError when no usable report comes back.
+
+    `past` is the `history.report` result the history tool shows. Searching it does not count as searching
+    a feed.
+    """
     chat_fn = chat_fn or llm.chat
     report = _report_tool()
+    past = past or {"available": False, "reason": "no decision history"}
     messages = [{"role": "system", "content": TRIAGE_SYSTEM},
                 {"role": "user", "content": "Incident report, as JSON:\n" + json.dumps(incident, indent=1)}]
-    seen, searches, results = {}, [], []
+    seen, searches, results, seen_history = {}, [], [], set()
     for round_ in range(MAX_ROUNDS + 1):
         last = round_ == MAX_ROUNDS
-        message = chat_fn(messages, tools=[report] if last else [*SEARCH_TOOLS, report],
+        message = chat_fn(messages, tools=[report] if last else [*SEARCH_TOOLS, HISTORY_TOOL, report],
                           tool_choice=_force("report_triage") if last else None)
         calls = [call for call in message.get("tool_calls") or [] if isinstance(call, dict)]
         names = [_call_name(call) for call in calls]
@@ -287,11 +287,12 @@ def llm_triage(incident, sources, chat_fn=None):
             if not searches:
                 raise ValueError("reported without searching any feed")
             reply = _structured(message, "report_triage")
-            return {**_validate_report(reply, seen, incident, results), "searches": searches}
+            return {**_validate_report(reply, seen, incident, results, seen_history), "searches": searches}
         messages.append({"role": "assistant", "content": message.get("content") or "", "tool_calls": calls})
         for index, (call, name) in enumerate(zip(calls, names)):
             try:
-                result = run_search(name, _arguments(call), sources, seen, searches)
+                result = (run_history_search(past, seen_history) if name == HISTORY_TOOL["function"]["name"]
+                          else run_search(name, _arguments(call), sources, seen, searches))
             except ValueError as error:
                 result = {"error": str(error)}
             results.append(result)
@@ -303,20 +304,37 @@ def llm_triage(incident, sources, chat_fn=None):
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-def triage(scenario, variant, mode="live", chat_fn=None, live_fn=None):
-    if mode not in MODES:
-        raise ValueError("mode must be live or demo")
+def _past(scenario, variant):
+    """The decision history for this incident. A history failure never breaks the web check."""
+    try:
+        return history.report(scenario, variant)
+    except Exception as error:  # noqa: BLE001 - the history is optional here
+        return {"available": False, "reason": f"decision history failed: {error}"}
+
+
+def _history_brief(past, cited_ids):
+    if not past.get("available"):
+        return {"available": False, "reason": past.get("reason"), "count": 0, "bad_count": 0, "line": None,
+                "cited_ids": [], "basis": "synthetic"}
+    summary = past["summary"]
+    return {"available": True, "count": summary["count"], "bad_count": summary["bad_count"],
+            "line": summary["line"], "cited_ids": cited_ids, "basis": "synthetic"}
+
+
+def triage(scenario, variant, chat_fn=None, live_fn=None):
     if scenario.get("scenario_type") != "disruption":
         return _unavailable("no incident to triage")
-    key = (variant, mode)
-    hit = _cache.get(key)
+    hit = _cache.get(variant)
     if hit and time.monotonic() - hit[0] < CACHE_S and chat_fn is None and live_fn is None:
         return hit[1]
 
     place = incident_point(scenario)
     point = (place["lat"], place["lon"])
     check = _check(scenario)
-    sources, mode_used, fallback = gather(variant, point, mode, live_fn)
+    sources = (live_fn or _live_sources)(point)
+    if all(source["status"] != "ok" for source in sources.values()):
+        reasons = "; ".join(f"{source['source']}: {source['status']}" for source in sources.values())
+        return _unavailable(f"every live feed failed ({reasons})")  # Not cached, so the next run retries.
     disruption = scenario["disruption"]
     incident = {
         "title": disruption.get("title"), "description": disruption.get("description"),
@@ -324,13 +342,13 @@ def triage(scenario, variant, mode="live", chat_fn=None, live_fn=None):
         "kind_of_check": {"label": check["label"], "bad_state": f"road {check['bad']}",
                           "good_state": f"road {check['good']}"},
         "reported_spot": {"name": "CA-47 connector", "lat": place["lat"], "lon": place["lon"]},
-        "feeds": ("synthetic demo records written to match this incident" if mode_used == "demo" else
-                  "live public feeds describing real roads right now; the incident itself is a fictional scenario"),
+        "feeds": "live public feeds describing real roads right now; the incident itself is a fictional scenario",
     }
 
+    past = _past(scenario, variant)
     agent, agent_note = "llm", None
     try:
-        report = llm_triage(incident, sources, chat_fn)
+        report = llm_triage(incident, sources, chat_fn, past)
     except llm.LLMUnavailable as error:
         agent, agent_note, report = "rules", f"LLM unavailable: {error.reason}", rule_finding(sources, check)
     except (ValueError, TypeError, KeyError, AttributeError) as error:  # Any malformed reply falls back to rules.
@@ -342,7 +360,6 @@ def triage(scenario, variant, mode="live", chat_fn=None, live_fn=None):
         key=lambda item: (not item["cited"], item["distance_km"] is None, item["distance_km"] or 0))
     result = {
         "available": True, "scenario_id": variant, "incident_id": disruption.get("id"),
-        "mode_requested": mode, "mode": mode_used, "fallback_reason": fallback,
         "agent": agent, "agent_note": agent_note,
         "basis": llm.BASIS if agent == "llm" else "rule_based", "model": _model() if agent == "llm" else None,
         "finding": report["finding"], "confidence": report["confidence"], "summary": report["summary"],
@@ -353,9 +370,10 @@ def triage(scenario, variant, mode="live", chat_fn=None, live_fn=None):
         "evidence": evidence[:12],
         "effect": effect_of(scenario, report["finding"]),
         "check": check,
+        "history": _history_brief(past, report.get("history_ids", [])),
         "point": {"lat": place["lat"], "lon": place["lon"], "name": place.get("name")},
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     if chat_fn is None and live_fn is None:
-        _cache[key] = (time.monotonic(), result)
+        _cache[variant] = (time.monotonic(), result)
     return result

@@ -113,7 +113,8 @@
       "label": "Schools near routes",
       "kind": "public baseline",
       "source": "OpenStreetMap amenity=school through the Overpass API; see config/community_exposure.json"
-    }
+    },
+    {"label": "Decision history", "kind": "synthetic", "source": "Hand-written past decisions scored by the decision engine; see config/decision_history.json"}
   ],
   "decision_model": {
     "lateness_cost_per_minute": 85,

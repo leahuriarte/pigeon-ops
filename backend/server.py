@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from backend import copilot, llm, triage
+from backend import copilot, history, llm, triage
 from backend.decision_engine import analyze
 from backend.inspection import ASSETS, list_inspections, review_inspection
 from backend.playback import build_playback
@@ -68,14 +68,13 @@ class DemoHandler(BaseHTTPRequestHandler):
                 check = None
             cached = copilot.cached_footage_opinion(case["id"], (check or {}).get("type"))
             return self._json(cached or copilot.footage_opinion(case, check=check))
-        if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback", "/api/llm/brief", "/api/triage"):
+        if parsed.path not in ("/api/scenario", "/api/analysis", "/api/playback", "/api/llm/brief", "/api/triage",
+                               "/api/history"):
             return self._static(parsed.path)
 
         variant = params.get("scenario", "disruption")
         try:
             triage.validate_finding(params.get("web"))
-            if params.get("mode", "live") not in triage.MODES:
-                raise ValueError("mode must be live or demo")
         except ValueError as error:
             return self._json({"error": str(error)}, 400)
         try:
@@ -83,11 +82,13 @@ class DemoHandler(BaseHTTPRequestHandler):
         except ValueError as error:
             return self._json({"error": str(error)}, 404)
         if parsed.path == "/api/triage":
-            return self._json(triage.triage(scenario, variant, params.get("mode", "live")))
+            return self._json(triage.triage(scenario, variant))
         try:  # The dispatcher applied the web triage finding: start from the updated blockage chance.
             scenario = triage.apply_web_evidence(scenario, params.get("web"))
         except ValueError as error:
             return self._json({"error": str(error)}, 400)
+        if parsed.path == "/api/history":  # A reference only: it never moves the blockage chance.
+            return self._json(history.report(scenario, variant))
         if parsed.path == "/api/scenario":
             return self._json({**scenario, "analysis": analyze(scenario)})
         if parsed.path in ("/api/analysis", "/api/llm/brief"):
@@ -106,7 +107,7 @@ class DemoHandler(BaseHTTPRequestHandler):
 
     def _post(self):
         path = urlparse(self.path).path
-        if path not in ("/api/inspection-review", "/api/llm/ask"):
+        if path not in ("/api/inspection-review", "/api/llm/ask", "/api/history"):
             return self._json({"error": "not found"}, 404)
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -115,9 +116,38 @@ class DemoHandler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             if path == "/api/llm/ask":
                 return self._json(self._ask(payload))
+            if path == "/api/history":
+                return self._json(self._save_decision(payload))
             return self._json(review_inspection(payload))
         except (ValueError, UnicodeDecodeError) as error:
             return self._json({"error": str(error)}, 400)
+
+    @staticmethod
+    def _save_decision(payload):
+        """Save one decision made in the app with its estimate and its simulated result."""
+        if not isinstance(payload, dict):
+            raise ValueError("Request must be a JSON object")
+        run_id, variant = payload.get("run_id"), payload.get("scenario")
+        if not isinstance(run_id, str) or not 0 < len(run_id.strip()) <= 100:
+            raise ValueError("run_id must be text of 1 to 100 characters")
+        if not isinstance(variant, str):
+            raise ValueError("Scenario must be a name")
+        observation = payload.get("observation")
+        if observation not in (None, "blocked", "clear", "inconclusive"):
+            raise ValueError("observation must be blocked, clear, inconclusive or null")
+        if payload.get("road") not in ("open", "blocked"):
+            raise ValueError("road must be open or blocked")
+        reason = payload.get("override_reason")
+        if reason is not None and (not isinstance(reason, str) or len(reason) > 300):
+            raise ValueError("override_reason must be text of at most 300 characters, or null")
+        web = triage.validate_finding(payload.get("web"))
+        scenario = load_scenario(variant=variant)  # ValueError for an unknown variant
+        if scenario.get("scenario_type") != "disruption":
+            raise ValueError("only an incident decision can be saved")
+        scenario = triage.apply_web_evidence(scenario, web)
+        record = history.decision_record(scenario, analyze(scenario, observation), payload.get("action"),
+                                         payload["road"], observation, web, reason, run_id.strip(), variant=variant)
+        return {"record": history.save(record)}
 
     @staticmethod
     def _ask(payload):

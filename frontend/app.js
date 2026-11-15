@@ -1,6 +1,7 @@
 import { openInspection, resetInspection } from "./inspection.js";
 import { clearBrief, initAsk, renderBrief, resetAsk } from "./copilot.js";
-import { clearTriage, renderTriage, setAppliedWeb, withWeb } from "./triage.js";
+import { appliedWeb, clearTriage, renderTriage, setAppliedWeb, withWeb } from "./triage.js";
+import { annotateRankings, clearHistory, newHistoryRun, rememberDecision, renderHistory, renderHistoryResults, setRememberedRoad } from "./history.js";
 import { inspectionSentence, inspectionChoices, responseExplanation, accuracyNote, renderSensitivity, outcomeCases } from "./insight.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -1160,6 +1161,7 @@ function renderRankings(items, observation = null, blocked = scenario.disruption
       </label>
     </li>`;
   }).join("");
+  annotateRankings($("#rankings"));
   renderConfirm();
 }
 
@@ -1581,18 +1583,28 @@ async function triggerIncident() {
   mode = "incident";
   setAppliedWeb(null);
   clearTriage($("#web-triage"));
+  clearHistory($("#history-card"));
   if (!(await loadScenario(reports[reportIndex].id, { keepTime: true }))) return;
   const d = scenario.disruption;
   logDecision(`${d.title}. Reported ${clockLabel(incidentAt())} (simulated). ${d.evidence_summary}. Synthetic scenario.`);
   logDecision(`${inspectionSentence(scenario.analysis.evoi)} ${inspectionChoices(scenario.analysis.evoi, check())}`);
   setStep("incident");
   renderTriage($("#web-triage"), activeScenario, { onApply: applyWebFinding });
+  loadHistory();
+}
+
+// Past decisions for the incident on screen; a reference that never changes the estimate.
+function loadHistory() {
+  renderHistory($("#history-card"), activeScenario, {
+    onOpen: (text) => logDecision(`Viewed past decisions: ${text}`),
+  }).catch((error) => console.error(error));
 }
 
 // The dispatcher used (or stopped using) the web check's finding: reload the incident from the new chance.
 async function applyWebFinding(finding, result) {
   setAppliedWeb(finding);
   if (!(await loadScenario(activeScenario, { keepTime: true }))) return;
+  loadHistory();
   const cited = result.cited_ids.length ? ` (${result.cited_ids.join(", ")})` : "";
   logDecision(finding
     ? `Web check used: ${result.finding.replace("_", " ")}${cited}. ${riskText()} at ${incidentPlace()} now ${pct(scenario.disruption.prior_blocked_probability)}.`
@@ -1618,6 +1630,8 @@ async function restartMorning() {
   setSpeed(5);
   setAppliedWeb(null);
   clearTriage($("#web-triage"));
+  clearHistory($("#history-card"));
+  newHistoryRun();
   if (!(await loadScenario("normal"))) return;
   setStep("start");
   setView("map");
@@ -1625,10 +1639,17 @@ async function restartMorning() {
 
 function confirmResponse() {
   const label = actionLabel(plan.action);
+  const reason = plan.action === modelPick?.id ? null : $("#override-reason").value.trim();
   logDecision($("#response-why").textContent);
-  logDecision(plan.action === modelPick?.id
+  logDecision(reason === null
     ? `Confirmed: ${label} (recommended).`
-    : `Chose ${label} over ${modelPick.label}. Reason: ${$("#override-reason").value.trim()}`);
+    : `Chose ${label} over ${modelPick.label}. Reason: ${reason}`);
+  // Saved to the decision history when the shift report is shown; a later confirmation replaces it.
+  if (reportIndex >= 0) {
+    rememberDecision(reportIndex, {
+      scenario: activeScenario, action: plan.action, road: plan.road, observation: observed, web: appliedWeb(), override_reason: reason,
+    }, { label: reports[reportIndex].label, check: check() });
+  }
   mode = "incident";
   setStep("outcome");
   setView("map");
@@ -1674,6 +1695,7 @@ function renderReport() {
     : `Completed: ${action.label}. Recommended: ${modelPick.label}.`;
   $("#report-log").innerHTML = [...decisionLog, { t: currentTime, text: closing }]
     .map((entry) => `<li><time>${clockLabel(entry.t)}</time><span>${esc(entry.text)}</span></li>`).join("");
+  renderHistoryResults($("#report-outcomes")).catch((error) => console.error(error));
 }
 
 // Skips to the next report while one is still due, otherwise to the end of the morning.
@@ -1754,6 +1776,7 @@ function bindEvents() {
   });
   $$('input[name="road"]').forEach((input) => input.addEventListener("change", () => {
     plan = { ...plan, road: input.value };
+    if (mode === "incident" && step === "outcome") setRememberedRoad(reportIndex, input.value);
     loadPlayback({ keepTime: true }).catch(fail);
   }));
   // The ask box's text input is an input, so the space-bar handler below ignores it.

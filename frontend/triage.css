@@ -6,10 +6,9 @@
 .web-triage[data-finding="contradicts"] { border-left: 5px solid var(--ok); }
 .web-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; align-self: stretch; }
 .web-head h2 { font-family: var(--font-display); font-size: 17px; }
-.web-mode { display: flex; gap: 4px; }
-.web-mode .btn[aria-pressed="true"] { background: var(--ink); color: var(--white); }
 .web-triage h3 { font-family: var(--font-display); font-size: 16px; }
 .web-summary { font-size: 13.5px; }
+.web-history { padding-left: 8px; border-left: 3px solid var(--hair); font-size: 13px; }
 .web-effect { padding: 6px 8px; border-left: 3px solid var(--signal); background: var(--checked); font-size: 13px; }
 .web-effect.applied { border-left-color: var(--ink); background: var(--card); }
 .web-actions { display: flex; gap: 8px; }

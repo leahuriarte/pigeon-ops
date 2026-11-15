@@ -8,6 +8,7 @@ from backend.scenario import available_scenarios, load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
 LIBRARY = ROOT / "cv" / "review_library" / "library.json"
+HISTORY = ROOT / "config" / "decision_history.json"
 INDICATOR_IDS = {"shipments_at_risk", "appointments_feasible", "expected_delay_min", "added_miles", "co2_kg", "community_exposure"}
 BASES = {"stub", "estimated", "simulated", "measured"}
 CHECK_TYPES = {"crash", "congestion", "environment"}
@@ -62,23 +63,62 @@ class ScenarioContractTests(unittest.TestCase):
 
 
 class WebTriageContractTests(unittest.TestCase):
-    def test_likelihoods_and_fixtures_match_contract(self):
+    def test_likelihoods_match_contract(self):
         model = load_scenario(variant="disruption")["decision_model"]["web_triage"]
         self.assertEqual("assumed", model["basis"])
         for state in ("blocked", "open"):
             row = model["likelihoods"][state]
             self.assertEqual({"corroborates", "contradicts", "nothing_found"}, set(row))
             self.assertAlmostEqual(1.0, sum(row.values()))
-        fixtures = json.loads((ROOT / "config" / "web_triage_fixtures.json").read_text(encoding="utf-8"))
-        self.assertEqual("synthetic", fixtures["basis"])
-        incidents = {item["id"] for item in available_scenarios()} - {"normal"}
-        self.assertLessEqual(incidents, set(fixtures["variants"]))
-        for records in fixtures["variants"].values():
-            for record in records:
-                self.assertTrue(record["id"].startswith("SYN-"))
-                self.assertIn(record["feed"], {"chp", "signs", "weather"})
-                self.assertLessEqual({"source", "source_url", "title", "detail", "time", "lat", "lon"}, set(record))
         self.assertIn("web_evidence", analyze(load_scenario(variant="disruption")))
+
+
+class DecisionHistoryContractTests(unittest.TestCase):
+    CASE = {"id", "date", "reported_at", "check_type", "variant", "title", "place", "lat", "lon", "reports",
+            "estimated_bad_probability", "web_finding", "inspection", "action", "action_label", "recommended_action",
+            "override_reason", "actual_road_state", "estimate", "actual", "actual_note", "schools_within_300m",
+            "lesson", "pattern_ids", "basis"}
+    FIGURES = {"lateness_min", "cost_usd", "co2_kg", "added_miles", "missed_appointments"}
+    PATTERNS = {"crash-clearance-time", "public-feed-lag", "driver-report-reliability", "gate-queue-variability",
+                "water-main-break", "flood-depth-unknown", "neighborhood-truck-detour", "diesel-idle-vs-miles",
+                "drone-verification-limits"}
+
+    def test_committed_history_matches_contract(self):
+        data = json.loads(HISTORY.read_text(encoding="utf-8"))
+        self.assertEqual("synthetic", data["basis"])
+        self.assertIn("not real dispatch records", data["note"])
+        self.assertEqual("scripts/build_decision_history.py", data["generated_by"])
+        self.assertEqual(self.PATTERNS, {pattern["id"] for pattern in data["patterns"]})
+        for pattern in data["patterns"]:
+            self.assertLessEqual({"id", "claim", "source", "source_url"}, set(pattern))
+        self.assertGreaterEqual(len(data["cases"]), 12)
+        rates = {}
+        for case in data["cases"]:
+            with self.subTest(case=case["id"]):
+                self.assertLessEqual(self.CASE, set(case))
+                self.assertRegex(case["id"], r"^SYN-HIS-\d{3}$")
+                self.assertEqual("synthetic", case["basis"])
+                scenario = load_scenario(variant=case["variant"])
+                self.assertEqual(scenario["disruption"]["check"]["type"], case["check_type"])
+                self.assertIn(case["web_finding"], (None, "corroborates", "contradicts", "nothing_found"))
+                self.assertLessEqual({"flown", "observation", "wait_min", "changed_response"}, set(case["inspection"]))
+                self.assertIn(case["inspection"]["observation"], (None, "blocked", "clear", "inconclusive"))
+                self.assertEqual(case["inspection"]["flown"], case["inspection"]["observation"] is not None)
+                actions = {action["id"] for action in scenario["decision_model"]["actions"]}
+                self.assertLessEqual({case["action"], case["recommended_action"]}, actions)
+                self.assertEqual(case["override_reason"] is None, case["action"] == case["recommended_action"])
+                self.assertIn(case["actual_road_state"], ("open", "blocked"))
+                self.assertTrue(0 <= case["estimated_bad_probability"] <= 1)
+                self.assertEqual(self.FIGURES, set(case["estimate"]))
+                self.assertEqual(self.FIGURES, set(case["actual"]))
+                self.assertTrue(1 <= len(case["pattern_ids"]) <= 3)
+                self.assertLessEqual(set(case["pattern_ids"]), self.PATTERNS)
+                self.assertTrue(case["lesson"].endswith("."))
+                prior = scenario["disruption"]["prior_blocked_probability"]
+                rates.setdefault(case["variant"], (prior, []))[1].append(case["actual_road_state"] == "blocked")
+        for variant, (prior, states) in rates.items():
+            with self.subTest(variant=variant):
+                self.assertLessEqual(abs(sum(states) / len(states) - prior), 0.2)
 
 
 class InspectionLibraryContractTests(unittest.TestCase):

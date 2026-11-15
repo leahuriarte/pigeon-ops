@@ -1,12 +1,14 @@
 """Web triage: feed parsing, the agent loop, the Bayes update and the endpoints. No network: live feeds are
 replaced by recorded samples below, and the LLM is either disabled, a fake function or the local stub."""
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from backend import llm, triage, web_feeds
+from backend import history, llm, triage, web_feeds
 from backend.decision_engine import analyze
 from backend.scenario import load_scenario
 from scripts import llm_stub
@@ -135,41 +137,36 @@ class ApplyTests(TriageTestCase):
             triage.apply_web_evidence(load_scenario(variant="disruption"), "maybe")
         with self.assertRaises(ValueError):
             triage.apply_web_evidence(load_scenario(variant="normal"), "corroborates")
-        self.assertFalse(triage.triage(load_scenario(variant="normal"), "normal", "demo")["available"])
+        self.assertFalse(triage.triage(load_scenario(variant="normal"), "normal")["available"])
 
 
-class RuleAndModeTests(TriageTestCase):
-    def test_demo_feed_without_an_llm_uses_rules(self):
-        expected = {"disruption": "corroborates", "disruption_b": "corroborates",
-                    "congestion": "corroborates", "flood": "contradicts"}
-        with no_llm():
-            for variant, finding in expected.items():
-                with self.subTest(variant=variant):
-                    result = triage.triage(load_scenario(variant=variant), variant, "demo")
-                    self.assertEqual(("demo", "rules", "rule_based"), (result["mode"], result["agent"], result["basis"]))
-                    self.assertEqual(finding, result["finding"])
-                    self.assertTrue(result["cited_ids"])
-                    self.assertTrue(all(item["basis"] == "synthetic" for item in result["evidence"]))
-                    self.assertTrue(all(item["id"].startswith("SYN-") for item in result["evidence"]))
-
-    def test_live_mode_reads_the_feeds(self):
+class RuleTests(TriageTestCase):
+    def test_feeds_without_an_llm_use_rules(self):
         with no_llm(), patch.object(web_feeds, "fetch", fake_fetch):
-            result = triage.triage(load_scenario(variant="disruption"), "disruption", "live")
-        self.assertEqual("live", result["mode"])
+            result = triage.triage(load_scenario(variant="disruption"), "disruption")
+        self.assertEqual(("rules", "rule_based"), (result["agent"], result["basis"]))
         self.assertEqual("corroborates", result["finding"])
         self.assertIn("CHP-261114LA0001", result["cited_ids"])
         self.assertEqual({"ok"}, {source["status"] for source in result["sources"]})
+        self.assertTrue(all(item["basis"] == "live" for item in result["evidence"]))
 
-    def test_live_mode_falls_back_to_the_demo_feed_when_every_feed_fails(self):
+    def test_traffic_getting_through_contradicts(self):
+        item = {"id": "CHP-1", "source": "CHP", "title": "Flooding on SR47", "detail": "Lanes open, traffic passing",
+                "distance_km": 0.3}
+        sources = {"chp": {"status": "ok", "items": [item]}, "signs": {"status": "ok", "items": []}}
+        result = triage.rule_finding(sources, {"type": "environment", "good": "passable"})
+        self.assertEqual(("contradicts", ["CHP-1"]), (result["finding"], result["cited_ids"]))
+
+    def test_every_feed_failing_makes_the_check_unavailable(self):
         with no_llm(), patch.object(web_feeds, "fetch", failing_fetch):
-            result = triage.triage(load_scenario(variant="disruption"), "disruption", "live")
-        self.assertEqual(("live", "demo"), (result["mode_requested"], result["mode"]))
-        self.assertIn("every live feed failed", result["fallback_reason"])
+            result = triage.triage(load_scenario(variant="disruption"), "disruption")
+        self.assertFalse(result["available"])
+        self.assertIn("every live feed failed", result["reason"])
 
     def test_nothing_nearby_is_nothing_found(self):
         with no_llm(), patch.object(web_feeds, "fetch", lambda url, accept="*/*": b'{"data": [], "features": []}'
                                     if "json" in url or "weather" in url else CHP_XML.replace(b"33773600", b"33873600")):
-            result = triage.triage(load_scenario(variant="disruption"), "disruption", "live")
+            result = triage.triage(load_scenario(variant="disruption"), "disruption")
         self.assertEqual("nothing_found", result["finding"])
         self.assertEqual([], result["cited_ids"])
 
@@ -182,26 +179,27 @@ class AgentTests(TriageTestCase):
             calls.append({"messages": messages, **kwargs})
             return replies[min(len(calls), len(replies)) - 1]
 
-        result = triage.triage(load_scenario(variant="disruption"), "disruption", "demo", chat_fn=fake_chat)
+        with patch.object(web_feeds, "fetch", fake_fetch):
+            result = triage.triage(load_scenario(variant="disruption"), "disruption", chat_fn=fake_chat)
         return result, calls
 
     def test_agent_searches_then_reports(self):
         result, calls = self.run_agent([
             tool_reply("search_chp_incidents", {"radius_km": 3}),
-            tool_reply("report_triage", {"finding": "corroborates", "confidence": "high", "cited_ids": ["SYN-CHP-0914A"],
+            tool_reply("report_triage", {"finding": "corroborates", "confidence": "high", "cited_ids": ["CHP-261114LA0001"],
                                          "summary": "CHP logged a big rig on its side blocking lanes at 09:08."}),
         ])
         self.assertEqual(("llm", "corroborates", "high"), (result["agent"], result["finding"], result["confidence"]))
         self.assertEqual([{"tool": "search_chp_incidents", "radius_km": 3.0, "status": "ok", "found": 1}], result["searches"])
         tool_message = json.loads(calls[1]["messages"][-1]["content"])
-        self.assertEqual("SYN-CHP-0914A", tool_message["records"][0]["id"])
+        self.assertEqual("CHP-261114LA0001", tool_message["records"][0]["id"])
         self.assertTrue(result["evidence"][0]["cited"])
 
     def test_bad_reports_fall_back_to_rules(self):
         search = tool_reply("search_chp_incidents", {})
         cases = {
-            "invented id": {"finding": "corroborates", "confidence": "high", "cited_ids": ["SYN-NOPE"], "summary": "Seen."},
-            "ungrounded": {"finding": "corroborates", "confidence": "high", "cited_ids": ["SYN-CHP-0914A"],
+            "invented id": {"finding": "corroborates", "confidence": "high", "cited_ids": ["CHP-NOPE"], "summary": "Seen."},
+            "ungrounded": {"finding": "corroborates", "confidence": "high", "cited_ids": ["CHP-261114LA0001"],
                            "summary": "Seven units and 45 minutes to clear."},
             "uncited": {"finding": "contradicts", "confidence": "low", "cited_ids": [], "summary": "Looks fine."},
         }
@@ -216,7 +214,7 @@ class AgentTests(TriageTestCase):
 
     def test_malformed_tool_calls_and_nan_radius_do_not_crash(self):
         report = tool_reply("report_triage", {"finding": "corroborates", "confidence": "high",
-                                              "cited_ids": ["SYN-CHP-0914A"], "summary": "CHP logged a big rig."})
+                                              "cited_ids": ["CHP-261114LA0001"], "summary": "CHP logged a big rig."})
         odd_shapes = {"role": "assistant", "content": None, "tool_calls": [
             {"id": "c1", "function": "search_chp_incidents"}, {"id": "c2", "function": {"name": ["x"]}}]}
         result, _ = self.run_agent([odd_shapes, tool_reply("search_chp_incidents", {"radius_km": float("nan")}), report])
@@ -235,10 +233,83 @@ class AgentTests(TriageTestCase):
         stub, url = llm_stub.start()
         self.addCleanup(stub.server_close)
         self.addCleanup(stub.shutdown)
-        with llm_env(PIGEONOPS_LLM_BASE_URL=url, PIGEONOPS_LLM_MODEL="stub-llm", PIGEONOPS_LLM_API_KEY="stub"):
-            result = triage.triage(load_scenario(variant="disruption"), "disruption", "demo")
+        with llm_env(PIGEONOPS_LLM_BASE_URL=url, PIGEONOPS_LLM_MODEL="stub-llm", PIGEONOPS_LLM_API_KEY="stub"),                 patch.object(web_feeds, "fetch", fake_fetch):
+            result = triage.triage(load_scenario(variant="disruption"), "disruption")
         self.assertEqual(("llm", "stub-llm", "corroborates"), (result["agent"], result["model"], result["finding"]))
         self.assertEqual(["search_chp_incidents", "read_message_signs"], [s["tool"] for s in result["searches"]])
+
+
+class HistoryToolTests(TriageTestCase):
+    run_agent = AgentTests.run_agent
+
+    def setUp(self):
+        super().setUp()
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        patcher = patch.object(history, "LOG", Path(folder.name) / "decision-log.jsonl")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def report(self, **changes):
+        return tool_reply("report_triage", {
+            "finding": "corroborates", "confidence": "high", "cited_ids": ["CHP-261114LA0001"],
+            "summary": "CHP logged a big rig on its side blocking lanes. In the synthetic history, rerouting held up.",
+            **changes})
+
+    def test_agent_reads_the_history_and_cites_cases(self):
+        result, calls = self.run_agent([tool_reply("search_chp_incidents", {}), tool_reply("search_decision_history", {}),
+                                        self.report(history_ids=["SYN-HIS-001"])])
+        self.assertIn("search_decision_history", [tool["function"]["name"] for tool in calls[0]["tools"]])
+        shown = json.loads(calls[2]["messages"][-1]["content"])
+        self.assertEqual("synthetic", shown["basis"])
+        self.assertIn("SYN-HIS-001", [case["id"] for case in shown["cases"]])
+        self.assertEqual("llm", result["agent"], result["agent_note"])
+        self.assertEqual(["search_chp_incidents"], [search["tool"] for search in result["searches"]])
+        self.assertEqual({"available", "count", "bad_count", "line", "cited_ids", "basis"}, set(result["history"]))
+        self.assertEqual((["SYN-HIS-001"], "synthetic"), (result["history"]["cited_ids"], result["history"]["basis"]))
+        self.assertEqual(0.4, result["effect"]["prior_before"])  # The history never moves the chance.
+
+    def test_history_figures_count_as_grounded(self):
+        found = history.report(load_scenario(variant="disruption"), "disruption")
+        cost = found["summary"]["by_action"][1]["actual"]["cost_usd"]
+        summary = f"CHP logged a big rig blocking lanes. Keeping the route averaged ${cost:.2f} in the synthetic history."
+        result, _ = self.run_agent([tool_reply("search_chp_incidents", {}), tool_reply("search_decision_history", {}),
+                                    self.report(summary=summary)])
+        self.assertEqual("llm", result["agent"], result["agent_note"])
+        triage.clear_cache()
+        result, _ = self.run_agent([tool_reply("search_chp_incidents", {}), self.report(summary=summary)])
+        self.assertIn("ungrounded", result["agent_note"])  # Without the history search the figure is not given.
+
+    def test_bad_history_ids_fall_back_to_rules(self):
+        cases = {
+            "invented": [tool_reply("search_chp_incidents", {}), tool_reply("search_decision_history", {}),
+                         self.report(history_ids=["SYN-HIS-999"])],
+            "not searched": [tool_reply("search_chp_incidents", {}), self.report(history_ids=["SYN-HIS-001"])],
+            "not a list": [tool_reply("search_chp_incidents", {}), self.report(history_ids="SYN-HIS-001")],
+        }
+        for label, replies in cases.items():
+            with self.subTest(label):
+                triage.clear_cache()
+                result, _ = self.run_agent(replies)
+                self.assertEqual("rules", result["agent"])
+                self.assertEqual([], result["history"]["cited_ids"])
+        result, _ = self.run_agent([tool_reply("search_decision_history", {}), self.report()])
+        self.assertIn("without searching", result["agent_note"])  # The history is not a feed.
+
+    def test_rules_report_the_deterministic_line(self):
+        with no_llm(), patch.object(web_feeds, "fetch", fake_fetch):
+            result = triage.triage(load_scenario(variant="flood"), "flood")
+        line = history.report(load_scenario(variant="flood"), "flood")["summary"]["line"]
+        self.assertEqual({"available": True, "count": 5, "bad_count": 3, "line": line, "cited_ids": [],
+                          "basis": "synthetic"}, result["history"])
+
+    def test_a_history_failure_does_not_break_the_web_check(self):
+        with no_llm(), patch.object(web_feeds, "fetch", fake_fetch), \
+                patch.object(history, "report", side_effect=RuntimeError("disk")):
+            result = triage.triage(load_scenario(variant="disruption"), "disruption")
+        self.assertTrue(result["available"])
+        self.assertEqual("corroborates", result["finding"])
+        self.assertFalse(result["history"]["available"])
 
 
 class EndpointTests(TriageTestCase):
@@ -265,12 +336,11 @@ class EndpointTests(TriageTestCase):
             return error.code
 
     def test_triage_endpoint(self):
-        with no_llm():
-            body = self.get("/api/triage?scenario=disruption&mode=demo")
-            self.assertEqual(("demo", "corroborates"), (body["mode"], body["finding"]))
-            self.assertFalse(self.get("/api/triage?scenario=normal&mode=demo")["available"])
-        self.assertEqual(400, self.status_of("/api/triage?scenario=disruption&mode=psychic"))
-        self.assertEqual(404, self.status_of("/api/triage?scenario=nope&mode=demo"))
+        with no_llm(), patch.object(web_feeds, "fetch", fake_fetch):
+            body = self.get("/api/triage?scenario=disruption")
+            self.assertEqual(("rules", "corroborates"), (body["agent"], body["finding"]))
+            self.assertFalse(self.get("/api/triage?scenario=normal")["available"])
+        self.assertEqual(404, self.status_of("/api/triage?scenario=nope"))
 
     def test_web_parameter_moves_the_prior(self):
         body = self.get("/api/analysis?scenario=disruption&web=corroborates")

@@ -14,7 +14,7 @@ import json
 import re
 from pathlib import Path
 
-from backend import llm
+from backend import history, llm
 from backend.decision_engine import information_value, rank_actions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -173,6 +173,7 @@ def decision_facts(scenario, analysis):
             {"label": item["label"], "value": item["value"], "unit": item["unit"], "basis": item["basis"]}
             for item in analysis.get("indicators", [])
         ],
+        "similar_past_decisions": history.facts_block(scenario),
     }
 
 
@@ -363,8 +364,9 @@ BRIEF_SYSTEM = (
     "You write a short brief for a port dispatcher under time pressure. Use plain words and short sentences. "
     "The user message is a JSON object of facts from the PigeonOps decision engine. Use only figures that "
     "appear verbatim in those facts and do no arithmetic. Recommend only the option the facts rank first "
-    "(rank 1), and set inspect_first to the facts' inspection.recommended value. Make clear it is advice and "
-    "the dispatcher decides. Reply by calling write_brief."
+    "(rank 1), and set inspect_first to the facts' inspection.recommended value. similar_past_decisions is "
+    "synthetic history; if you mention it, say so. Make clear it is advice and the dispatcher decides. "
+    "Reply by calling write_brief."
 )
 BRIEF_FIELDS = ("headline", "why", "what_would_change_it", "who_is_affected")
 
@@ -413,8 +415,9 @@ def decision_brief(scenario, analysis, chat_fn=None):
 ASK_SYSTEM = (
     "You answer a port dispatcher's questions about a delivery decision. Answer only from the results of "
     "the tools, which call the PigeonOps decision engine. Start with get_decision_summary if you need the "
-    "situation. If the tools cannot answer the question, say so. Use at most four sentences. Do no "
-    "arithmetic beyond what the tools return. Your answer is advice; the dispatcher decides."
+    "situation. past_decisions returns synthetic past cases; say so if you cite them. If the tools cannot "
+    "answer the question, say so. Use at most four sentences. Do no arithmetic beyond what the tools return. "
+    "Your answer is advice; the dispatcher decides."
 )
 PROBABILITY = {"type": "number", "minimum": 0, "maximum": 1,
                "description": "Chance the road is blocked, from 0 to 1 (0.6 means 60%)."}
@@ -426,6 +429,7 @@ ASK_TOOLS = [
           {"blocked_probability": PROBABILITY}),
     _tool("shipment_outcomes", "Per-shipment arrival, lateness and appointment for one response and road state, acting now.",
           {"action_id": {"type": "string"}, "road_state": {"type": "string", "enum": list(ROAD_STATES)}}),
+    _tool("past_decisions", "Synthetic past decisions on similar reports: estimate, result and lesson for each.", {}),
 ]
 
 
@@ -471,6 +475,8 @@ def run_engine_tool(name, arguments, scenario, analysis):
                     "lateness_min", "constraint_breaches", "basis")
             return {"action": action["label"], "road_state": road, "timing": "acting now, without an inspection wait",
                     "shipments": [{key: row.get(key) for key in keys} for row in rows]}
+        if name == "past_decisions":
+            return history.tool_result(history.report(scenario, scenario.get("id")))
         return {"error": f"unknown tool {name}"}
     except (ValueError, KeyError, TypeError) as error:
         return {"error": str(error)}

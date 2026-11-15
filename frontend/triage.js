@@ -5,15 +5,12 @@
 // Feed text and agent text come from outside, so they are always set with textContent.
 
 let applied = null; // The finding the dispatcher applied, or null.
-let appliedMode = null; // The feed ("live" or "demo") the applied finding came from.
 let token = 0;
-let mode = "live";
-const results = new Map(); // One run per incident and feed while the page is open; cleared by clearTriage.
+const results = new Map(); // One run per incident while the page is open; cleared by clearTriage.
 
 export const appliedWeb = () => applied;
 export const setAppliedWeb = (finding) => {
   applied = finding;
-  if (!finding) appliedMode = null;
 };
 
 // Adds the applied finding to a URLSearchParams or a request body object.
@@ -56,27 +53,9 @@ export function clearTriage(container) {
   container.replaceChildren();
 }
 
-function modeSwitch(container, scenarioId, options) {
-  const box = el("div", "web-mode");
-  box.setAttribute("role", "group");
-  box.setAttribute("aria-label", "Feed to search");
-  [["live", "Live feeds"], ["demo", "Demo feed"]].forEach(([value, label]) => {
-    const button = el("button", "btn small", label);
-    button.type = "button";
-    button.setAttribute("aria-pressed", String(value === mode));
-    button.addEventListener("click", () => {
-      if (value === mode) return;
-      mode = value;
-      renderTriage(container, scenarioId, options);
-    });
-    box.append(button);
-  });
-  return box;
-}
-
-function header(container, scenarioId, options) {
+function header() {
   const top = el("div", "web-head");
-  top.append(el("h2", null, "Web check"), modeSwitch(container, scenarioId, options));
+  top.append(el("h2", null, "Web check"));
   return top;
 }
 
@@ -88,7 +67,7 @@ function evidenceList(result) {
   result.evidence.forEach((item) => {
     const row = el("li", item.cited ? "cited" : "");
     const meta = el("p", "web-meta");
-    meta.append(el("span", `basis ${item.basis === "live" ? "live" : "synthetic"}`, item.basis === "live" ? "Live" : "Synthetic"));
+    meta.append(el("span", "basis live", "Live"));
     const where = item.distance_km === null || item.distance_km === undefined ? "covers the area"
       : item.distance_km < 0.1 ? "under 0.1 km away" : `${item.distance_km} km away`;
     meta.append(` ${item.source} · ${item.time || "time not given"} · ${where}${item.cited ? " · cited" : ""} · `, link(item.source_url, "source"));
@@ -116,25 +95,22 @@ function effectLine(result) {
 export async function renderTriage(container, scenarioId, options = {}) {
   const mine = ++token;
   const stale = () => mine !== token;
-  const feed = mode;
   container.hidden = false;
-  container.replaceChildren(header(container, scenarioId, options),
-    el("p", "note", `Searching nearby CHP, Caltrans and NWS reports${mode === "demo" ? " (synthetic)" : ""}…`));
-  const key = `${scenarioId}|${mode}`;
-  let result = results.get(key);
+  container.replaceChildren(header(), el("p", "note", "Searching nearby CHP, Caltrans and NWS reports…"));
+  let result = results.get(scenarioId);
   if (!result) {
     try {
-      const response = await fetch(`/api/triage?${new URLSearchParams({ scenario: scenarioId, mode })}`, { signal: AbortSignal.timeout(120000) });
+      const response = await fetch(`/api/triage?${new URLSearchParams({ scenario: scenarioId })}`, { signal: AbortSignal.timeout(120000) });
       result = await response.json();
       if (!response.ok) result = { available: false, reason: result.error };
     } catch {
       result = { available: false, reason: "no response" };
     }
-    if (result.available) results.set(key, result);
+    if (result.available) results.set(scenarioId, result);
   }
   if (stale()) return;
   if (!result.available) {
-    container.replaceChildren(header(container, scenarioId, options), el("p", "note", "Web check unavailable."));
+    container.replaceChildren(header(), el("p", "note", "Web check unavailable."));
     return;
   }
 
@@ -142,13 +118,15 @@ export async function renderTriage(container, scenarioId, options = {}) {
   const by = result.agent === "llm"
     ? el("span", "tag llm", `AI agent · ${result.confidence} confidence · unvalidated`)
     : el("span", "tag llm", "Keyword rule · no AI");
-  const source = result.mode === "live"
-    ? "Live reports; fictional scenario."
-    : `Synthetic demo reports.${result.fallback_reason ? " Live feeds unavailable." : ""}`;
-
-  const parts = [header(container, scenarioId, options), el("h3", null, headline[result.finding])];
+  const parts = [header(), el("h3", null, headline[result.finding])];
   if (result.finding === "nothing_found") parts.push(el("p", "note", "Missing reports are weak evidence."));
-  const isApplied = applied === result.finding && appliedMode === feed;
+  // Past decisions on similar reports, beside what the feeds say. A reference only (see history.js).
+  if (result.history?.available && result.history.line) {
+    const history = el("p", "web-history");
+    history.append(el("span", "basis", "History"), ` ${result.history.line}`);
+    parts.push(history);
+  }
+  const isApplied = applied === result.finding;
   if (isApplied) {
     parts.push(el("p", "web-effect applied", `Applied: road ${result.check.bad} chance ${pct(result.effect.prior_after)} estimated (was ${pct(result.effect.prior_before)} assumed).`));
   } else {
@@ -162,14 +140,13 @@ export async function renderTriage(container, scenarioId, options = {}) {
   use.addEventListener("click", async () => {
     use.disabled = true;
     error.hidden = true;
-    const previous = [applied, appliedMode];
+    const previous = applied;
     applied = isApplied ? null : result.finding;
-    appliedMode = applied ? feed : null;
     try {
       await options.onApply?.(applied, result);
     } catch (failure) {
       console.error(failure);
-      [applied, appliedMode] = previous;
+      applied = previous;
       use.disabled = false;
       error.textContent = isApplied ? "Could not stop using the finding. Try again." : "Could not apply the finding. Try again.";
       error.hidden = false;
@@ -182,7 +159,7 @@ export async function renderTriage(container, scenarioId, options = {}) {
   evidence.append(el("p", "web-summary", result.summary), by);
   if (result.agent_note) evidence.append(el("p", "fine-print", result.agent_note));
   parts.push(actions, evidence);
-  const notes = [source, `Report reliability: ${result.effect.likelihoods_basis}.`];
+  const notes = ["Live reports; fictional scenario.", `Report reliability: ${result.effect.likelihoods_basis}.`];
   const fine = el("p", "fine-print", notes.join(" "));
   if (result.agent_note) fine.title = result.agent_note;
   parts.push(fine);

@@ -15,6 +15,7 @@ The shared operating picture in `config/port_scenario.json` contains:
 - 5 illustrative corridors, including a current route, candidate detour, two fleet context routes, and a route for SYN-SHP-1077
 - A playback schedule for every truck, built from the shipment ETAs, appointments, and release holds, with road-following paths in `config/road_geometry.json`
 - 5 scenario variants: routine morning operations and four incident reports, each calling for a kind of drone check: an unverified crash, a corroborated crash, heavy traffic, and road damage from a burst water main
+- 16 synthetic past decisions on similar reports in `config/decision_history.json` (see "Decision history" below)
 - 3 dispatcher actions whose delay, cost, emissions, and constraint outcomes are computed from route data; see [docs/METHODS.md](docs/METHODS.md)
 - 1 simulated observation per incident, with an explicit accuracy and time assumption for each kind of check
 - Schools within 300 m of each route, from OpenStreetMap (`config/community_exposure.json`, rebuilt by `scripts/build_community_exposure.py`); the only non-synthetic values in the indicators
@@ -83,6 +84,14 @@ The normal scenario uses a 2% blockage prior, so inspection is not cost-effectiv
 
 The queue scenario places the released load outside Pier 400's gate on one outbound access road. Its synthetic 09:40 ETA leaves 35 minutes before the appointment; an assumed severe queue adds 30 minutes and no miles. This models an access-road delay, not terminal gate processing, which changing the road route would not bypass. The flood scenario places the hazard farther north on the connector approach. Aerial review is assumed only 65% accurate and cannot establish water depth or pavement integrity. Both modeled drone findings favor avoiding the flooded section. All locations, reports, release times and incident parameters are fictional; the footage illustrates other places.
 
+## Decision history
+
+`config/decision_history.json` holds 16 synthetic past decisions: 6 crash reports, 5 heavy-traffic reports and 5 flood reports, dated August to early November 2026. They are modelled on public patterns and are not real dispatch records. `scripts/build_decision_history.py` writes the file from hand-written cases. Each case names the report, the web finding, whether a drone flew and what it showed, the response chosen, any override and the road state that followed. The figures come from the decision engine for the named scenario variant, so they match the app. Five cases apply a stated deviation to the actual figures, such as a queue that cleared in 18 minutes instead of the assumed 30; `actual_note` says so. The share of cases with the road in the bad state is close to each variant's prior (crash 0.4 and 0.8, traffic 0.5, flood 0.6).
+
+Each case cites one to three `patterns`: short claims about real incidents, such as how long crashes take to clear. Each pattern names a public source and its URL (FHWA, CHP studies, PierPass, LADWP, NWS, CARB, DOE). The patterns shaped the cases; the cases themselves are invented.
+
+Decisions made in the app are saved to `outputs/decision-log.jsonl` (not committed) in the same shape, with `basis: "simulated"`: the estimate is the engine's, and the actual figures are the engine's outcome for the road state the playback showed. The history is a reference only and never changes the blockage chance. See docs/METHODS.md section 11.
+
 ## Decision model
 
 For each action and possible road state:
@@ -109,7 +118,7 @@ Lower loss is better. The score is decision-support logic, not a market price, i
 - Route lines are illustrative and must not be used for navigation. Playback paths use a car routing profile, not the California Truck Network.
 - Playback times are derived, not simulated traffic: SYN-TRK-07 arrives at the time the outcome model computes for the chosen option and road state; other trucks arrive at their scenario ETA, drive at up to 1.5× the network travel time, and otherwise wait at the destination. Load, unload, and transfer times (15, 20, and 10 min) are assumptions. Only SYN-TRK-07 and SYN-TRK-12 change with the dispatch option and road state.
 - Terminal turn time, traffic speed, and emissions are not live measurements.
-- The web check reads real public feeds (CHP incident log, Caltrans District 7 message signs, NWS alerts) about roads as they are now, while the incident is fictional. Its reliability table (`decision_model.web_triage`) is assumed, and the demo feed (`config/web_triage_fixtures.json`) is synthetic. See docs/METHODS.md section 9.
+- The web check reads real public feeds (CHP incident log, Caltrans District 7 message signs, NWS alerts) about roads as they are now, while the incident is fictional. Its reliability table (`decision_model.web_triage`) is assumed. If every feed is unreachable the check reports itself unavailable. See docs/METHODS.md section 9.
 - The accuracy for dispatcher-reviewed drone footage is assumed: 90% by default, 95% for heavy traffic and 85% for road damage. The CV suggestion shown with each clip comes from hand-set speed thresholds and is not validated. Automated CV alone is measured on 27 annotated aerial frames and shown separately; it is not yet worth an inspection (cv/RUN_RESULTS.md).
 - Driver hours are synthetic summaries and do not implement hours-of-service compliance.
 - Community exposure is described qualitatively; the demo does not yet calculate population-weighted pollution or noise exposure.
